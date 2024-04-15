@@ -7,7 +7,7 @@
  ![.....](https://img.shields.io/github/v/release/qine233/NoLine-Typecho-theme.svg?style=flat-square)
 #### 注意！本主题不提供壁纸，需自行在主题设置中配置链接
 #### 主题文件夹务必命名为Noline , 在release内可以看到近期更新日志
-#### 主题预览：https://www.idkzr.com/
+#### 主题预览：https://www.idkzr.com/   ，本主题建议typecho版本不高于1.2，在使用1.3的时候部分功能未适配
 #
 #### 关于使用名称为 时光的 自定义页面，需要在后台中关闭评论反垃圾！！
 ##### 并且开启如下评论设置：
