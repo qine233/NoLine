@@ -1,4 +1,4 @@
-# TYPECHO主题-NoLine   --Demo
+# TYPECHO主题-NoLine
 ###  💬优化阅读，爱上写作  |  
 ###### 本项目为Noline的衍生项目（原项目暂不更新），可以解释为另外发版 不用下载realese，建议直接克隆，本项目随机更新
  ![.....](https://img.shields.io/github/downloads/qine233/NoLineLite/total.svg?style=flat-square)
