@@ -1,11 +1,11 @@
-ny/* Make clicks pass-through */
+
 #nprogress {
     pointer-events: none;
 }
 
 #nprogress .bar {
     /*background: #29d;*/
-    background: linear-gradient(64deg, #71c2f1, #c75050, #e73c7ee7);
+    background: linear-gradient(64deg, #71c2f1, #2ec4b8, #37e9b3e7);
     position: fixed;
     z-index: 1031;
     top: 0;
@@ -22,7 +22,7 @@ ny/* Make clicks pass-through */
     right: 0px;
     width: 100px;
     height: 100%;
-    box-shadow: 0 0 10px #9063fd, 0 0 5px #dd229c;
+    box-shadow: 0 0 10px #082b58, 0 0 5px #2f0ee9;
     opacity: 1.0;
 
     -webkit-transform: rotate(3deg) translate(0px, -4px);
@@ -45,8 +45,8 @@ ny/* Make clicks pass-through */
     box-sizing: border-box;
 
     border: solid 2px transparent;
-    border-top-color: #9011f6;
-    border-left-color: #cf29f1;
+    border-top-color: #2a70cc;
+    border-left-color: #2997f1;
     border-radius: 50%;
 
     -webkit-animation: nprogress-spinner 400ms linear infinite;
@@ -65,7 +65,7 @@ ny/* Make clicks pass-through */
 
 @-webkit-keyframes nprogress-spinner {
     0%   { -webkit-transform: rotate(0deg); }
-    100% { -webkit-transform: rotate(360deg); }
+    100% { -webkit-transform: rotate(260deg); }
 }
 @keyframes nprogress-spinner {
     0%   { transform: rotate(0deg); }

@@ -1355,22 +1355,35 @@ hr {
     border-style: none;
     background-color: rgb(248, 243, 233);
 }
-
+.post-tags a{
+    background: whitesmoke;
+    font-size: 12px !important;
+    padding: 3px;
+    border-radius: 0.5rem !important;
+    border-bottom: none !important;
+    color: #354b60 !important;
+}
+.post-tags{
+    border-top: 2px dashed #aaacb6;
+    padding-top: 10px;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+}
 .talk-content-talk .text {
     padding: 10px 10px 10px 10px; */
 font-size: 1rem;
 
     height: 10rem;
     font-family: 'MiSans','Noto Serif SC', serif;
-    box-shadow: 0 5px 8px rgb(29 35 54 / 21%), 0 0 2px rgb(0 0 0 / 0%);
-
 
     border-width: 0.5px;
-    outline: 0;
+    outline: 1px solid #354b6042;
     width: 100%;
     border-color: #b0b0b000;
     border-radius: 0.3rem;
-    background: #f1f1f1;
+    background: #f5f5f5ba;
     resize: none;
     padding: 1rem;
 
@@ -1437,11 +1450,11 @@ font-size: 1rem;
     display: block;
     width: 100%;
     margin-top: -4.5rem;
-    border: 3px solid #ebf0ff;
-    box-shadow: 0 5px 8px rgb(29 35 54 / 21%), 0 0 2px rgb(0 0 0 / 0%);
     margin-bottom: 20px;
     color: #464750;
     font-size: 1.28rem;
+    border-radius: 1rem;
+    outline: 1px solid #354b6042;
 }
 .talk-list li {
     list-style: none;
