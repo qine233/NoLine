@@ -2,7 +2,7 @@
 <footer class="footer">
 
 <h3 class="text-ellipsis">&copy;2024 Copyright&nbsp;&nbsp;<a href="<?php $this->options->siteUrl(); ?>"><?php $this->options->title(); ?></a><?php $this->options->logoFooter(); ?></h3>
-    <h4 class="text-ellipsis_copy">Powered by Typecho | Theme by <a href="https://github.com/qine233/NoLine-Typecho-theme">Noline-Demo-V1.0</a></h4>
+    <h4 class="text-ellipsis_copy">Powered by Typecho | Theme by <a href="https://github.com/qine233/NoLine">Noline-V3.0</a></h4>
 </footer>
 <script>
 
