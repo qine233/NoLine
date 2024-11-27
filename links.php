@@ -13,7 +13,7 @@
 <div class="content-all"><?php $this->need('sidebar.php'); ?>
 
 
-
+<div id="pjax-container">
         <div class="typecho-user-text">
              <div class="content-list-post border-wid">
                  <!-- 下面text部分 -->
@@ -62,9 +62,10 @@
                      var image = new Viewer(document.getElementById('write'),{
                                          url: 'src'
                                      });
-                     </script>
-
+                     </script></div></div>
+ <?php $this->need('sidebar-right.php'); ?>
            </div>
+          
 </div>
 </div>
 </div></div>

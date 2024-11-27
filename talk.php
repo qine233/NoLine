@@ -11,10 +11,11 @@
 <?php $this->need('public/header.php'); ?>
 
 <div class="content-all content-all-post">
-    <?php $this->need('sidebar.php'); ?>
-    <div class="typecho-user-text">
+    <?php $this->need('sidebar.php'); ?> 
+    <div id="pjax-container">
+    <!-- <div class="typecho-user-text"> -->
         <!-- <div class="content-list"> -->
-
+       
 
         <div class="content-list-post border-wid">
 
@@ -81,13 +82,13 @@
                 <!-- <?php $comments->pageNav('« 前一页', '后一页 »'); ?>  -->
             </div>
         </div>
-
-
+        <?php $this->need('sidebar-right.php'); ?>
     </div>
 
 </div>
 
-</div></div>
+</div>
+</div>
 
 <?php $this->need('public/footer.php'); ?>
 </div>

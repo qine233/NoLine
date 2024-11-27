@@ -1,12 +1,18 @@
 <?php
 /**
- * “ 一款简单的主题，请设置完再看最后效果并修改，主题文件夹务必命名为Noline ”
- * @package NOLINE_2.0
+ * “ 一款简单的主题，主题文件夹务必命名为Noline,注意本主题仅适用于typecho 1.2版本系列，未针对1.3进行语法上的适配 ”
+ * @package NOLINELITE_1.0—Demo
  * @author QINE
+ * @version 1.0Demo
  * @link https://www.idkzr.com/
  */
 ?>
 <?php $this->need('public/header.php'); ?>
+<?php $this->need('sidebar.php'); ?>
+
+<div class="container">
+</div>
+<div id="pjax-container">
 
 <script type="text/javascript">
     //点击加载更多
@@ -42,9 +48,9 @@
         });
     });
 </script>
-<div class="content-all center-block">
 
-    <?php $this->need('sidebar.php'); ?>
+
+
     <div class="content">
 
         <div class="content-list">
@@ -55,7 +61,7 @@
                     background-position-x: center;
                     background-position-y: center;
                     background-size: cover;">
-                    <?php
+                    <!-- <?php
                     preg_match_all("/\<img.*?src\=(\'|\")(.*?)(\'|\")[^>]*>/i", $this->content, $matches);
                     $imgCount = count($matches[0]);
                     if ($imgCount >= 1) {
@@ -65,10 +71,8 @@
                     };
                     $CCimg = "<p class='post-images'><a href='{$this->permalink}' title='{$this->title}'><img src='{$img}' alt='{$this->title}'></a></p>";
                     echo $CCimg;
-                    ?>
-
-                </div>
-                <h2 class="entry_title"><a href="<?php $this->permalink() ?>"><?php $this->title() ?></a></h2>
+                    ?> -->
+                 <h2 class="entry_title"><a href="<?php $this->permalink() ?>"><?php $this->title() ?></a></h2>
 
 
                 <div class="entry_text">
@@ -79,6 +83,8 @@
                     </p>
                 </div>
                 <span class="post_index-more"> <?php $this->date('Y年n月d日'); ?></span>
+                </div>
+              
 
                 </div>
             <?php endwhile; ?>
@@ -88,8 +94,8 @@
     <div class="nextWide">
         <?php $this->pageLink('点击查看更多','next'); ?>
     </div></div>
-<!--   <?php //$this->need('sidebar-right.php'); ?> -->
-</div>
+  <?php $this->need('sidebar-right.php'); ?>
+</div></div>
 </div><?php $this->need('public/footer.php'); ?>
 </div>
 
@@ -97,5 +103,5 @@
 
 </div>
 </div>
-
+</div></div>
 </body>

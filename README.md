@@ -1,19 +1,9 @@
-### 可以无缝从本主题更换到另外一个项目[Nolinelite](https://github.com/qine233/NoLineLite)上
-# 
-# TYPECHO主题-NoLine     
-###  💬优化阅读，爱上写作
-###### 可以点一个项目的star，鼓励一下开发者哦！
-![...](https://cloud.idkzr.com/f/YWh1/mb.jpg)
- ![.....](https://img.shields.io/github/downloads/qine233/NoLine-Typecho-theme/total.svg?style=flat-square)
- ![.....](https://img.shields.io/github/v/release/qine233/NoLine-Typecho-theme.svg?style=flat-square)
-#### 注意！本主题不提供壁纸，需自行在主题设置中配置链接
-#### 主题文件夹务必命名为Noline , 在release内可以看到近期更新日志
-#### 本主题建议typecho版本不高于1.2，在使用1.3的时候部分功能未适配
-#
-#### 关于使用名称为 时光的 自定义页面，需要在后台中关闭评论反垃圾！！
-##### 并且开启如下评论设置：
-      1.  启用分页, 并且每页显示 8篇评论, 在列出时将 第一页作为默认显示
-      2.  将 较新的的评论显示在前面
+# TYPECHO主题-NoLine   --Demo
+###  💬优化阅读，爱上写作  |  
+###### 本项目为Noline的衍生项目（原项目暂不更新），可以解释为另外发版 不用下载realese，建议直接克隆，本项目随机更新
+ ![.....](https://img.shields.io/github/downloads/qine233/NoLineLite/total.svg?style=flat-square)
+  ![.....](https://github.com/qine233/NoLineLite/blob/main/screenshot.png)
+#### 主题文件夹务必命名为Noline , 目前支持typecho1.2，暂时无1.3的适配计划
 ##### 目前这款主题用到了bootstrap框架，highlights代码高亮等
       1. 响应式布局，移动端舒适体验
       2. 主题足够轻量
@@ -25,7 +15,14 @@
       8. 使用谷歌开发者工具评测，seo分数高
       9. 自定义背景
       10. more待发现...
-
+##### DEMO版本随谈：
+      1. 随缘更新，如果用的人多，会加快更新
+      2. 虽然引用进了bootsrtap框架，但是用到的地方极少
+      3. 大部分页面纯手写css，没有对项目目录进行规范
+##### 并且开启如下评论设置：
+      1. 启用分页, 并且每页显示 8篇评论, 在列出时将 第一页作为默认显示
+      2. 将 较新的的评论显示在前面
+      3. 关于使用名称为 时光的 自定义页面，需要在后台中关闭评论反垃圾！！
 ##### 例外，关于友链的添加方式，友链的代码是内嵌进了单页模块，当建立了友链单页时，需要在编辑内填写如下字段完成添加
 ```
 <li>网站名称</li>
@@ -34,10 +31,5 @@
 <li>网站简介</li>
 ```
 ##### 如上的添加方式重复即可添加更多友链
-# 
-#### 最后！ 作者有话说：
-##### 这个主题起始只是为了体验自己开发自己用的乐趣,应该不会再有什么更新了，除非真的有时间，因为要参与实习啦
-#####  然后就是再说一下，主题可以随意二创，注明本源项目即可，如果做了很多大改动（结构上的），可以不用注明，因为本项目代码结构写得真的很答辩
-#####  sidebar-right.php 该文件已经弃用，可以随意删除
-# 
-###### 本项目使用JetBrains旗下软件编写
+##### 如果你愿意请我喝一杯可乐，我会感到非常荣幸
+![](https://github.com/qine233/NoLineLite/blob/main/pay.png)

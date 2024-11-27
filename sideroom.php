@@ -1,13 +1,13 @@
 
 <div class="sideroom" id="sideroom">
-<div class="bg_color-sideroom" style="background: url(<?php $this->options->logobgcolor(); ?>);
+<div class="bg_color-sideroom" style="background: linear-gradient(to bottom, rgb(255 255 255 / 0%) 0%, rgb(255 255 255 / 80%) 100%, #fff, 18%, #fff), url(https://cloud.idkzr.com/f/RLiX/IMG_0006.JPG) no-repeat center;
+
         background-position-x: center;
         background-position-y: center;
         background-size: cover;
         object-fit: cover;">
 <img class="alaver-img" src="<?php $this->options->logoCss(); ?>">
- <h1 class="name"><?php $this->options->logoName(); ?></h1>
- <h1 class="name-talk"><?php $this->options->logobg(); ?></h1>
+
 </div>
 
 
@@ -38,4 +38,3 @@
                              </div></div></div></div>
                 <div class="sideroom-blur" id="sideroom-blur">
                 </div>
-</div>

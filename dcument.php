@@ -8,22 +8,17 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
 ?>
 <?php $this->need('public/header.php'); ?>
 <div class="content-all"><?php $this->need('sidebar.php'); ?>
-
-
-
+<div id="pjax-container">
         <div class="typecho-user-text">
              <div class="content-list-post border-wid">
                  <!-- 下面text部分 -->
 		<div class="typecho-text text-tream " >
-
-
         </div>
-                       <h1 class="post-title" itemprop="name headline">「&nbsp&nbsp<?php $this->title() ?>&nbsp&nbsp」</h1>
+        <h1 class="post-title" itemprop="name headline">「&nbsp&nbsp<?php $this->title() ?>&nbsp&nbsp」</h1>
        <div class="content-text-2 "  id="write">
 
            <article>
                <?php
-
                     $this->widget('Widget_Contents_Post_Recent', 'pageSize=10000')->to($archives);
                $year = 0;
                $mon = 0;
@@ -54,7 +49,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
     </div>
 
 
-
+    <?php $this->need('sidebar-right.php'); ?>
            </div>
 </div>
 </div>

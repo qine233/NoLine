@@ -1,6 +1,6 @@
 @charset "UTF-8";
 #write {
-  color: #595959;
+  color: #354b60;
   font-size: 14px;
   line-height: 1.8em;
   word-break: break-all;
@@ -132,7 +132,8 @@
   box-shadow: 2px 4px 7px #999;
 }
 #write img {
-  width: 100%;
+  width: 78%;
+  max-height: 32rem;
   display: block;
   margin: 10px auto;
   object-fit: contain;

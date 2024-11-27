@@ -4,71 +4,11 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
 /* 获取模板版本号 */
 function NolineVersion()
 {
-    return "2.0";
+    return "LITE v1.0";//后续完善版本号管理方法
 }
 function themeConfig($logo)
 {
-    $db = Typecho_Db::get();
-    $sjdq = $db->fetchRow($db->select()->from('table.options')->where('name = ?', 'theme:qine'));
-    $ysj = $sjdq['value'];
-    if (isset($_POST['type'])) {
-        if ($_POST["type"] == "备份模板数据") {
-            if ($db->fetchRow($db->select()->from('table.options')->where('name = ?', 'theme:qine'))) {
-                $update = $db->update('table.options')->rows(array('value' => $ysj))->where('name = ?', 'theme:qine');
-                $updateRows = $db->query($update);
-                echo '<div class="tongzhi">备份已更新，请等待自动刷新！如果等不到请点击';
-                ?>
-                <a href="<?php Helper::options()->adminUrl('options-theme.php'); ?>">这里</a></div>
-                <script
-                    language="JavaScript">window.setTimeout("location=\'<?php Helper::options()->adminUrl('options-theme.php'); ?>\'", 2500);</script>
-                <?php
-            } else {
-                if ($ysj) {
-                    $insert = $db->insert('table.options')
-                        ->rows(array('name' => 'theme:qine', 'user' => '0', 'value' => $ysj));
-                    $insertId = $db->query($insert);
-                    echo '<div class="tongzhi">备份完成，请等待自动刷新！如果等不到请点击';
-                    ?>
-                    <a href="<?php Helper::options()->adminUrl('options-theme.php'); ?>">这里</a></div>
-                    <script
-                        language="JavaScript">window.setTimeout("location=\'<?php Helper::options()->adminUrl('options-theme.php'); ?>\'", 2500);</script>
-                    <?php
-                }
-            }
-        }
-        if ($_POST["type"] == "还原模板数据") {
-            if ($db->fetchRow($db->select()->from('table.options')->where('name = ?', 'theme:qine'))) {
-                $sjdub = $db->fetchRow($db->select()->from('table.options')->where('name = ?', 'theme:qine'));
-                $bsj = $sjdub['value'];
-                $update = $db->update('table.options')->rows(array('value' => $bsj))->where('name = ?', 'theme:qine');
-                $updateRows = $db->query($update);
-                echo '<div class="tongzhi">检测到模板备份数据，恢复完成，请等待自动刷新！如果等不到请点击';
-                ?>
-                <a href="<?php Helper::options()->adminUrl('options-theme.php'); ?>">这里</a></div>
-                <script
-                    language="JavaScript">window.setTimeout("location=\'<?php Helper::options()->adminUrl('options-theme.php'); ?>\'", 2000);</script>
-                <?php
-            } else {
-                echo '<div class="tongzhi">没有模板备份数据，恢复不了哦！</div>';
-            }
-        }
-        if ($_POST["type"] == "删除备份数据") {
-            if ($db->fetchRow($db->select()->from('table.options')->where('name = ?', 'theme:qine'))) {
-                $delete = $db->delete('table.options')->where('name = ?', 'theme:qine');
-                $deletedRows = $db->query($delete);
-                echo '<div class="tongzhi">删除成功，请等待自动刷新，如果等不到请点击';
-                ?>
-                <a href="<?php Helper::options()->adminUrl('options-theme.php'); ?>">这里</a></div>
-                <script
-                    language="JavaScript">window.setTimeout("location=\'<?php Helper::options()->adminUrl('options-theme.php'); ?>\'", 2500);</script>
-                <?php
-            } else {
-                echo '<div class="tongzhi">不用删了！备份不存在！！！</div>';
-            }
-        }
-    }
-    echo '<form class="protected" action="?qine" method="post">
-<input type="submit" name="type" class="btn btn-s" value="备份模板数据" />&nbsp;&nbsp;<input type="submit" name="type" class="btn btn-s" value="还原模板数据" />&nbsp;&nbsp;<input type="submit" name="type" class="btn btn-s" value="删除备份数据" /></form>';
+
 
     $logoCss = new Typecho_Widget_Helper_Form_Element_Text('logoCss', NULL, NULL, _t('站点头像地址'), _t('在这里填入一个图片 URL 地址, 以修改头像'));
     $logo->addInput($logoCss);
@@ -83,12 +23,22 @@ function themeConfig($logo)
     $logobgcolor = new Typecho_Widget_Helper_Form_Element_Text('logobgcolor', NULL, NULL, _t('资料卡头图'), _t('在这里填入你的头图链接，建议使用外链'));
     $logo->addInput($logobgcolor);
 
-    $logocontacta = new Typecho_Widget_Helper_Form_Element_Text('logocontacta', NULL, NULL, _t('关注按钮对应链接'), _t('在这里填入你的github链接或其他社交平台链接'));
-    $logo->addInput($logocontacta);
+    // $logocontacta = new Typecho_Widget_Helper_Form_Element_Text('logocontacta', NULL, NULL, _t('关注按钮对应链接'), _t('在这里填入你的github链接或其他社交平台链接'));
+    // $logo->addInput($logocontacta);
 
-    $logocontactb = new Typecho_Widget_Helper_Form_Element_Text('logocontactb', NULL, _t('https://cdn.jsdelivr.net/gh/qine233/jsdever-ty/bg.jpg'), _t('主页半屏背景图'), _t('在这里填入你的背景图链接，建议引用外部图床节省网站所在服务器带宽'));
-    $logo->addInput($logocontactb);
+    // $logocontactb = new Typecho_Widget_Helper_Form_Element_Text('logocontactb', NULL, _t('https://cdn.jsdelivr.net/gh/qine233/jsdever-ty/bg.jpg'), _t('主页半屏背景图'), _t('在这里填入你的背景图链接，建议引用外部图床节省网站所在服务器带宽'));
+    // $logo->addInput($logocontactb);
 
+    $gtihubname = new Typecho_Widget_Helper_Form_Element_Text('gtihubname', NULL, _t('qine233'), _t('GitHubID名'), _t('在这里填入你的ID'));
+    $logo->addInput($gtihubname);
+    $gtihubsite = new Typecho_Widget_Helper_Form_Element_Text('gtihubsite', NULL, _t('https://github.com/qine233/NoLineLite'), _t('GitHub链接'), _t('在这里填入你的GitHub链接'));
+    $logo->addInput($gtihubsite);
+
+    $BliBliname = new Typecho_Widget_Helper_Form_Element_Text('BliBliname', NULL, _t('BliBli'), _t('Blibli名'), _t('Blibli名'));
+    $logo->addInput($BliBliname);
+
+    $BliBlisite = new Typecho_Widget_Helper_Form_Element_Text('BliBlisite', NULL, NULL, _t('BliBli链接'), _t('在这里填入你的BILIBILI链接等'));
+    $logo->addInput($BliBlisite);
 
     $logoFooter = new Typecho_Widget_Helper_Form_Element_Textarea('logoFooter', NULL, NULL, _t('站点底部版权填写区域，后续会考虑将footer区域拉高，增加更多可自定义内容'), _t('在这里填入你的站点底部代码，例如备案链接等'));
     $logo->addInput($logoFooter);

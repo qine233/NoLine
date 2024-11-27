@@ -1,47 +1,32 @@
-  <div class="content-last">
-  <div class="contact border-wid">
-      <h2 class="name-talk"><?php $this->options->logobg(); ?></h2>
-    <div class="bg_color" style="background: url(<?php $this->options->logobgcolor(); ?>);
-            background-position-x: center;
-            background-position-y: center;
-            background-size: cover;
-            object-fit: cover;">
-  <!-- <h1 class="contact-h1">#社交频道</h1> -->
-  <img class="logo" src="<?php $this->options->logoCss(); ?>">
-            <h1 class="name"><?php $this->options->logoName(); ?></h1></div>
- <button class="a-left"><a target="_blank" href="<?php $this->options->logocontacta(); ?>">关注</a></button>
-             <div class="sibar-data-a">
+<div class="background-img" id="background-img" >
 
-            <?php Typecho_Widget::widget('Widget_Stat')->to($stat); ?>
-            <ul class="sibar-data-a-ul">
-            <li><?php $stat->publishedPostsNum() ?></li><li>文章数</li>
-            </ul class="sibar-data-a-ul">
-            <ul class="sibar-data-a-ul"><li><?php $stat->categoriesNum() ?></li><li>分类数</li></ul>
-            <ul class="sibar-data-a-ul"><li><?php $stat->publishedCommentsNum() ?></li><li>评论数</li></ul>
-            </div>
+<div id="NewPjax-container">
 
 
-</div>
-<div class="sibar-all">
-<div class="sibar-data border-wid" >
-<div class="mac"><span>classification</span>
-    <i class="bg-primary"></i></div>
-<div class="sibar-data-abc" >
+<!--    <div class="indexTitle">-->
+<!--        --><?php //if($this->is('index')): ?>
+<!--            <div class="Indexpost-title" itemprop="name headline">--><?php //$this->options->title(); ?><!--</div>-->
+<!--        --><?php //else: ?>
+<!--            <div class="Indexpost-title" itemprop="name headline">--><?php //$this->title(); ?><!--</div>-->
+<!--        --><?php //endif; ?>
+<!--    </div>-->
+    <?php $this->need('sideroom.php'); ?>
 
 
-<div class="sibar-data-b">
- <!-- <ul style="display: inline;">
+<header class="header " id="backgroundHeader" >
+    <div class="header-wide">
+        <div id="box_hover" ><svg xmlns="http://www.w3.org/2000/svg" width="16px" height="16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></div>
 
+  
 
+        <ul  id="nav_menu">
 
-</ul> -->
-<div class="archives"> <ul>
-    <?php $this->widget('Widget_Metas_Category_List')
-               ->parse('<li><a href="{permalink}">{name}</a> <span id="archives_span">{count}</span></li>'); ?>
-</ul>  </div>
-
-</div>
-</div>
-</div>
-</div>
-  </div>
+        <li><a id="nevColorTWO" style="color: inherit" href="<?php $this->options->siteUrl(); ?>">主页</a></li>
+            <?php $this->widget('Widget_Contents_Page_List')
+                ->parse('<li><a id="nevColorTWO" style="color: inherit" href="{permalink}">{title}</a></li>'); ?>
+        </ul> 
+        <div class="percentagewide">
+        <div id="percentage"></div></div>
+      </div>
+       
+</header>

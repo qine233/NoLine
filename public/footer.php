@@ -1,9 +1,8 @@
 
 <footer class="footer">
 
-<h3 class="text-ellipsis">&copy;2023 Copyright&nbsp;&nbsp;<a href="<?php $this->options->siteUrl(); ?>"><?php $this->options->title(); ?></a><?php $this->options->logoFooter(); ?></h3>
-    <h4 class="text-ellipsis_copy">Powered by Typecho | Theme by <a href="https://github.com/qine233/NoLine-Typecho-theme">Noline</a></h4>
-    <div class="nav_top">  <div id="percentage"></div> </div>
+<h3 class="text-ellipsis">&copy;2024 Copyright&nbsp;&nbsp;<a href="<?php $this->options->siteUrl(); ?>"><?php $this->options->title(); ?></a><?php $this->options->logoFooter(); ?></h3>
+    <h4 class="text-ellipsis_copy">Powered by Typecho | Theme by <a href="https://github.com/qine233/NoLineLite">Noline-Demo-V1.0</a></h4>
 </footer>
 <script>
 
