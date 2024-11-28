@@ -156,6 +156,7 @@ a:hover {
 }
 #nav_menu a{
     font-size: 14.8px;
+    text-shadow: 0 0.1875rem 0.3125rem rgb(0 0 0 / 30%);
 }
 #pjax-container{
     display: flex;
@@ -616,6 +617,7 @@ footer .nav_top{
     font-size: 2.7rem;
     color: rgb(255, 255, 255);
     text-decoration: none;
+    text-shadow: 0 0.1875rem 0.3125rem rgb(0 0 0 / 30%);
     font-weight: 600;
     text-align: center;
     margin-top: 5rem;
@@ -785,6 +787,7 @@ footer .nav_top{
     color:rgb(53, 75, 96);
     text-decoration: none;
     font-weight: 400;
+    text-shadow: 0 0.1875rem 0.3125rem rgb(0 0 0 / 30%);
 }
 
 .content .entry_title {
@@ -1050,6 +1053,7 @@ code {
 pre {
     background-color: #484a5c !important;
     border: none !important;
+    text-shadow: 0 0.1875rem 0.3125rem rgb(0 0 0 / 30%);
 }
 
 pre code {

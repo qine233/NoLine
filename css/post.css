@@ -640,17 +640,16 @@ pre, article pre {
     width: 100%;
     padding: 0;
     border-radius: 3px;
-    background-color: #fff;
-    -webkit-box-shadow:  0 4px 10px rgb(0 0 0 / 9%), 0 0 1px rgb(0 0 0 / 11%);
-    box-shadow:0 4px 10px rgb(0 0 0 / 9%), 0 0 1px rgb(0 0 0 / 11%);
+    background: #e6ebf163;
     border-radius: 0.5rem;
+    outline: 1px solid #354b6042;
 }
 
 .post-list-item-container .item-label {
     position: relative;
     height: 130px;
     padding: 25px 20px 40px;
-    background-color: #fff;
+
 }
 
 .post-list-item-container .item-label.bg-purple .item-title a {
@@ -671,7 +670,7 @@ pre, article pre {
     float: right;
     width: 45px;
     height: 45px;
-    border: 1px solid #eaeaea;
+    /* border: 1px solid #eaeaea; */
     border-radius: 0.5rem;
 }
 
@@ -698,7 +697,7 @@ pre, article pre {
 }
 
 .bg-white {
-    background-color: #fff !important;
+    /* background-color: #fff !important; */
 }
 
 #flinksH {
