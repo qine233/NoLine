@@ -4,7 +4,7 @@
  ![.....](https://img.shields.io/github/downloads/qine233/NoLine-Typecho-theme/total.svg?style=flat-square)
  ![.....](https://img.shields.io/github/v/release/qine233/NoLine-Typecho-theme.svg?style=flat-square)
   ![.....](https://github.com/qine233/NoLineLite/blob/main/screenshot.png)
-#### 主题文件夹务必命名为Noline , 目前支持typecho1.2，暂时无1.3的适配计划
+#### 主题文件夹务必命名为Noline , 目前支持typecho1.2，暂时无1.3的适配计划 本主题制作以适配chrome系浏览器为主
 ##### 目前这款主题用到了bootstrap框架，highlights代码高亮等
       1. 响应式布局，移动端舒适体验
       2. 主题足够轻量
