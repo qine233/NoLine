@@ -61,7 +61,7 @@
                     if ($imgCount >= 1) {
                         $img = $matches[2][0];
                     } else {
-                        $img = "/usr/themes/Noline/nbg2.jpg";
+                        $img = $this->options->themeUrl."/nbg2.jpg";
                     };
                     $CCimg = "<p class='post-images'><a href='{$this->permalink}' title='{$this->title}'><img src='{$img}' alt='{$this->title}'></a></p>";
                     echo $CCimg;
