@@ -1,0 +1,365 @@
+/* body{
+	background-color: #e7eff5;
+	font-family: ziti;
+}
+@font-face {
+	font-family: ziti;
+	font-weight: 400;
+			font-style: normal;
+			font-display: swap;
+	src: url('css/ziti.ttf');
+} */
+.backgound{
+	position: relative; top: 0; left: 0;
+	width: 100%;
+	height: 25vw;
+	/* background-color: #d5b6dc; */
+	background-image: linear-gradient(to right, rgba(0, 187, 255, 0.932), rgba(0, 38, 255, 0.6));
+	 box-shadow: 20px 20px 10px #d0d7dc;
+}
+
+/* .backgound .http-code{
+	float: left;
+	color: #D0D7DC;
+	/* background-color: #D5B6DC; */
+/* 	width: 10%;
+	height: 120px;
+	position: absolute; bottom: 5px; left: 100px;
+	border: 1px solid rgba(190, 190, 190, 0.3);
+	border-top: none; 
+	border-left: none;
+	border-bottom: none;
+} */
+
+.backgound img{
+	width: 25%;
+	opacity: 0.8;
+	margin-left: 38%;
+}
+
+.mod-first{
+	display: flex;
+	/* 这里的背景颜色请在写完时注释掉 */
+	/* background-color: #ffeaeb; */
+	    width: 95%;
+	   /* position: absolute; bottom: 0px; */
+	    height: 20vw;
+		margin-top: 2rem;
+}
+
+.left{
+	
+    width: 25rem;
+    height: 20rem;
+    background-color:#f3fdff;
+	margin-top: 2rem;
+	margin-left: 5%;
+	 box-shadow: 20px 20px 60px #d0d7dc, -20px -20px 60px #f2faff;
+	/* position: absolute; bottom: 0; */
+}
+
+.left img{	
+	margin-left: 5px;
+	margin-top: 18px;
+	float: left;
+    width: 50px;
+	opacity: 0.7;
+}
+
+.left h2{
+	font-size: 30px;
+	font-weight: 300;
+}
+
+.left li{
+	line-height: 3rem;
+	
+}
+
+.right{
+	
+    width: 25rem;
+    height: 20rem;
+    background-color:#f3fdff;
+	margin-top: 2rem;
+	margin-left: 3%;
+	 box-shadow: 20px 20px 60px #d0d7dc, -20px -20px 60px #f2faff;
+	/* position: absolute; bottom: 0; */
+}
+.right img{
+	margin-left: 5px;
+	margin-top: 15px;
+	float: left;
+	width: 50px;
+}
+.top{
+	
+    width: 25rem;
+    height: 20rem;
+    background-color:#f3fdff;
+	margin-top: 2rem;
+	margin-left: 3%;
+	 box-shadow: 20px 20px 60px #d0d7dc, -20px -20px 60px #f2faff;
+	/* position: absolute; bottom: 0; */
+}
+.top img{
+	margin-left: 5px;
+	margin-top: 15px;
+	float: left;
+	width: 50px;
+}
+.bottom{
+	
+    width: 25rem;
+    height: 20rem;
+    background-color:#f3fdff;
+	margin-top: 2rem;
+	margin-left: 3%;
+	 box-shadow: 20px 20px 60px #d0d7dc, -20px -20px 60px #f2faff;
+	/* position: absolute; bottom: 0; */
+}
+
+.bottom img{
+	margin-top: 15px;
+	float: left;
+	width: 50px;
+}
+/* 最新文章 */
+h1{
+	/* margin-left: 50px; */
+	/* margin-right: 0; */
+	font-size: 30px ;
+	font-weight: 100;
+}
+
+a{
+	text-decoration: none;color: #757575;
+	width: 100%;
+	height: 10px;
+	
+}
+
+a:hover{
+	color: #242424;
+}
+#news-post{
+	margin-left: 8px;
+	list-style: none;
+	line-height: 40px;
+	text-overflow: ellipsis;
+	white-space:nowrap;
+	overflow: hidden;
+}
+
+/* 下列主要是写联系中三个方式的样式 */
+.content-span1{
+	opacity: 0.8;
+	 background-color: rgba(129, 129, 129, 0.5);
+	 border-radius: 0.8rem;
+	 width: 90%;
+	 height: 50px;
+	 margin-left: 1rem;
+ }
+ .content-span1 span{
+	 font-size: 20px;
+	 letter-spacing: 2px;
+	/* margin-top: 1rem; */
+	display: inline-block;
+	padding-left: 9%;
+	padding-top: 4%;
+ }
+ 
+ .content-span2{
+	 opacity: 0.8;
+	 margin-top: 2rem;
+ 	 background-color: rgba(129, 129, 129, 0.5);
+ 	 border-radius: 0.8rem;
+ 	 width: 90%;
+ 	 height: 50px;
+ 	 margin-left: 1rem;
+  }
+  .content-span2 span{
+ 	 font-size: 20px;
+ 	 letter-spacing: 2px;
+ 	/* margin-top: 1rem; */
+ 	display: inline-block;
+ 	padding-left: 9%;
+ 	padding-top: 4%;
+  }
+  
+  .content-span3{
+  	 opacity: 0.8;
+  	 margin-top: 2rem;
+  	 background-color: rgba(129, 129, 129, 0.5);
+  	 border-radius: 0.8rem;
+  	 width: 90%;
+  	 height: 50px;
+  	 margin-left: 1rem;
+   }
+   .content-span3 span{
+  	 font-size: 20px;
+  	 letter-spacing: 2px;
+  	/* margin-top: 1rem; */
+  	display: inline-block;
+  	padding-left: 9%;
+  	padding-top: 4%;
+   }
+   
+   
+   /* 联系方式中鼠标悬停效果 */
+   .content-span1:hover{
+   	   background-color: #eeeeee;
+   }
+   .content-span2:hover{
+	    background-color: #eeeeee;
+   }
+   .content-span3:hover{
+   	    background-color: #eeeeee;
+   }
+	   
+	/* 下面主要写网站导航中，分链接中的样式 */
+.GPS{
+	/* color: FFF; */
+}
+	
+	.gps-line-first{
+		/* padding: 10px 10px 10px 10px; */
+		margin-top: 2rem;
+		width: 42%;
+		height: 5rem;
+		border-radius: 1rem;
+		background-color: rgba(129, 129, 129, 0.5);
+		margin-left: 4%;
+	}
+	.gps-line-first span{
+		display: inline-block;
+	    margin-top: 1.8rem;
+		margin-left: 2.78rem;
+	}
+	.gps-line-second{
+		float: right;
+		margin-top: -5rem;
+		margin-right: 1rem;
+		width: 42%;
+		height: 5rem;
+		border-radius: 1rem;
+		background-color: rgba(129, 129, 129, 0.5);
+	}   
+	.gps-line-second span{
+		display: inline-block;
+	    margin-top: 1.4rem;
+		margin-left: 2.78rem;
+	}
+	.gps-line-third{
+		float: left;
+		width: 42%;
+		height: 5rem;
+		margin-top: 3rem;
+		margin-left: 4%;
+		border-radius: 1rem;
+		background-color: rgba(129, 129, 129, 0.5);
+	}
+	.gps-line-third span{
+		display: inline-block;
+	    margin-top: 1.5rem;
+		margin-left: 2.78rem;
+	}
+	.gps-line-fouth{
+		float: left;
+		margin-top: 3rem;
+		margin-left: 8%;
+		width: 42%;
+		height: 5rem;
+		border-radius: 1rem;
+		background-color: rgba(129, 129, 129, 0.5);
+	}
+	   .gps-line-fouth span{
+	   	display: inline-block;
+	       margin-top: 1.8rem;
+	   	margin-left: 2.78rem;
+	   }
+	   
+	   /* 链接hover */
+	   .gps-line-first:hover,.gps-line-fouth:hover,.gps-line-third:hover,.gps-line-second:hover{
+		   background-color: #efefef;
+	   }
+	   /* 字体颜色 */
+	   .gps-line-first a,.gps-line-fouth a,.gps-line-third a,.gps-line-second a{
+	   		  color: #242424;
+			  font-weight: 502;
+	   }
+	   .mobile-all{
+		 display: none;
+	   }
+   /* 下面是手机端的界面样式表 */
+   
+    @media (max-width:1000px) {
+   	 .mod-first{
+   		 /* margin-top: 2rem; */
+   		 width: 100%;
+           height: 100%;
+   	 	display: block;
+   		/* flex-direction: column; */
+   		/* flex-wrap: wrap;//开启自动换行 */
+   		           /* align-content: center;元素居中 */
+   		}
+   	 .backgound{
+   		 position: relative; top: 0; left: 0;
+   		 height: 75vw;
+   	 }
+   	 .backgound img{
+		width: 60%;
+		margin-left: 19%;
+		margin-top: 10%;
+   	 }
+		.mod-first{
+			display: none;
+		
+		}
+
+   .mobile-all{
+	   color: rgba(0, 0, 0, 0.575);
+	display: block;
+	margin-top: 50px;
+  }
+  .mobile-first{
+	background-color: #f3fdff;
+	position: relative;
+	width: 100%;
+	height: 50rem;
+	box-shadow: 20px 20px 60px #d0d7dc, -20px -20px 60px #f2faff;
+  }
+
+  .mobile-first .mobile-news {
+   font-size: 4rem;
+   text-align: center;
+  }
+  .mobile-news-post{
+	margin-left: 8px;
+	list-style: none;
+	line-height: 100px;
+	text-overflow: ellipsis;
+	white-space:nowrap;
+	overflow: hidden;
+	font-size: 2rem;
+	text-align:center;
+	font-size: 2.5rem;
+  }
+  .nar-ber{
+	  /* position: fixed; bottom: 0;  */
+	  position: fixed;
+	  z-index:999; left: 0; right: 0; bottom:5px;
+
+	  width: 100%;
+	  height: 10rem;
+	  background-color: #f3fdff;
+	  margin-top:50px ;
+  }
+
+  .nar-ber a{
+	  position: absolute; top: 45px; left:386px ;
+
+	  font-size: 50px;
+  }
+    }
+   
