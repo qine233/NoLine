@@ -19,7 +19,7 @@
     <span class="author"><?php $this->author() ?></span>
     <span class="data">&nbsp&nbsp|&nbsp&nbsp<?php $this->date('Y年m月d日 '); ?></span>
 </span>
-<span class="contentheadFortitle4">   <?php $this->excerpt(70, '...'); ?> </span>
+<span class="contentheadFortitle4">   <?php $this->excerpt(65, '...'); ?> </span>
         </div>    
              <div class="content-list-post border-wid">
                  <!-- 下面text部分 -->

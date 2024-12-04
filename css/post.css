@@ -706,3 +706,16 @@ pre, article pre {
     align-content: flex-end;
     flex-wrap: wrap;
 }
+ /* 以下代码为giscuz做适配*/
+ .giscus{
+    background: #ffffff;
+padding: 1rem;
+border-radius: 0.3rem;
+margin-top: 2rem;
+border-radius: 1.5rem;
+outline: 1px solid #354b6042;
+padding-top: 3rem;
+}
+.giscus-frame .main {
+  --color-btn-primary-disabled-bg: #5e95f3 ;
+}

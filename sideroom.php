@@ -22,19 +22,19 @@
             </div></div>
  <div class="nav_menu-mb" >
                         <ul  id="nav_menu-m">
-                                 <li><a href="<?php $this->options->siteUrl(); ?>">首页</a></li>
-                                 <li id="nav_list_a_f" >栏目</li>
+                                
+                      
                                  <div id="nav_list_a">
-                                  <div class="nav_list_a-padding">
+                                  <div class="nav_list_a-padding"> <li><a href="<?php $this->options->siteUrl(); ?>">首页</a></li>
                                   <?php $this->widget('Widget_Contents_Page_List')
                                  ->parse('<li ><a href="{permalink}">{title}</a></li>'); ?>
 </div></div>
                              </ul>
-                               <ul  id="nav_menu-m">
+                               <!-- <ul  id="nav_menu-m">
                                 <li id="nav_list_a_g" >分类</li>
                                       <div id="nav_list_b">  <div class="nav_list_a-padding"> <?php $this->widget('Widget_Metas_Category_List')
                                            ->parse('<li><a href="{permalink}">{name}</a> </li>'); ?>
-                               </ul>
+                               </ul> -->
                              </div></div></div></div>
                 <div class="sideroom-blur" id="sideroom-blur">
                 </div>

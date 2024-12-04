@@ -120,12 +120,15 @@ a:hover {
     padding-top: 2.2rem;
 }
 #percentage{
+    font-weight: 500;
     margin-top: -2px;
-    background: white;
-    border-radius: 2rem;
-    width: 8rem;
-    border: 4px solid #5186d3bf;
+    background: #ffffff00;
+    border-radius: 0.9rem;
+    width: 5rem;
+    border: 3px solid #7d889abf;
     height: 2.7rem;
+    font-size: 1.5rem;
+    text-align: center;
 }
 #percentageintter{
     width: 47%;
@@ -154,6 +157,9 @@ a:hover {
     margin-right:5rem ;
     font-weight: 600;
 }
+@media screen and (max-width: 1400px) {
+    #nav_menu li { margin-right: 2.5rem ;
+}}
 #nav_menu a{
     font-size: 14.8px;
     text-shadow: 0 0.1875rem 0.3125rem rgb(0 0 0 / 30%);
@@ -203,18 +209,18 @@ a:hover {
 
 .post_index-more{
     display: block;
-    background: #9cd2ff6b;
-    padding: 1 5;
+    background: #b9cbda6b;
+    padding: 3px 5;
     position: relative;
+    font-size: 11px;
     top: -140px;
     right: -81%;
-    color: #007bffe6;
+    color: #546c86e6;
     border-radius: 0.5rem;
     backdrop-filter: blur(16px);
     max-width: 15rem;
     height: 2.2rem;
     text-align: center;
-    box-shadow: 0 4px 10px rgb(26 72 162 / 0%), 0 0 1px rgb(42 78 244 / 21%);
 }
 .post_index-more a{
     color: white  !important;
@@ -1005,7 +1011,7 @@ margin-left: -4rem;
 } */
 /* 底部footer */
 .footer {
-    margin-top: 4rem;
+    /* margin-top: 4rem; */
     z-index: 999;
     height: 8rem;
     width: 100%;
@@ -1193,7 +1199,7 @@ hr {
 }
 .nextWide .next{
     /*background: #8596ae;*/
-    color: #1b1515 !important;
+    color: rgb(53, 75, 96);
     padding: 0.8rem;
     font-size: 1.3rem;
     /*border-radius: 0.4rem;*/

@@ -59,9 +59,7 @@
     }
 
     .content {
-        margin-top: 0.5rem;
-        margin-top: -1.5rem;
-
+        margin-top: -5px;
         width: 100% !important;
 
     }
@@ -87,10 +85,11 @@
         box-shadow: 0 4px 10px rgb(0 0 0 / 5%), 0 0 1px rgb(0 0 0 / 10%);
     }
     .contact .name-talk{
+        top: 1.5rem;
         text-align: center;
         background: #c8d0dc3b;
         position: relative;
-        top: 4.89rem;
+        top: 0.89rem;
         font-weight: 100;
         font-size: 13px;
         color: #00000094;
@@ -108,16 +107,29 @@
         margin-top: 3rem;
         padding: 0 2% 0 2%;
     }
+    .content-last .bg_color{
+        height: 22rem;
+    }
+    .logowide {
+        padding-top: 4.7rem;
+    }
+    #nevColor {
+        font-size: 1.9rem;
+        margin-top: 2rem;
+    }
     .percentagewide {
         padding-right: 18px;
     }
     #percentage {
         margin-top: -24px;
-        background: white;
-        border-radius: 2rem;
-        width: 8rem;
-        border: 4px solid #5186d3bf;
-        height: 2.7rem;
+        font-weight: 500;
+    background: #ffffff00;
+    border-radius: 0.9rem;
+    width: 5rem;
+    border: 3px solid #7d889abf;
+    height: 2.7rem;
+    font-size: 1.5rem;
+    text-align: center;
     }
     .content-list {
         margin-left: 0% !important;
@@ -161,9 +173,9 @@
         flex-wrap: wrap;
         color: rgba(65, 65, 65, 0.767);
         background: white;
-        border-radius: 0.5rem;
+        border-radius: 1.5rem;
         color: rgba(0, 0, 0, 0.856);
-        margin-bottom: 34px;
+        margin-bottom: 19px;
         border-width: 1px;
         box-shadow: 0 4px 10px rgb(0 0 0 / 5%), 0 0 1px rgb(0 0 0 / 10%);
     }
@@ -322,26 +334,22 @@ margin-left: 0;
         text-align: center;
     }
     .nav_menu-mb{
-        padding: 0 5%;
+        /* padding: 0 5%; */
 
     }
     #nav_menu-m {
-        box-shadow: 0 4px 10px rgb(0 0 0 / 5%), 0 0 1px rgb(0 0 0 / 10%);
-        margin-top: 3rem;
-        background: white;
+               
+               margin-top: 5rem;
+               
     }
     #nav_menu-m li{
-
-        /*text-align: center;*/
         list-style: none;
         padding: 0.8rem;
-        margin-left: -4rem;
-        background: #ffffff;
         font-size: 1.3rem;
     }
     #nav_menu-m a{
         color: #202020;
-
+        color: rgb(53, 75, 96);
         font-weight: 500;
     }
     .sideroom-blur{
@@ -365,18 +373,13 @@ margin-left: 0;
         margin: 0;
     }
     #nav_list_a{
-        /* display: none; */
-        background: white;
         width: 100%;
     }
     #nav_list_a li{
-        box-shadow: none;
-        border-left-width: 1px;
-        border-left-style: solid;
-        border-left-color: #ecf0f8;
+        text-align: center;
     }
     .nav_list_a-padding{
-        margin-left:3.2rem ;
+        margin-left: -4.2rem;
 
     }
     .name-talk {
