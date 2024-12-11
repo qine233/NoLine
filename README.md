@@ -30,8 +30,13 @@
 <li>网站名称</li>
 <li>网站网址</li>
 <li>网站图标</li>
+
 <li>网站简介</li>
 ```
+
+##### 推荐插件
+  【[superLink](https://github.com/ShangJixin/Typecho-Plugin-superLink/tree/main) 】 :对GitHub Blibli等站点做了卡片解析，现版本主题不建议安装，因为存在Pjax兼容问题和样式简单，本主题在未来版本会适配，演示站已经配置成功，等待代码释出即可
+
 # 
 ##### 如上的添加方式重复即可添加更多友链
 ##### 如果你愿意请我喝一杯可乐，我会感到非常荣幸
