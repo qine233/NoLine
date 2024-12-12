@@ -1,5 +1,5 @@
 # TYPECHO主题-NoLine
-###  💬优化阅读，爱上写作  |  
+###  💬优化阅读，爱上写作  |  使用时需要配合下列推荐插件一起使用（建议）
 ###### 本项目为Noline的衍生项目（原项目暂不更新），可以解释为另外发版 不用下载realese，建议直接克隆，本项目随机更新
  ![.....](https://img.shields.io/github/downloads/qine233/NoLine-Typecho-theme/total.svg?style=flat-square)
  ![.....](https://img.shields.io/github/v/release/qine233/NoLine-Typecho-theme.svg?style=flat-square)
@@ -35,8 +35,8 @@
 ```
 
 ##### 推荐插件
-  【[superLink](https://github.com/ShangJixin/Typecho-Plugin-superLink/tree/main) 】 :对GitHub Blibli等站点做了卡片解析，现版本主题不建议安装，因为存在Pjax兼容问题和样式简单，本主题在未来版本会适配，演示站已经配置成功，等待代码释出即可；后续版本强制要求安装该插件
-【[MarkdownParse](https://github.com/mrgeneralgoo/typecho-markdown) 】 : 对数学公式支持，等多种解析；本主题暂时支持其中部分解析，有问题待排查，建议安装
+ - 【[superLink](https://github.com/ShangJixin/Typecho-Plugin-superLink/tree/main) 】 :对GitHub Blibli等站点做了卡片解析，现版本主题不建议安装，因为存在Pjax兼容问题和样式简单，本主题在未来版本会适配，演示站已经配置成功，等待代码释出即可；后续版本强制要求安装该插件
+ -  【[MarkdownParse](https://github.com/mrgeneralgoo/typecho-markdown) 】 : 对数学公式支持，等多种解析；本主题暂时支持其中部分解析，有问题待排查，建议安装
 # 
 ##### 如上的添加方式重复即可添加更多友链
 ##### 如果你愿意请我喝一杯可乐，我会感到非常荣幸
