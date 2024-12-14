@@ -1011,9 +1011,9 @@ margin-left: -4rem;
 } */
 /* 底部footer */
 .footer {
-    /* margin-top: 4rem; */
+    margin-top: 4rem;
     z-index: 999;
-    height: 8rem;
+    height: 8.5rem;
     width: 100%;
     background-color: rgba(255, 255, 255);
     text-align: center;

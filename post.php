@@ -32,7 +32,7 @@
 
         <?php $this->content(); ?>
 
-        <script >hljs.initHighlightingOnLoad();</script>
+        <script>hljs.highlightAll();</script>
         <div class="post-tags"> <?php $this->tags('&nbsp', true, '该文章无TAG'); ?></div>
     </div>
 

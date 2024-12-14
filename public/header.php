@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, shrink-to-fit=no, viewport-fit=cover">
     <meta name="keywords" content="<?php echo $this->fields->keywords ? $this->fields->keywords : htmlspecialchars($this->_keywords); ?>" />
     <meta name="description" content="<?php echo $this->fields->description ? $this->fields->description : htmlspecialchars($this->_description); ?>" />
-    <script src="https://lf3-cdn-tos.bytecdntp.com/cdn/expire-2-M/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://lf3-cdn-tos.bytecdntp.com/cdn/expire-2-M/jquery/3.1.1/jquery.min.js"></script>
     <script src="https://lf26-cdn-tos.bytecdntp.com/cdn/expire-1-M/jquery.pjax/2.0.1/jquery.pjax.min.js"></script>
     <script src="https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-M/viewerjs/1.10.4/viewer.min.js"></script>
     <script src="<?php $this->options->themeUrl('css/nprogress.js'); ?>"></script>
@@ -22,7 +22,8 @@
     <script src="https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-M/highlight.js/11.3.1/highlight.min.js"></script>
     <link rel="stylesheet" href="https://lf6-cdn-tos.bytecdntp.com/cdn/expire-1-M/highlight.js/11.3.1/styles/atom-one-dark.min.css">
        <link rel="shortcut icon" href="<?php $this->options->logoCss(); ?>" />
-    <script>
+
+   <script>
         $(document)
             .on('click', 'a[href*="#"]', function() {
                 if ( this.hash ) {
@@ -44,7 +45,8 @@
 
     <script>
         window.onload = function ()
-        {
+        {   
+            superLink();
             var ob="test";
             var oBtn3 = document.getElementById("nav_list_a_f");
             var oBox3 = document.getElementById("nav_list_a");
@@ -84,8 +86,9 @@
 
 
             // };
-            oBtn4.onclick = function ()
-            {
+         
+           oBtn4.onclick = function ()
+              {
 
                 if(getComputedStyle(nav_list_b).display=="none"){
                     oBox4.style.cssText = "display:block;"
@@ -128,6 +131,7 @@
              });
         };
     </script>
+
 
 </head>
 <body>

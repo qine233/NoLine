@@ -57,7 +57,14 @@
         /* visibility: hidden;
         display: none; */
     }
-
+#write img {
+    /* width: 78%; */
+    max-height: 16rem;
+    display: block;
+    margin: 10px auto;
+    object-fit: contain;
+    border-radius: 6px;
+}
     .content {
         margin-top: -5px;
         width: 100% !important;
@@ -102,6 +109,17 @@
         backdrop-filter: blur(16px);
         border-radius: 0 0 1.5rem 1.5rem;
     }
+    .article-ach li {
+    padding-left: 1.7rem;
+    line-height: 3rem;
+    list-style: none;
+    /* border-left: 1.5px solid #21212129; */
+    background: #f7f7fb;
+    margin: 9px 19px;
+    padding: 1PX 12PX;
+    border-radius: 0.9rem;
+    display: revert;
+}
     .content-all {
         width: 100%;
         margin-top: 3rem;

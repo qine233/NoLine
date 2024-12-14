@@ -132,13 +132,13 @@
   box-shadow: 2px 4px 7px #999;
 }
 #write img {
-  width: 78%;
-  max-height: 32rem;
+       max-width: 100%;
+    max-height: 36rem;
   display: block;
   margin: 10px auto;
   object-fit: contain;
   border-radius: 6px;
-  box-shadow: 2px 4px 7px #999;
+ /* box-shadow: 2px 4px 7px #999;*/
 }
 #write picture {
   display: flex;

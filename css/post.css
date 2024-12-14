@@ -27,7 +27,7 @@
 }
 
 .content-text-2 img {
-    width: 500px;
+ /*   width: 500px;*/
 }
 
 ::-webkit-scrollbar {
@@ -551,7 +551,12 @@ pre, article pre {
     padding-left: 1.7rem;
     line-height: 3rem;
     list-style: none;
-    border-left: 1.5px solid #00000029;
+    /* border-left: 1.5px solid #21212129; */
+    background: #f7f7fb;
+    margin: 9px 19px;
+    padding: 1PX 12PX;
+    border-radius: 0.9rem;
+    display: inline-flex;
 }
 
 #archives li::before {
