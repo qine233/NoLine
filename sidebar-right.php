@@ -2,7 +2,7 @@
 <div class="sidebar-r">
 <div class="sidebar-r-top">
     <div class="sidebarPersonInfo"  style="
-    background: linear-gradient(to bottom, rgb(255 255 255 / 50%) 0%, rgb(255 255 255 / 80%) 100%, #fff, 100%, #fff), url(https://cloud.idkzr.com/f/RLiX/IMG_0006.JPG) no-repeat center;
+    background: linear-gradient(to bottom, rgb(255 255 255 / 50%) 0%, rgb(255 255 255 / 80%) 100%, #fff, 100%, #fff), url(<?php $this->options->logobgcolor(); ?>) no-repeat center;
             background-position-x: center;
             background-position-y: center;
             background-size: cover;
