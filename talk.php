@@ -11,6 +11,7 @@
 <?php $this->need('public/header.php'); ?>
 
 <div class="content-all content-all-post">
+    <div class="container">
     <?php $this->need('sidebar.php'); ?> 
     <div id="pjax-container">
     <!-- <div class="typecho-user-text"> -->
@@ -61,11 +62,11 @@
                     <li class="listTalkc" id="list-talk-list-talk <?php $comments->theId(); ?>">
                         <div class="comment_data">
                             <!-- <?php echo $comments->sequence(); ?>.  -->
-                            <img id="talkIMG" src="<?php $this->options->logoCss(); ?>"/>
+                        
 
                             <div class="comment_body">
 
-                                <div class="talkUserTitle"> <strong><?php $comments->author(); ?></strong>
+                                <div class="talkUserTitle"> <strong><?php $this->options->title(); ?></strong>
                                 &nbsp; <?php $comments->date('Y-m-d H:i'); ?>
                             </div>
                             <?php $comments->content(); ?>

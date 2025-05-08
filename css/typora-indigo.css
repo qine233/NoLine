@@ -111,13 +111,13 @@
 }
 #write a {
   text-decoration: none;
-  border-bottom: 1px solid;
+
 }
 #write .footnote-ref {
   border-width: 0px;
 }
 #write code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: DingTalk JinBuTi,ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 #write pre > code {
   font-weight: 400;

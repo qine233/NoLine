@@ -11,7 +11,7 @@
 <?php $this->need('public/header.php'); ?>
 
 <div class="content-all"><?php $this->need('sidebar.php'); ?>
-
+<div class="container">
 
 <div id="pjax-container">
         <div class="typecho-user-text">

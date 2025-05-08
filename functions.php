@@ -42,7 +42,8 @@ function themeConfig($logo)
 
     $logoFooter = new Typecho_Widget_Helper_Form_Element_Textarea('logoFooter', NULL, NULL, _t('站点底部版权填写区域，后续会考虑将footer区域拉高，增加更多可自定义内容'), _t('在这里填入你的站点底部代码，例如备案链接等'));
     $logo->addInput($logoFooter);
-
+  $exsite = new Typecho_Widget_Helper_Form_Element_Text('exsite', NULL, NULL, _t('临时屏蔽恶意IP'), _t('在这里填入一个IP，强制其跳转baidu.com,'));
+    $logo->addInput($exsite);
 
 }
 
@@ -81,82 +82,84 @@ function getGravatar($email, $s = 96, $d = 'mp', $r = 'g', $img = false, $atts =
     return $url;
 }
 
+function time_ago_in_words($timestamp) {
+    $time_difference = time() - $timestamp;
+    $seconds = $time_difference;
+    
+    $minutes      = round($seconds / 60);           // value 60 is seconds
+    $hours        = round($seconds / 3600);         // value 3600 is 60 minutes * 60 sec
+    $days         = round($seconds / 86400);        // value 86400 is 24 hours * 60 minutes * 60 sec
+    $weeks        = round($seconds / 604800);       // value 604800 is 7 days * 24 hours * 60 minutes * 60 sec
+    $months       = round($seconds / 2629440);      // value 2629440 is 30 days * 24 hours * 60 minutes * 60 sec
+    $years        = round($seconds / 31553280);     // value 31553280 is 365 days * 24 hours * 60 minutes * 60 sec
 
-Typecho_Plugin::factory('admin/write-post.php')->bottom = array('tagshelper', 'tagslist');
-class tagshelper {
-    public static function tagslist()
-    {
-    $tag="";$taglist="";$i=0;//循环一次利用到两个位置
-Typecho_Widget::widget('Widget_Metas_Tag_Cloud', 'sort=count&desc=1&limit=200')->to($tags);
-while ($tags->next()) {
-$tag=$tag."'".$tags->name."',";
-$taglist=$taglist."<a id=".$i." onclick=\"$(\'#tags\').tokenInput(\'add\', {id: \'".$tags->name."\', tags: \'".$tags->name."\'});\">".$tags->name."</a>";
-$i++;
-}
-?><style>.Posthelper a{cursor: pointer; padding: 0px 6px; margin: 2px 0;display: inline-block;border-radius: 2px;text-decoration: none;}
-.Posthelper a:hover{background: #ccc;color: #fff;}.fullscreen #tab-files{right: 0;}/*解决全屏状态下鼠标放到附件上传按钮上导致的窗口抖动问题*/
-</style>
-<script>
-  function chaall () {
-   var html='';
- $("#file-list li .insert").each(function(){
-   var t = $(this), p = t.parents('li');
-   var file=t.text();
-   var url= p.data('url');
-   var isImage= p.data('image');
-   if ($("input[name='markdown']").val()==1) {
-   html = isImage ? html+'\n!['+file+'](' + url + ')\n':''+html+'';
-   }else{
-   html = isImage ? html+'<img src="' + url + '" alt="' + file + '" />\n':''+html+'';
-   }
-    });
-   var textarea = $('#text');
-   textarea.replaceSelection(html);return false;
-    }
-
-    function chaquan () {
-   var html='';
- $("#file-list li .insert").each(function(){
-   var t = $(this), p = t.parents('li');
-   var file=t.text();
-   var url= p.data('url');
-   var isImage= p.data('image');
-   if ($("input[name='markdown']").val()==1) {
-   html = isImage ? html+'':html+'\n['+file+'](' + url + ')\n';
-   }else{
-   html = isImage ? html+'':html+'<a href="' + url + '"/>' + file + '</a>\n';
-   }
-    });
-   var textarea = $('#text');
-   textarea.replaceSelection(html);return false;
-    }
-function filter_method(text, badword){
-    //获取文本输入框中的内容
-    var value = text;
-    var res = '';
-    //遍历敏感词数组
-    for(var i=0; i<badword.length; i++){
-        var reg = new RegExp(badword[i],"g");
-        //判断内容中是否包括敏感词
-        if (value.indexOf(badword[i]) > -1) {
-            $('#tags').tokenInput('add', {id: badword[i], tags: badword[i]});
+    if ($seconds <= 60) {
+        return '刚刚';
+    } else if ($minutes <= 60) {
+        if ($minutes == 1) {
+            return '1分前';
+        } else {
+            return $minutes.'分前';
+        }
+    } else if ($hours <= 24) {
+        if ($hours == 1) {
+            return '1小时前';
+        } else {
+            return $hours.'小时前';
+        }
+    } else if ($days <= 7) {
+        if ($days == 1) {
+            return '昨天';
+        } else {
+            return $days.'天前';
+        }
+    } else if ($weeks <= 4.3) { // 4.3 == 30/7
+        if ($weeks == 1) {
+            return '1周前';
+        } else {
+            return $weeks.'周前';
+        }
+    } else if ($months <= 12) {
+        if ($months == 1) {
+            return '1月前';
+        } else {
+            return $months.'月前';
+        }
+    } else {
+        if ($years == 1) {
+            return '1年前';
+        } else {
+            return $years.'年前';
         }
     }
-    return;
 }
-var badwords = [<?php echo $tag; ?>];
-function chatag(){
-var textarea=$('#text').val();
-filter_method(textarea, badwords);
-}
-  $(document).ready(function(){
-    $('#file-list').after('<div class="Posthelper"><a class="w-100" onclick=\"chaall()\" style="background: #467B96;background-color: #3c6a81;text-align: center; padding: 5px 0; color: #fbfbfb; box-shadow: 0 1px 5px #ddd;">插入所有图片</a><a class="w-100" onclick=\"chaquan()\" style="background: #467B96;background-color: #3c6a81;text-align: center; padding: 5px 0; color: #fbfbfb; box-shadow: 0 1px 5px #ddd;">插入所有非图片附件</a></div>');
-    $('#tags').after('<div style="margin-top: 35px;" class="Posthelper"><ul style="list-style: none;border: 1px solid #D9D9D6;padding: 6px 12px; max-height: 240px;overflow: auto;background-color: #FFF;border-radius: 2px;margin-bottom: 0;"><?php echo $taglist; ?></ul><a class="w-100" onclick=\"chatag()\" style="background: #467B96;background-color: #3c6a81;text-align: center; padding: 5px 0; color: #fbfbfb; box-shadow: 0 1px 5px #ddd;">检测内容插入标签</a></div>');
-  });
-  </script>
-<?php
+function get_post_view($archive) {
+    $cid = $archive->cid;
+    $path = __DIR__ . '/views/' . $cid . '.txt'; // 计数文件存放目录（确保可写）
+
+    if (!file_exists($path)) {
+        file_put_contents($path, '0');
     }
+
+    $views = (int)file_get_contents($path);
+
+    $cookieName = 'viewed_' . $cid;
+
+    // 如果没有记录过，就增加计数
+    if (!isset($_COOKIE[$cookieName])) {
+        $views++;
+        file_put_contents($path, $views);
+
+        // 设置cookie，有效期1天，可以自己改
+        setcookie($cookieName, '1', time() + 86400, '/');
+    }
+
+    echo $views;
 }
-
-
-
+Typecho_Plugin::factory('Widget_Feedback')->comment = function($comment, $post) {
+    file_put_contents('/tmp/comment_debug.log', 
+        date('Y-m-d H:i:s') . "\n" . 
+        print_r($comment, true) . "\n\n", 
+        FILE_APPEND
+    );
+};

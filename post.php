@@ -19,7 +19,7 @@
     <span class="author"><?php $this->author() ?></span>
     <span class="data">&nbsp&nbsp|&nbsp&nbsp<?php $this->date('Y年m月d日 '); ?></span>
 </span>
-<span class="contentheadFortitle4">   <?php $this->excerpt(65, '...'); ?> </span>
+<span class="contentheadFortitle4">   <?php $this->excerpt(70, '...'); ?> </span>
         </div>    
              <div class="content-list-post border-wid">
                  <!-- 下面text部分 -->
@@ -31,17 +31,19 @@
        <div class="content-text-2 "  id="write">
 
         <?php $this->content(); ?>
-
-        <script>hljs.highlightAll();</script>
+       <span style="display:none;color:white;"><?php get_post_view($this); ?></span> 
+        <script >hljs.highlightAll();</script>
         <div class="post-tags"> <?php $this->tags('&nbsp', true, '该文章无TAG'); ?></div>
     </div>
 
-    </div> <?php $this->need('comments.php'); ?>
-    </div>   
- </div>     
+    </div> 
+<?php $this->need('comments.php'); ?>    </div> </div> 
 
  
-    <script src="https://cdn.jsdelivr.net/npm/vditor/dist/index.min.js"></script>
+    
+
+ 
+
               <script type="text/javascript">
                      var image = new Viewer(document.getElementById('write'),{
                                          url: 'src'
@@ -50,7 +52,7 @@
 
        
           
-</div><?php $this->need('sidebar-right.php'); ?> 
+</div><?php $this->need('sidebar-right.php'); ?>    </div>    </div> 
 </div>
 <?php $this->need('public/footer.php'); ?>
 

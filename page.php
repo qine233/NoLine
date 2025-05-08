@@ -31,7 +31,7 @@
        <div class="content-text-2 "  id="write">
 
         <?php $this->content(); ?>
-
+  
         <script >hljs.initHighlightingOnLoad();</script>
     </div>
 

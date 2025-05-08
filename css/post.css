@@ -68,7 +68,7 @@
 
 }
 .nav-page .current a {
-    background: #84a0ca;
+    background: #244c74;
     color: white !important;
 }
 .pagination>li>a, .pagination>li>span {
@@ -101,7 +101,7 @@
     list-style: none;
     display: block;
     float: left;
-    font-family: 'Noto Serif SC', serif;
+    font-family: 'DingTalk JinBuTi', serif;
     border-style: none;
     border-radius: 1rem !important;
     padding-top: 7px;
