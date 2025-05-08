@@ -1,9 +1,9 @@
 <?php
 /**
  * “ 一款简单的主题，主题文件夹务必命名为Noline,注意本主题仅适用于typecho 1.2版本系列，未针对1.3进行语法上的适配 ”
- * @package NOLINELITE_1.0—Demo
+ * @package NOLINE
  * @author QINE
- * @version 1.0Demo
+ * @version 3.0_END
  * @link https://www.idkzr.com/
  */
 ?>
