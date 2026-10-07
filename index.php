@@ -1,144 +1,120 @@
 <?php
 /**
- * “ 一款简单的主题，主题文件夹务必命名为Noline,注意本主题仅适用于typecho 1.2版本系列，未针对1.3进行语法上的适配 ”
- * @package NOLINE
+ * NoLine —— 简洁的双栏 Typecho 主题
+ *
+ * @package NoLine
  * @author QINE
- * @version 3.0_END
+ * @version 1.6.0
  * @link https://www.idkzr.com/
  */
+
+if (!defined('__TYPECHO_ROOT_DIR__')) exit;
+$this->need('public/header.php');
 ?>
-<?php $this->need('public/header.php'); ?>
-<?php $this->need('sidebar.php'); ?>
-<div class="content-all content-all-post">
 
-</div>
 <div class="container">
-    
-</div>
-</div>
-
-<div id="pjax-container">
-
-<script type="text/javascript">
-    // 下滑加载更多
-    jQuery(document).ready(function($) {
-        var loading = false;
-
-        $(window).on('scroll', function() {
-            if (loading) return;
-
-            var scrollTop = $(window).scrollTop();
-            var windowHeight = $(window).height();
-            var documentHeight = $(document).height();
-
-            if (scrollTop + windowHeight >= documentHeight - 900) {
-                var $next = $('.next');
-                var href = $next.attr('href');
-
-                if (href !== undefined) {
-                    loading = true;
-                    $next.addClass('loading').text('正在努力加载');
-
-                    $.ajax({
-                        url: href,
-                        type: 'get',
-                        success: function(data) {
-                            var $res = $(data).find('.post-list');
-                            $('.content-list').append($res.fadeIn(500));
-
-                            var newhref = $(data).find('.next').attr('href');
-                            if (newhref !== undefined) {
-                                $next.attr('href', newhref).removeClass('loading').text('滑动加载更多');
-                            } else {
-                                $next.remove();
-                            }
-
-                            loading = false;
-                        },
-                        error: function() {
-                            $next.removeClass('loading').text('加载失败，请重试');
-                            loading = false;
-                        }
-                    });
-                }
-            }
-        });
-    });
-</script>
-
-<div class="content">
-    <div class="content-list">
-        <?php while ($this->next()): ?>
-            <?php 
-                $categories = $this->categories;
-                $isDiary = false;
-                foreach ($categories as $category) {
-                    if ($category['name'] === '日记') {
-                        $isDiary = true;
-                        break;
-                    }
-                }
-            ?>
-            <div class="post-list <?php echo $isDiary ? 'diary-style' : 'normal-style'; ?>">
-                <div class="post" style="
-                    object-fit: cover;
-                    background-position-x: center;
-                    background-position-y: center;
-                    background-size: cover;">
-            <div class="postinfo">     <img class="logo" src="<?php $this->options->logoCss(); ?>"> 
-        
-            <div class="postinfoofdaily">
-              <span class="nameinfo"> <?php $this->options->logoName(); ?> </span>
-            <div class="postinfoofdailytime"> <?php echo time_ago_in_words($this->created); ?> ·            <?php $this->category(','); ?> </div>
-            </div>
-        
-        
-        
-        
-        </div>
-                  
-
-                    <?php if (!$isDiary): ?>
-                        <!-- 正常文章显示标题 -->
-                        <h2 class="entry_title"><a href="<?php $this->permalink() ?>"><?php $this->title() ?></a></h2>
-                    <?php endif; ?>
-
-                    <div class="entry_text" id="entry_text">
-                        <p> <?php 
-    // 判断当前文章是否属于“日记”分类
-    if ($category['name'] === '日记') {
-        $this->content(); // 输出全文
-        
-
-      
-    } else {
-        $this->excerpt(160, '...'); // 只截取160字
+    <?php
+    /* 首页 masthead：顶栏管导航，这块管站点身份——封面 + 居中大头像 + 站名 + 座右铭。
+       值在这里重算一遍：header.php 的局部变量不会流进模板作用域。 */
+    $heroName = trim((string)$this->options->logoName);
+    if ($heroName === '') {
+        $heroName = trim((string)$this->options->title);
     }
-    ?></p>
- 
+    $heroBio = trim((string)$this->options->logobg);
+    if ($heroBio === '') {
+        $heroBio = trim((string)$this->options->description);
+    }
+    $heroAvatar = noline_profile_avatar();
+    $heroCover  = trim((string)$this->options->logobgcolor);
+    ?>
+    <div class="site-hero<?php if ($heroCover !== ''): ?> has-cover<?php endif; ?>">
+        <?php if ($heroCover !== ''): ?>
+        <div class="site-hero-cover" style="background-image:url('<?php echo htmlspecialchars($heroCover, ENT_QUOTES, 'UTF-8'); ?>')" aria-hidden="true"></div>
+        <?php endif; ?>
+        <div class="site-hero-inner">
+            <?php /* width/height 必须和 CSS 的 136px 一致：属性值是首帧占位的唯一依据，
+                     写小了图片加载完会把下面整块内容顶下去。 */ ?>
+            <?php if ($heroAvatar !== null): ?>
+            <img src="<?php echo $heroAvatar; ?>" alt="" class="site-hero-avatar" width="136" height="136">
+            <?php else: ?>
+            <div class="site-hero-avatar site-hero-placeholder" aria-hidden="true"><?php echo noline_initial($heroName); ?></div>
+            <?php endif; ?>
+            <h1 class="site-hero-title"><?php echo htmlspecialchars($heroName, ENT_QUOTES, 'UTF-8'); ?></h1>
+            <?php if ($heroBio !== ''): ?>
+            <p class="site-hero-bio"><?php echo htmlspecialchars($heroBio, ENT_QUOTES, 'UTF-8'); ?></p>
+            <?php endif; ?>
+        </div>
+    </div>
 
-                    </div>
-               
-         <span class="post_views"> 阅读 <?php get_post_view($this); ?> </span>
-         <span class="post_views"> 评论 <?php $this->commentsNum(); ?> </span>
+    <div class="grid-layout">
 
+        <div class="main-content">
+            <?php /* 公告卡：notice 留空时整张卡不出现，不留空框 */ ?>
+            <?php $notice = trim((string)$this->options->notice); ?>
+            <?php if ($notice !== ''): ?>
+            <div class="card">
+                <div class="card-header"><?php _e('公告'); ?></div>
+                <div class="notice-body">
+                    <span class="notice-icon" aria-hidden="true">📢</span>
+                    <div class="notice-text"><?php echo $notice; ?></div>
                 </div>
             </div>
-        <?php endwhile; ?>
-    </div>
-  <script type="text/javascript">
-        var image = new Viewer(document.getElementById('entry_text'),{
-                            url: 'src'
-                        });
-        </script>
-    <div class="nextWide">
-        <?php $this->pageLink('点击查看更多','next'); ?>
+            <?php endif; ?>
+
+            <?php if ($this->have()): ?>
+                <?php while ($this->next()): ?>
+
+                    <?php /* 动态和文章混在同一条时间线里按发布时间穿插，分页逻辑不变。
+                           命中动态分类的走 status-card.php 然后 continue，
+                           用 continue 而不是 if/else 包住下面整个 article，
+                           省得把二十多行标记整体再缩进一层。 */ ?>
+                    <?php if (noline_is_diary($this)): ?>
+                        <?php $this->need('public/status-card.php'); ?>
+                        <?php continue; ?>
+                    <?php endif; ?>
+
+                <article class="card post-card">
+                    <div class="post-header">
+                        <img src="<?php echo noline_author_avatar($this); ?>" alt="" class="avatar" width="40" height="40" loading="lazy">
+                        <div class="header-text">
+                            <div class="author-name"><?php $this->author(); ?></div>
+                            <div class="post-meta">
+                                <span class="meta-item"><?php noline_icon('clock'); ?><time datetime="<?php $this->date('c'); ?>"><?php $this->date('Y-m-d'); ?></time></span>
+                                <span class="category-tag"><?php $this->category(', ', true, _t('未分类')); ?></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2 class="post-title">
+                        <a class="post-title-link" href="<?php $this->permalink(); ?>"><?php $this->title(); ?></a>
+                    </h2>
+
+                    <div class="post-excerpt"><?php $this->excerpt(140, '…'); ?></div>
+
+                    <div class="post-footer">
+                        <span class="stat-item"><?php noline_icon('eye'); ?> <?php _e('阅读'); ?> <?php echo noline_get_views($this->cid); ?></span>
+                        <a class="stat-item" href="<?php $this->permalink(); ?>#comments"><?php noline_icon('comment'); ?> <?php _e('评论'); ?> <?php $this->commentsNum('0', '1', '%d'); ?></a>
+                        <a class="read-more" href="<?php $this->permalink(); ?>"><?php _e('阅读全文'); ?></a>
+                    </div>
+
+                    <?php noline_comment_preview($this); ?>
+                </article>
+                <?php endwhile; ?>
+
+                <?php $this->pageNav('&laquo; ' . _t('前一页'), _t('后一页') . ' &raquo;'); ?>
+            <?php else: ?>
+                <div class="card">
+                    <div class="empty-state">
+                        <div class="empty-state-icon"><?php noline_icon('circle-info'); ?></div>
+                        <p class="empty-state-text"><?php _e('这里还什么都没有，先去写点什么吧。'); ?></p>
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <?php $this->need('public/sidebar.php'); ?>
+
     </div>
 </div>
 
-<?php $this->need('sidebar-right.php'); ?>
-</div></div></div>
-
 <?php $this->need('public/footer.php'); ?>
-</div></div></div></div>
-</body>

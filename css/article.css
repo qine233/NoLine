@@ -1,0 +1,279 @@
+@charset "UTF-8";
+
+/**
+ * 文章正文排版。
+ *
+ * 前身是 typora-indigo.css —— 那是 Typora 编辑器主题导出，所有规则都以 #write 为前缀，
+ * 而主题的正文容器是 .post-content，所以整份样式表从未生效过；其中还有大量只存在于
+ * Typora 编辑器里的选择器（.md-fences / .cm-s-inner / .svg-markmap-box）。
+ *
+ * 这里只保留能作用到 Typecho 渲染结果的部分。
+ *
+ * 配色一律引用 design.css 的设计令牌，本文件里不允许出现任何字面量颜色——
+ * 否则深色模式和后台自定义强调色都会漏。想改配色请去改 :root。
+ */
+
+.post-content {
+    color: var(--text-main);
+    font-size: 1rem;
+    line-height: 1.8;
+    /* break-all 会把英文单词从中间截断，这里换成只在必要时断行 */
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+
+.post-content > :first-child {
+    margin-top: 0;
+}
+
+.post-content > :last-child {
+    margin-bottom: 0;
+}
+
+/* ---------- 段落与块级间距 ---------- */
+
+.post-content p,
+.post-content blockquote,
+.post-content dl,
+.post-content ol,
+.post-content ul,
+.post-content pre,
+.post-content table,
+.post-content details {
+    margin: 0 0 1rem;
+}
+
+/* ---------- 标题 ---------- */
+/* 原先只给了 margin-bottom，配合 design.css 的全局 margin 归零后标题会全部粘在一起 */
+
+.post-content h1,
+.post-content h2,
+.post-content h3,
+.post-content h4,
+.post-content h5,
+.post-content h6 {
+    margin: 2rem 0 1rem;
+    line-height: 1.3;
+    font-weight: 700;
+    color: var(--text-strong);
+}
+
+.post-content h1 { font-size: 1.75rem; }
+.post-content h2 { font-size: 1.5rem; }
+.post-content h3 { font-size: 1.25rem; }
+.post-content h4 { font-size: 1.1rem; }
+.post-content h5 { font-size: 1rem; }
+.post-content h6 { font-size: 0.95rem; color: var(--text-secondary); }
+
+.post-content h1,
+.post-content h2 {
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* ---------- 列表 ---------- */
+/* design.css 的重置只作用于 ul[class]，正文里没 class 的列表不受影响；
+   这里显式声明是为了把浏览器默认的 40px 缩进收成统一的 1.75em */
+
+.post-content ul { list-style: disc; }
+.post-content ol { list-style: decimal; }
+
+.post-content ul,
+.post-content ol {
+    padding-left: 1.75em;
+}
+
+.post-content li { margin-bottom: 0.35em; }
+.post-content li > ul,
+.post-content li > ol { margin-top: 0.35em; margin-bottom: 0; }
+.post-content li::marker { color: var(--accent); }
+
+/* ---------- 引用 ---------- */
+
+.post-content blockquote {
+    padding: 0.75rem 1rem;
+    border-left: 0.25em solid var(--accent);
+    background-color: var(--accent-bg);
+    color: var(--text-secondary);
+    border-radius: 0 6px 6px 0;
+}
+
+.post-content blockquote > :first-child { margin-top: 0; }
+.post-content blockquote > :last-child { margin-bottom: 0; }
+
+/* ---------- 行内元素 ---------- */
+
+.post-content a {
+    color: var(--accent);
+    font-weight: 500;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(var(--accent-rgb), .35);
+    transition: border-color .2s, color .2s;
+}
+
+.post-content a:hover {
+    color: var(--accent-hover);
+    border-bottom-color: var(--accent-hover);
+}
+
+.post-content strong { color: var(--text-strong); font-weight: 700; }
+
+.post-content del { color: var(--text-light); }
+
+.post-content mark {
+    background-color: var(--mark-bg);
+    color: inherit;
+    padding: 0 0.15em;
+    border-radius: 2px;
+}
+
+.post-content hr {
+    height: 1px;
+    margin: 2rem 0;
+    border: 0;
+    background-color: var(--border-strong);
+}
+
+/* ---------- 行内代码 ---------- */
+
+.post-content code {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    padding: 0.15em 0.4em;
+    background-color: var(--surface-code);
+    color: var(--accent);
+    border-radius: 4px;
+}
+
+/* ---------- 代码块 ----------
+   语法配色交给 vendor/atom-one-dark.min.css，这里管容器、红绿灯和滚动。
+
+   macOS 红绿灯画在 pre 的 background-image 上，不用 ::before——pre 是 overflow:auto，
+   绝对定位的伪元素会跟着内容横向滚走，而默认 background-attachment:scroll 的背景
+   是钉在 padding box 上不动的。三个圆点的坐标在 design.css 的 --code-dots 里。 */
+
+.post-content pre {
+    padding: 2rem 0 0;
+    overflow: auto;
+    border-radius: var(--radius-md);
+    background-color: var(--code-bg);
+    background-image: var(--code-dots);
+    background-repeat: no-repeat;
+    box-shadow: var(--shadow-sm);
+    -webkit-overflow-scrolling: touch;
+}
+
+/* 特异性陷阱：atom-one-dark.min.css 里有 `pre code.hljs{padding:1em}`，特异性 (0,1,2)，
+   和 `.post-content pre code` 完全打平，但它在 header.php 里加载于本文件之后，所以 padding 归它赢。
+   要改就必须把特异性抬上去——带上 .hljs 再写一遍，(0,2,2) 稳赢。
+   两条选择器共用同一份声明，高亮块和未高亮块因此始终一致。 */
+.post-content pre code,
+.post-content pre code.hljs {
+    display: block;
+    padding: 0.75em 1.1em 1em;
+    background: none;
+    /* 必须显式给浅色前景：写成 inherit 会继承到正文的深色，
+       而 highlight.js 没跑起来时（禁用 JS、或语言识别不出）代码就是深底深字，完全看不清。
+       --code-fg 就是 atom-one-dark 的基础前景色，.hljs 类只在此基础上细化各语法元素的颜色。 */
+    color: var(--code-fg);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: 1.6;
+    border-radius: 0;
+    white-space: pre;
+}
+
+/* main.js 会把每个 pre 包进 .code-block，复制按钮挂在外层 wrapper 上——
+   直接绝对定位在 pre 里会跟着横向滚动跑掉。 */
+.post-content .code-block {
+    position: relative;
+    margin: 0 0 1rem;
+}
+.post-content .code-block > pre { margin: 0; }
+
+.btn-copy-code {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: .3125rem;
+    padding: .1875rem .5625rem;
+    font-size: .75rem;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--code-fg);
+    background-color: var(--code-chrome);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .18s ease, background-color .18s ease;
+}
+.post-content .code-block:hover .btn-copy-code,
+.btn-copy-code:focus-visible { opacity: 1; }
+.btn-copy-code:hover { background-color: var(--code-chrome-hover); }
+.btn-copy-code.is-done { color: var(--accent); }
+
+/* 触屏上没有 hover，按钮常驻 */
+@media (hover: none) {
+    .btn-copy-code { opacity: 1; }
+}
+
+/* ---------- 图片 ---------- */
+
+.post-content img {
+    display: block;
+    max-width: 100%;
+    max-height: 36rem;
+    height: auto;
+    margin: 1rem auto;
+    object-fit: contain;
+    border-radius: 6px;
+}
+
+.post-content picture {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 1rem 0;
+}
+
+/* ---------- 表格 ---------- */
+/* 原样式表完全没有表格样式，Markdown 表格会散架 */
+
+.post-content table {
+    width: 100%;
+    display: block;
+    overflow-x: auto;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+}
+
+.post-content th,
+.post-content td {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-strong);
+    text-align: left;
+}
+
+.post-content th {
+    background-color: var(--surface-sunken);
+    font-weight: 700;
+    color: var(--text-strong);
+}
+
+.post-content tbody tr:nth-child(even) { background-color: var(--surface-zebra); }
+
+/* ---------- 脚注 ---------- */
+
+.post-content .footnotes {
+    margin-top: 2rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.post-content .footnote-ref { border-width: 0; }
