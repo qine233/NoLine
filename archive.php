@@ -58,6 +58,7 @@
                 <?php endwhile; ?>
 
                 <?php $this->pageNav('&laquo; ' . _t('前一页'), _t('后一页') . ' &raquo;'); ?>
+                <?php $this->need('public/feed-status.php'); ?>
             <?php else: ?>
                 <div class="card">
                     <div class="empty-state">

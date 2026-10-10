@@ -261,11 +261,13 @@ summary:focus-visible,
    布局
    ========================================================================== */
 
+/* 顶栏全站 sticky，它下方那段留白归 container 管，而不是 .grid-layout——
+   首页的 .site-hero 排在 .grid-layout 之前，挂在 grid-layout 上的顶距它拿不到。 */
 .container {
     width: 100%;
     max-width: 1320px;
     margin: 0 auto;
-    padding: 0 1.25rem;
+    padding: 2rem 1.25rem;
     transition: opacity .34s ease, transform .34s ease;
 }
 
@@ -273,7 +275,6 @@ summary:focus-visible,
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 2rem;
-    padding: 2rem 0;
     /* 侧边栏比正文长时不要把正文卡一起拉伸 */
     align-items: start;
 }
@@ -283,6 +284,33 @@ summary:focus-visible,
    按 8fr/4fr 拆出正文 635px、右栏 317px——正文再窄就不好读了。 */
 @media (min-width: 1024px) {
     .grid-layout { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); }
+
+    /* 右栏必须撑满整行高度，.sidebar-sticky 才有地方可走：sticky 元素被父盒的
+       内容框约束，而 grid 的 align-items:start 会把 .sidebar 压成内容高度。
+       列表改成无限加载之后正文能长到几千像素，右栏若只有自身那 1300px，
+       尾部滚过那一截就跟着走了，等于白钉。 */
+    .sidebar { align-self: stretch; }
+
+    /* 右栏尾部（近期评论 + 站点信息）跟着页面滚。整栏都钉的话前面四张滚走以后
+       右栏上半截是空的，一张都不钉的话滚过一屏之后右栏整个是空的。
+       max-height 是矮窗口下的保险丝：尾部约 580px，1024×600 那种窗口放不下，
+       不设上限的话站点信息底部的版权行会永久留在视口外。
+       top 比 .container 的 2rem 顶距少 .25rem，正是下面那层 padding 的厚度，
+       这样钉住时第一张卡的位置和没这层壳时一模一样。 */
+    .sidebar-sticky {
+        position: sticky;
+        top: calc(var(--topbar-h) + 1.75rem);
+        max-height: calc(100vh - var(--topbar-h) - 4rem);
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--border-strong) transparent;
+        /* overflow-y:auto 会把 overflow-x 一起算成 auto（CSS 不允许一轴 visible
+           另一轴 auto），卡片的 box-shadow 会撑出两三像素横向溢出、挤出滚动条。
+           四周让出 .25rem 再用等量负 margin 抵掉，卡片位置不动。 */
+        margin: -.25rem;
+        padding: .25rem;
+    }
+    .sidebar-sticky .card:last-child { margin-bottom: 0; }
 }
 
 /* grid 子项默认 min-width:auto，长代码块/宽表格会把列撑破，必须显式归零 */
@@ -1365,6 +1393,47 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
 .page-navigator li a:hover { border-color: var(--accent); color: var(--accent); }
 .page-navigator .current a,
 .page-navigator .current span { background-color: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+/* 无限滚动接管后 JS 把页码设成 hidden 留作退路；上面那条 display:flex 会压掉 UA 的 [hidden] */
+.page-navigator[hidden] { display: none; }
+
+/* 自动加载状态区。它同时是 IntersectionObserver 的观察目标，
+   高度为 0 的盒子在 IO 里行为含糊，所以 min-height 不是装饰。 */
+.feed-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    min-height: 3rem;
+    padding: .5rem 0;
+    font-size: .875rem;
+    color: var(--text-light);
+}
+.feed-status[hidden] { display: none; }
+.feed-spinner {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    border: 2px solid var(--border-strong);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: feed-spin .7s linear infinite;
+}
+/* 三句文案长度不同，给个下限，居中的状态组才不会在每次加载结束时左右跳 */
+.feed-text { min-width: 5em; }
+.feed-retry {
+    padding: .375rem 1rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-full);
+    background-color: var(--card-bg);
+    font-family: inherit;
+    font-size: .8125rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background-color .2s, color .2s, border-color .2s;
+}
+.feed-retry:hover { background-color: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+
+@keyframes feed-spin { to { transform: rotate(360deg); } }
 
 /* ==========================================================================
    文章底部上一篇 / 下一篇

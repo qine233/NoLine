@@ -2,9 +2,13 @@
 <?php
 /**
  * 右栏。站点身份（头像/名字/座右铭）在顶栏品牌和首页 masthead 里，
- * 这里放组件卡：日历 / 那年今日 / 近期评论 / 分类 / 标签 / 站点信息。
+ * 这里放组件卡：日历 / 那年今日 / 分类 / 标签 / 近期评论 / 站点信息。
  *
  * 药丸标题不塞图标：圆点由 .card-header::before 统一画，整排卡片才是同一种语言。
+ *
+ * 最后两张（近期评论 + 站点信息）包在 .sidebar-sticky 里，是右栏唯一跟着页面滚的
+ * 部分——列表改成无限加载之后正文会一直往下长，整栏都固定住的话前面四张滚走以后
+ * 右栏就空了，整栏都不固定的话滚过一屏之后右栏又是空的。
  */
 $options = $this->options;
 
@@ -68,28 +72,6 @@ $stats    = noline_site_stats();
     </div>
     <?php endif; ?>
 
-    <!-- 近期评论：头像之间一条竖向发丝线，正文坐进浅灰气泡 -->
-    <?php $this->widget('Widget_Comments_Recent', 'pageSize=5')->to($recent); ?>
-    <?php if ($recent->have()): ?>
-    <div class="card">
-        <div class="card-header"><?php _e('近期评论'); ?></div>
-        <div class="rcomment-list">
-            <?php while ($recent->next()): ?>
-            <a class="rcomment-item" href="<?php $recent->permalink(); ?>#comment-<?php echo (int)$recent->coid; ?>">
-                <img class="rcomment-face" src="<?php echo htmlspecialchars(noline_gravatar((string)$recent->mail, 64), ENT_QUOTES, 'UTF-8'); ?>" alt="" width="32" height="32" loading="lazy">
-                <span class="rcomment-main">
-                    <span class="rcomment-head">
-                        <span class="rcomment-author"><?php echo htmlspecialchars((string)$recent->author, ENT_QUOTES, 'UTF-8'); ?></span>
-                        <span class="rcomment-time"><?php echo noline_time_ago($recent->created); ?></span>
-                    </span>
-                    <span class="rcomment-bubble"><?php echo htmlspecialchars(noline_plain_excerpt($recent->text, 46), ENT_QUOTES, 'UTF-8'); ?></span>
-                </span>
-            </a>
-            <?php endwhile; ?>
-        </div>
-    </div>
-    <?php endif; ?>
-
     <!-- 分类。数据取自 noline_categories()，不再自己遍历 widget：
          顶栏的分类下拉已经遍历过一遍，而 Typecho 的 widget() 只按类名缓存实例、
          Rows 又没有 rewind()，这里第二遍 while 会直接空转，卡片静默变空。 -->
@@ -129,22 +111,50 @@ $stats    = noline_site_stats();
         </div>
     </div>
 
-    <!-- 站点信息 -->
-    <div class="card">
-        <div class="card-header"><?php _e('站点信息'); ?></div>
-        <div class="site-stats">
-            <span class="site-stat"><?php _e('文章'); ?><b><?php echo $stats['posts']; ?></b></span>
-            <span class="site-stat"><?php _e('评论'); ?><b><?php echo $stats['comments']; ?></b></span>
-            <span class="site-stat"><?php _e('分类'); ?><b><?php echo $stats['categories']; ?></b></span>
-            <span class="site-stat"><?php _e('运行'); ?><b><?php echo sprintf(_t('%d 天'), $stats['days']); ?></b></span>
+    <!-- 跟着页面滚的尾部。两张卡必须是相邻的兄弟：同级 sticky 元素共用一个 top
+         会精确重叠，而 .card 是不透明背景，后一张会整张盖住前一张。 -->
+    <div class="sidebar-sticky">
+
+        <!-- 近期评论：头像之间一条竖向发丝线，正文坐进浅灰气泡 -->
+        <?php $this->widget('Widget_Comments_Recent', 'pageSize=5')->to($recent); ?>
+        <?php if ($recent->have()): ?>
+        <div class="card">
+            <div class="card-header"><?php _e('近期评论'); ?></div>
+            <div class="rcomment-list">
+                <?php while ($recent->next()): ?>
+                <a class="rcomment-item" href="<?php $recent->permalink(); ?>#comment-<?php echo (int)$recent->coid; ?>">
+                    <img class="rcomment-face" src="<?php echo htmlspecialchars(noline_gravatar((string)$recent->mail, 64), ENT_QUOTES, 'UTF-8'); ?>" alt="" width="32" height="32" loading="lazy">
+                    <span class="rcomment-main">
+                        <span class="rcomment-head">
+                            <span class="rcomment-author"><?php echo htmlspecialchars((string)$recent->author, ENT_QUOTES, 'UTF-8'); ?></span>
+                            <span class="rcomment-time"><?php echo noline_time_ago($recent->created); ?></span>
+                        </span>
+                        <span class="rcomment-bubble"><?php echo htmlspecialchars(noline_plain_excerpt($recent->text, 46), ENT_QUOTES, 'UTF-8'); ?></span>
+                    </span>
+                </a>
+                <?php endwhile; ?>
+            </div>
         </div>
-        <div class="site-footer-note">
-            <p>&copy; <?php echo date('Y'); ?> <?php $options->title(); ?></p>
-            <p><?php _e('由 Typecho 驱动'); ?> · <?php _e('主题 NoLine'); ?></p>
-            <?php if ($customFooter !== ''): ?>
-            <p><?php echo $customFooter; ?></p>
-            <?php endif; ?>
+        <?php endif; ?>
+
+        <!-- 站点信息 -->
+        <div class="card">
+            <div class="card-header"><?php _e('站点信息'); ?></div>
+            <div class="site-stats">
+                <span class="site-stat"><?php _e('文章'); ?><b><?php echo $stats['posts']; ?></b></span>
+                <span class="site-stat"><?php _e('评论'); ?><b><?php echo $stats['comments']; ?></b></span>
+                <span class="site-stat"><?php _e('分类'); ?><b><?php echo $stats['categories']; ?></b></span>
+                <span class="site-stat"><?php _e('运行'); ?><b><?php echo sprintf(_t('%d 天'), $stats['days']); ?></b></span>
+            </div>
+            <div class="site-footer-note">
+                <p>&copy; <?php echo date('Y'); ?> <?php $options->title(); ?></p>
+                <p><?php _e('由 Typecho 驱动'); ?> · <?php _e('主题 NoLine'); ?></p>
+                <?php if ($customFooter !== ''): ?>
+                <p><?php echo $customFooter; ?></p>
+                <?php endif; ?>
+            </div>
         </div>
+
     </div>
 
 </aside>

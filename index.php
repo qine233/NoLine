@@ -4,7 +4,7 @@
  *
  * @package NoLine
  * @author QINE
- * @version 1.6.0
+ * @version 1.7.0
  * @link https://www.idkzr.com/
  */
 
@@ -102,6 +102,7 @@ $this->need('public/header.php');
                 <?php endwhile; ?>
 
                 <?php $this->pageNav('&laquo; ' . _t('前一页'), _t('后一页') . ' &raquo;'); ?>
+                <?php $this->need('public/feed-status.php'); ?>
             <?php else: ?>
                 <div class="card">
                     <div class="empty-state">
