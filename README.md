@@ -94,9 +94,19 @@ NoLine 主张「无描边卡片」与「设计令牌驱动」：层次靠留白�
 1. 把 `plugins/NolineApi` 整个目录拷到 `usr/plugins/`。
 2. 后台「插件」里启用，填接口密钥（明文存即可，接口靠请求头 `X-NoLine-Key` 校验）。
 3. **启用后请「停用 → 再启用」一次**：后台顶栏的「主题管理」链接挂在 `admin/menu.php:navBar`
-   钩子上，老版本激活时注册过的那条不会因为升级而补上。
+   钩子上，编辑器的图床面板挂在 `admin/write-post.php:bottom`、`write-page.php:bottom` 上，
+   老版本激活时注册过的那几条不会因为升级而补上。
 4. 后台顶栏点「主题管理」，那一页有：14 项主题设置的可视化编辑、接口状态与自检、
-   GitHub 检测更新与一键升级（升级前自动备份旧主题、留回滚入口、`views/` 会保留）。
+   GitHub 检测更新与一键升级（升级前自动备份旧主题、留回滚入口、`views/` 会保留）、
+   接入 Cloudreve 的图床上传。
+5. 图床：在插件设置里填 Cloudreve 地址和 **Refresh Token**（登录 Cloudreve 后在浏览器控制台
+   执行 `localStorage.getItem('refresh_token')` 取），启用后写文章/写页面的附件面板顶部会多一个
+   「图床」框，选文件、粘贴截图或拖图片进去都能上传，传完自动把直链按当前编辑器形态
+   （Markdown 或富文本）插进正文，附带「打开 / 复制」两个按钮。
+   Typecho 自带的附件上传一点不动，两者并存。
+   Cloudreve v4 没有长期个人 token（access 默认 1 小时过期），插件自己拿 Refresh Token 续 access
+   并缓存在 `usr/uploads/noline_api/cloudreve.php`；**令牌只在服务端用，浏览器请求先到插件、
+   由插件加上 `Authorization` 再转发给 Cloudreve**，所以这条链路不要求同源以外的任何凭据。
 
 接口端点（细节全部在 `APP-API-SPEC.md`）：
 
@@ -110,6 +120,9 @@ POST   /api/health/records        写入单条或 {"records":[…]} 批量
 DELETE /api/health/records?date=  删除某天记录
 ```
 
+`POST /index.php?noline_api=upload` 是图床上传，走后台登录态 + 编辑器令牌，不吃 `X-NoLine-Key`，
+只给浏览器用，所以不写进 `APP-API-SPEC.md`。
+
 数据落在 `usr/uploads/noline_api/store.php`，上限 3660 条。
 
 ---
@@ -120,7 +133,7 @@ DELETE /api/health/records?date=  删除某天记录
 
 | 脚本 | 拦的是什么 |
 |---|---|
-| `phpcheck.py` | 插件四个文件的括号配对、文件头守卫、`self::` 指向的方法是否存在、私有方法漏调用、`_t()` 占位符缺参、**主题字段表与 `functions.php` 的 14 项是否漂移** |
+| `phpcheck.py` | 插件五个文件的括号配对、文件头守卫、`self::` 指向的方法是否存在、私有方法漏调用、`_t()` 占位符缺参、**主题字段表与 `functions.php` 的 14 项是否漂移** |
 | `structure.py` | 模板 PHP/HTML 平衡、文档外壳、页面骨架、图标引用、死函数、重复声明 |
 | `classcheck.py` | 模板在用的 class 有没有样式、样式表里有没有解释不了的死规则（双向） |
 | `jscheck.py` | `main.js` 括号平衡、未定义引用、JS 钩子与模板 id/class 一一对应、CSS 花括号 |
@@ -158,6 +171,9 @@ tag 名用 `1.19.0` 或 `v1.19.0`（工作流只认这两种形状），且必�
   这是有意的：公告里要能放链接和样式。代价是拿到接口密钥的人能往前台注入任意脚本，
   所以 `PUT /api/theme` 有独立开关，`APP-API-SPEC.md` 里也把它标成高危能力。
 - 归档页一次列全部文章，查询数是 O(文章数)。
+- 图床只实现「走 Cloudreve 服务端」的上传策略。如果实例的存储策略配成浏览器直传第三方对象存储
+  （`file/upload` 会返回非空 `upload_urls`），插件会明确拒绝并提示去后台把该策略改成云端/本地，
+  而不是自作主张地去接一套签名协议。
 - 不做「首屏关键 CSS 内联 + 其余异步」：异步补 CSS 会重新引入首屏白闪，这一版宁可留全量阻塞 CSS。
 
 ---

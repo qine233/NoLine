@@ -17,20 +17,21 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  * NoLine 对外接口
  *
  * 把主题设置和个人健康数据（体重 / BMI）以 JSON 接口暴露出去，给 App 或脚本对接用；
- * 顺带在后台挂一个「主题管理」页，主题的全部配置项、GitHub 更新检测与一键升级都在那儿。
+ * 顺带在后台挂一个「主题管理」页，主题的全部配置项、GitHub 更新检测与一键升级都在那儿，
+ * 还能把后台编辑器的附件面板接上 Cloudreve v4 当图床（传完往正文插永久直链）。
  * 鉴权走自设密钥：请求头 X-NoLine-Key，或查询参数 key。站点没上 HTTPS 时务必用只读模式。
  *
  * 接口清单、鉴权方式、curl 示例都在「控制台 → 插件 → NolineApi → 设置」页面里。
  *
  * @package NolineApi
  * @author 州州
- * @version 1.1.0
+ * @version 1.2.0
  * @link https://ui.zhouzhou.work/
  */
 class Plugin implements PluginInterface
 {
     /** 改这里要同时改文件头注释里的 @version，后台插件列表读的是注释 */
-    private const VERSION = '1.1.0';
+    private const VERSION = '1.2.0';
 
     /** 数据目录放在 uploads 下，不在主题目录内，升级主题不会清空记录 */
     private const DATA_DIR = '/usr/uploads/noline_api';
@@ -51,10 +52,15 @@ class Plugin implements PluginInterface
         \Typecho\Plugin::factory('index.php')->begin = array(__CLASS__, 'onRequest');
         // 后台没有给插件留独立页面的挂载点，能塞东西的只有顶栏这一条，页面本身自己渲染
         \Typecho\Plugin::factory('admin/menu.php')->navBar = array(__CLASS__, 'onAdminMenu');
+        // 图床面板挂在写文章/写页面的 bottom。不占 richEditor：那个钩子一旦被插件占了，
+        // 核心就跳过 editor-js.php，自带编辑器和它的插入行为一起没了
+        \Typecho\Plugin::factory('admin/write-post.php')->bottom = array(__CLASS__, 'onEditorBottom');
+        \Typecho\Plugin::factory('admin/write-page.php')->bottom = array(__CLASS__, 'onEditorBottom');
 
         return _t('接口已启用。先在插件设置里填密钥，再访问 <code>/api/ping</code> 自检；'
             . '主题设置与一键更新在后台右上角的「主题管理」里（<strong>停用再启用一次插件</strong>'
-            . '那个链接才会出现）。');
+            . '那个链接才会出现）。图床同样在设置里填 Cloudreve 地址和 Refresh Token，'
+            . '填好后进写文章页的「附件」标签就能看到上传区。');
     }
 
     public static function deactivate()
@@ -165,6 +171,86 @@ class Plugin implements PluginInterface
         );
         $form->addInput($ghToken);
 
+        $crEnabled = new Radio(
+            'crEnabled',
+            array('1' => _t('开启'), '0' => _t('关闭')),
+            '1',
+            _t('Cloudreve 图床'),
+            _t('关闭时写文章页不出现图床上传区，已插进正文的直链不受影响。')
+        );
+        $form->addInput($crEnabled);
+
+        $crHost = new Text(
+            'crHost',
+            null,
+            null,
+            _t('Cloudreve 实例地址'),
+            _t('例如 <code>https://pan.example.com</code>，装在子目录就一起填上。'
+                . '插件只会往这个地址的 <code>/api/v4/</code> 发请求。留空等于关掉图床。')
+        );
+        $form->addInput($crHost);
+
+        $crDir = new Text(
+            'crDir',
+            null,
+            'noline',
+            _t('存放目录'),
+            _t('相对 Cloudreve 用户根目录的路径，例如 <code>noline</code> 或 <code>博客/图床</code>。'
+                . '不存在会在第一次上传时自动建。')
+        );
+        $form->addInput($crDir);
+
+        $crRefresh = new Password(
+            'crRefresh',
+            null,
+            null,
+            _t('Refresh Token（推荐）'),
+            _t('v4 没有长期有效的个人 token：浏览器用的 access token 默认只活 1 小时，'
+                . 'refresh token 默认 180 天。登录 Cloudreve 后在浏览器控制台执行 '
+                . '<code>localStorage.getItem('refresh_token')</code> 把这一串贴进来，'
+                . '插件会自己在快到期时换新的 access token。原文存库，只发给上面那个地址。')
+        );
+        $form->addInput($crRefresh);
+
+        $crAccess = new Password(
+            'crAccess',
+            null,
+            null,
+            _t('Access Token（备选，活不长）'),
+            _t('拿不到 refresh token 时才填。填了 Refresh Token 就不用管这里——'
+                . '它过期后接口会明确报 401，到时候回来补 Refresh Token。')
+        );
+        $form->addInput($crAccess);
+
+        $crMaxSize = new Text(
+            'crMaxSize',
+            null,
+            (string)Cloudreve::DEFAULT_MAX,
+            _t('单文件上限（MB）'),
+            _t('只是插件这边的闸，Cloudreve 自己那套存储策略限额照样生效；'
+                . 'PHP 的 <code>upload_max_filesize</code> 更小时以 PHP 为准，文件会在进插件之前就被拒。')
+        );
+        $form->addInput($crMaxSize);
+
+        $crAllow = new Text(
+            'crAllow',
+            null,
+            Cloudreve::DEFAULT_ALLOW,
+            _t('允许的扩展名'),
+            _t('逗号分隔，不带点。按文件真实内容判类型后再比扩展名。')
+        );
+        $form->addInput($crAllow);
+
+        $crPaste = new Radio(
+            'crPaste',
+            array('1' => _t('开'), '0' => _t('关')),
+            '1',
+            _t('粘贴截图直传'),
+            _t('开着时在正文框里 Ctrl+V 一张截图就直接走图床。'
+                . '关掉后仍然可以点按钮选文件或者拖进图床框。')
+        );
+        $form->addInput($crPaste);
+
         self::renderDocs();
     }
 
@@ -194,6 +280,15 @@ class Plugin implements PluginInterface
     }
 
     /**
+     * 写文章 / 写页面页脚（admin/write-post.php:bottom、write-page.php:bottom）。
+     * 两个钩子共用这一个入口，图床面板自己判断该不该出现。
+     */
+    public static function onEditorBottom($content = null)
+    {
+        Cloudreve::onWriteBottom($content);
+    }
+
+    /**
      * index.php:begin 钩子。不是接口请求就直接返回，让 Typecho 正常路由。
      */
     public static function onRequest($unused = null)
@@ -207,6 +302,13 @@ class Plugin implements PluginInterface
         // 管理页看的是登录态，跟对外接口开没开、密钥对不对都没关系
         if ($route === Admin::ROUTE) {
             Admin::handle();
+
+            return;
+        }
+
+        // 图床上传同理：它在浏览器和 Cloudreve 之间当代理，凭据在库里，不该要接口密钥
+        if ($route === Cloudreve::ROUTE) {
+            Cloudreve::handle();
 
             return;
         }

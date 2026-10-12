@@ -106,7 +106,11 @@ class Admin
                 return array('error', _t('没有保存，任何一项不通过都整批退回：') . implode('<br>', $lines));
 
             default:
-                // refresh / upgrade / rollback / drop_backup / clean_work 都归更新器
+                // cr_probe / cr_forget 归图床，其余（refresh / upgrade / rollback / drop_backup / clean_work）归更新器
+                if (strpos($action, 'cr_') === 0) {
+                    return Cloudreve::act($action);
+                }
+
                 return Updater::act($action);
         }
     }
@@ -197,6 +201,7 @@ class Admin
         echo self::themeSection($values, $token, $url, $isNoline);
         echo self::apiSection($options);
         echo Updater::section($token, $url);
+        echo Cloudreve::section($token, $url);
 
         echo '</div></div></div></div>' . self::scripts() . '</body></html>';
     }
