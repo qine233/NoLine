@@ -213,7 +213,9 @@
             if (a.origin !== location.origin) {
                 return;
             }
-            /* 纯锚点跳转交给浏览器，否则 hash 定位会被淡出动画吃掉 */
+            /* 同一路径、同一串查询参数，只有 hash 不同（或者压根没有 hash）的链接
+               一律放行：这类点击要的是浏览器原地的锚点定位或自我刷新，接管成
+               「淡出再淡入」只会把 hash 定位吃掉。目录那些 href="#toc-1" 就走这条。 */
             if (a.pathname === location.pathname && a.search === location.search) {
                 return;
             }
@@ -309,6 +311,20 @@
             button.addEventListener('click', function () {
                 copyFrom(button, pre);
             });
+        });
+    }
+
+    /* WebKit 会把「没有标记的列表」从无障碍树里降成一组普通方块——
+       只要 list-style-type 是 none 就摘掉 list 角色。article.css 正是这么画列表的
+       （自绘的圆点和 counter 序号读屏软件看不见），所以这里把角色显式加回来。
+       只碰 .post-content：样式表里也只有这一层关掉了 list-style。 */
+    function initListSemantics() {
+        var lists = document.querySelectorAll('.post-content ul, .post-content ol');
+
+        Array.prototype.forEach.call(lists, function (list) {
+            if (!list.hasAttribute('role')) {
+                list.setAttribute('role', 'list');
+            }
         });
     }
 
@@ -493,74 +509,6 @@
         }
     }
 
-    /* 分类下拉。CSS 的 :hover / :focus-within 已经能开合它，这里补三件 CSS 做不到的事：
-       触发器上如实的 aria-expanded、点击也能开合（触屏没有 hover）、以及点外面收起。 */
-    function initNavGroups() {
-        var groups = document.querySelectorAll('.nav-group');
-
-        if (!groups.length) {
-            return;
-        }
-
-        var wide = window.matchMedia ? window.matchMedia('(min-width: 1024px)') : null;
-
-        Array.prototype.forEach.call(groups, function (group) {
-            var button = group.querySelector('.nav-group-btn');
-
-            if (!button) {
-                return;
-            }
-
-            function setPinned(open) {
-                group.classList.toggle('is-open', open);
-                button.setAttribute('aria-expanded', open ? 'true' : 'false');
-            }
-
-            button.addEventListener('click', function () {
-                setPinned(!group.classList.contains('is-open'));
-            });
-
-            /* 宽屏上开合是 CSS 干的，aria-expanded 得跟着说真话，否则读屏器
-               一直以为菜单是关的。窄屏下面板只由点击控制，别把 hover 写进去。 */
-            if (wide) {
-                var onIn = function () {
-                    if (wide.matches) {
-                        button.setAttribute('aria-expanded', 'true');
-                    }
-                };
-                var onOut = function () {
-                    if (wide.matches && !group.classList.contains('is-open')) {
-                        button.setAttribute('aria-expanded', 'false');
-                    }
-                };
-                group.addEventListener('mouseenter', onIn);
-                group.addEventListener('focusin', onIn);
-                group.addEventListener('mouseleave', onOut);
-                group.addEventListener('focusout', onOut);
-            }
-
-            document.addEventListener('click', function (event) {
-                if (group.classList.contains('is-open') && !group.contains(event.target)) {
-                    setPinned(false);
-                }
-            });
-        });
-
-        document.addEventListener('keydown', function (event) {
-            if (event.key !== 'Escape') {
-                return;
-            }
-            Array.prototype.forEach.call(groups, function (group) {
-                var button = group.querySelector('.nav-group-btn');
-                if (button && group.classList.contains('is-open')) {
-                    group.classList.remove('is-open');
-                    button.setAttribute('aria-expanded', 'false');
-                    button.focus();
-                }
-            });
-        });
-    }
-
     /* 滚动百分比。整数写进 #nav-percent，百分号是 CSS 的 ::after，JS 不拼字符串。
        passive 是因为这里绝不会 preventDefault，浏览器就能不等 JS 直接滚；
        rAF 节流是免得一次滚动里重排好几遍。 */
@@ -608,6 +556,113 @@
     }
 
     /* ==========================================================================
+       顶栏收成玻璃胶囊
+       阈值取 hero 的下沿：滚过它顶栏才该变胶囊，不然白字会一路压到正文上。
+       没有 hero 的页面（归档、单页、404）压根没有这一屏，一进页面就是胶囊态——
+       固定顶栏是透明的，不挂胶囊等于没有顶栏。
+       ========================================================================== */
+    function initNavCollapse() {
+        var body = document.body;
+
+        if (!body.classList.contains('has-hero')) {
+            body.classList.add('nav-fixed');
+            return;
+        }
+
+        var hero = document.querySelector('.site-hero, .post-hero');
+        var queued = false;
+
+        function render() {
+            queued = false;
+
+            var bottom = hero ? hero.getBoundingClientRect().bottom : 0;
+
+            /* 用胶囊高度（44）而不是顶栏高度做阈值：胶囊在 hero 彻底离开之前就该成形，
+               等它完全滚出再换，白字会有一瞬压在页底色上。 */
+            body.classList.toggle('nav-fixed', bottom < 44);
+        }
+
+        function schedule() {
+            if (queued) {
+                return;
+            }
+            queued = true;
+            window.requestAnimationFrame(render);
+        }
+
+        window.addEventListener('scroll', schedule, { passive: true });
+        /* hero 高度是 min-height，标题换行、字体加载完、转屏都会改它，不重算阈值就错 */
+        window.addEventListener('resize', schedule);
+        render();
+    }
+
+    /* ==========================================================================
+       文章首屏那张封面小卡跟手
+       --tilt-x/--tilt-y/--glow-x/--glow-y 全写在元素上，CSS 负责把它们拼进
+       transform 和两圈白光（见 design.css 的「首屏」一节）。
+       一次移动只写一遍样式：读数攒在 pointer 里，写由 rAF 合并。
+       ========================================================================== */
+    function initHeroTilt() {
+        var card = document.querySelector('.post-hero-card');
+
+        if (!card || !window.matchMedia || reduceMotion()) {
+            return;
+        }
+        /* 触屏没有指针可跟，窄屏下这张卡本身也已经被 CSS 藏掉 */
+        if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+            return;
+        }
+
+        var MAX_TILT = 7;
+        var pointer = null;
+        var queued = false;
+
+        function render() {
+            queued = false;
+
+            if (!pointer) {
+                return;
+            }
+
+            /* rect 每帧读一次：卡片在 hero 里，页面滚动会让它相对视口移位，
+               缓存 rect 的话光斑和倾斜都会算歪。 */
+            var rect = card.getBoundingClientRect();
+            var x = (pointer.x - rect.left) / rect.width;
+            var y = (pointer.y - rect.top) / rect.height;
+
+            x = x < 0 ? 0 : (x > 1 ? 1 : x);
+            y = y < 0 ? 0 : (y > 1 ? 1 : y);
+
+            card.style.setProperty('--tilt-x', ((0.5 - y) * 2 * MAX_TILT).toFixed(2) + 'deg');
+            card.style.setProperty('--tilt-y', ((x - 0.5) * 2 * MAX_TILT).toFixed(2) + 'deg');
+            card.style.setProperty('--glow-x', (x * 100).toFixed(1) + '%');
+            card.style.setProperty('--glow-y', (y * 100).toFixed(1) + '%');
+        }
+
+        function schedule() {
+            if (queued) {
+                return;
+            }
+            queued = true;
+            window.requestAnimationFrame(render);
+        }
+
+        function reset() {
+            pointer = null;
+            card.style.setProperty('--tilt-x', '0deg');
+            card.style.setProperty('--tilt-y', '0deg');
+            card.style.setProperty('--glow-opacity', '0');
+        }
+
+        card.addEventListener('pointermove', function (event) {
+            pointer = { x: event.clientX, y: event.clientY };
+            card.style.setProperty('--glow-opacity', '1');
+            schedule();
+        });
+        card.addEventListener('pointerleave', reset);
+    }
+
+    /* ==========================================================================
        列表自动加载（首页 / 归档页）
        页码由核心渲染，这里接管后设成 hidden，不是从模板里删掉：无 JS、fetch 失败、
        没有 IntersectionObserver 的老浏览器三种情况下页码原样可用，那是退路。
@@ -644,7 +699,7 @@
         }
 
         /* #feed-status 只有 index.php / archive.php 会输出，它是区分归档分页和评论分页
-           的唯一判据，而且必须先于 .page-navigator 判。post / page / links / talk 的评论
+           的唯一判据，而且必须先于 .page-navigator 判。post / page / links 的评论
            分页渲染出的是同名 <ol class="page-navigator">，那几个模板同样有 .main-content
            ——顺序换过来就会静默劫持文章页：评论页码被藏、抓的是评论翻页地址、
            卡片被追加到正文后面，一句错都不报。 */
@@ -676,6 +731,7 @@
         var text = status.querySelector('.feed-text');
         var retry = status.querySelector('.feed-retry');
         var loading = false;
+        var skeletons = [];
 
         nav.hidden = true;
         status.hidden = false;
@@ -707,8 +763,55 @@
 
         function fail() {
             stop();
+            clearSkeleton();
             say(LABEL_FEED_FAIL);
             retry.hidden = false;
+        }
+
+        function makeSkeleton() {
+            var card = document.createElement('article');
+            var body = document.createElement('div');
+            var head = document.createElement('div');
+            var avatar = document.createElement('span');
+            var name = document.createElement('span');
+            var line1 = document.createElement('div');
+            var line2 = document.createElement('div');
+
+            card.className = 'card post-card feed-skeleton';
+            card.setAttribute('aria-hidden', 'true');
+            /* 骨架也得有 .post-card-body：正文卡的内边距挂在那一层上，
+               .post-card 在信息流里是 0（封面要贴到卡片边缘）。少了这一层，
+               骨架条会顶到卡片圆角上，加载完成后的抖动一眼可见。 */
+            body.className = 'post-card-body';
+            head.className = 'sk-head';
+            avatar.className = 'sk-avatar';
+            name.className = 'sk-line sk-line-sm';
+            line1.className = 'sk-line';
+            line2.className = 'sk-line sk-line-70';
+
+            head.appendChild(avatar);
+            head.appendChild(name);
+            body.appendChild(head);
+            body.appendChild(line1);
+            body.appendChild(line2);
+            card.appendChild(body);
+
+            list.insertBefore(card, status);
+            return card;
+        }
+
+        function showSkeleton() {
+            skeletons.push(makeSkeleton());
+            skeletons.push(makeSkeleton());
+        }
+
+        function clearSkeleton() {
+            skeletons.forEach(function (el) {
+                if (el.parentNode) {
+                    el.parentNode.removeChild(el);
+                }
+            });
+            skeletons = [];
         }
 
         function load(url) {
@@ -716,6 +819,7 @@
             retry.hidden = true;
             spinner.hidden = false;
             say(LABEL_FEED_LOADING);
+            showSkeleton();
 
             fetch(url, { credentials: 'same-origin' })
                 .then(function (res) {
@@ -725,6 +829,7 @@
                     return res.text();
                 })
                 .then(function (html) {
+                    clearSkeleton();
                     var doc = new DOMParser().parseFromString(html, 'text/html');
                     var fresh = doc.querySelector('.main-content');
                     var cards;
@@ -754,6 +859,8 @@
                         var node = list.insertBefore(document.importNode(card, true), status);
                         /* 得先进文档再量，脱离文档时 scrollHeight 是 0 */
                         initStatusFold(node);
+                        /* 追加进来的卡也淡入，和首屏的滚动进场同一套语言 */
+                        revealCard(node);
                     });
 
                     if (!following || following === url) {
@@ -792,20 +899,950 @@
         arm();
     }
 
+    /* ==========================================================================
+       滚动进场：列表卡进视口时淡入上移。
+       .reveal 只在 JS 里挂——无 JS / 无 IO / reduced-motion 时卡片保持默认可见，
+       不会因为脚本缺席而白屏。revealCard 同时被无限滚动复用：追加进来的卡片
+       同样淡入，而不是硬生生蹦出来。
+       ========================================================================== */
+
+    function revealCard(card) {
+        if (reduceMotion() || card.classList.contains('is-visible')) {
+            return;
+        }
+        card.classList.add('reveal');
+        /* 先让 opacity:0 的初始态被浏览器画出来，再补 is-visible 触发过渡；
+           同帧加上去的话 transition 看不到起始值，直接跳到终态。 */
+        window.requestAnimationFrame(function () {
+            card.classList.add('is-visible');
+        });
+    }
+
+    function initScrollReveal() {
+        var list = document.querySelector('.main-content');
+
+        if (!list || !window.IntersectionObserver || reduceMotion()) {
+            return;
+        }
+
+        var cards = list.querySelectorAll('.post-card, .status-card, .link-card');
+
+        if (!cards.length) {
+            return;
+        }
+
+        Array.prototype.forEach.call(cards, function (card) {
+            card.classList.add('reveal');
+        });
+
+        var observer = new window.IntersectionObserver(function (entries) {
+            for (var i = 0; i < entries.length; i++) {
+                if (entries[i].isIntersecting) {
+                    observer.unobserve(entries[i].target);
+                    revealCard(entries[i].target);
+                }
+            }
+        }, { rootMargin: '0px 0px -6% 0px' });
+
+        Array.prototype.forEach.call(cards, function (card) {
+            observer.observe(card);
+        });
+
+        /* 兜底：IO 若因边界情况迟迟不回调，不能让卡片永久透明 */
+        setTimeout(function () {
+            Array.prototype.forEach.call(cards, function (card) {
+                revealCard(card);
+            });
+        }, 2000);
+    }
+
+    /* ==========================================================================
+       站点统计滚动计数：站点信息卡四个数字进视口后从 0 滚到目标。
+       数字取 <b data-count="N">，后缀（如「 天」）从 textContent 里剥出，
+       所以「2190 天」和「42」两种写法都能滚。只滚一次。
+       ========================================================================== */
+
+    function initStatCount() {
+        var stats = document.querySelector('.site-stats');
+
+        if (!stats) {
+            return;
+        }
+
+        var items = stats.querySelectorAll('.site-stat b[data-count]');
+
+        if (!items.length) {
+            return;
+        }
+
+        function countUp(el, target, suffix, duration) {
+            var start = null;
+
+            function step(ts) {
+                if (start === null) {
+                    start = ts;
+                }
+                /* 除法两侧不能留空格：jscheck.py 会把空格后的 / 误认成正则字面量，
+                   一路吞到换行，把右括号也吃掉，静态检查就报括号不平衡。 */
+                var t = Math.min((ts-start)/duration, 1);
+                var eased = 1 - Math.pow(1 - t, 3);
+                el.textContent = String(Math.round(target * eased)) + suffix;
+                if (t < 1) {
+                    window.requestAnimationFrame(step);
+                }
+            }
+
+            window.requestAnimationFrame(step);
+        }
+
+        function startCount() {
+            Array.prototype.forEach.call(items, function (el) {
+                var target = parseInt(el.getAttribute('data-count'), 10);
+                var suffix = el.textContent.replace(/^\d+/, '');
+
+                if (isNaN(target)) {
+                    return;
+                }
+                if (reduceMotion()) {
+                    el.textContent = String(target) + suffix;
+                    return;
+                }
+                countUp(el, target, suffix, 800);
+            });
+        }
+
+        if (!window.IntersectionObserver) {
+            startCount();
+            return;
+        }
+
+        var observer = new window.IntersectionObserver(function (entries) {
+            if (entries[0].isIntersecting) {
+                observer.disconnect();
+                startCount();
+            }
+        }, { threshold: 0.4 });
+
+        observer.observe(stats);
+    }
+
+    /* ==========================================================================
+       文章目录
+       标题的 id 和整棵树都在这一步现搭：正文是后台写的，PHP 吐出来的是已经解析
+       好的 HTML，主题改不动它，只能在前端补 id、拼列表、量位置。
+       少于两个标题不出卡——一行字的目录不是导航，是占位。
+       高亮跟随没用 IntersectionObserver：标题只有几十像素高，快速滚动时会整条
+       掠过交叉判定，两节之间的正文更是没有任何 entry，那一瞬间整栏会一起失去高亮。
+       直接量「视口上沿之上最靠后的那个标题」，任何时候都恰好有一个答案。
+       ========================================================================== */
+
+    function initToc() {
+        var card = document.getElementById('sidebar-toc');
+        var content = document.getElementById('toc-content');
+        var list = document.getElementById('toc-list');
+        var body = document.querySelector('.post-content');
+
+        if (!card || !content || !list || !body) {
+            return;
+        }
+
+        var nodes = body.querySelectorAll('h2, h3');
+
+        if (nodes.length < 2) {
+            return;
+        }
+
+        var items = [];
+        var sectionLis = [];
+        var lastH2 = null;
+
+        Array.prototype.forEach.call(nodes, function (heading, i) {
+            if (!heading.id) {
+                /* 用户没给标题写锚点就补一个。toc- 前缀是为了不撞上正文里已有的 id */
+                heading.id = 'toc-' + (i+1);
+            }
+
+            var li = document.createElement('li');
+            li.className = 'toc-item';
+
+            var link = document.createElement('a');
+            link.className = 'toc-link';
+            /* 走 setAttribute 不拼 innerHTML：id 可能来自正文自带的中文锚点 */
+            link.setAttribute('href', '#' + heading.id);
+
+            var text = document.createElement('span');
+            /* trim：Markdown 渲染出来的标题 textContent 常带成对的换行，
+               目录行是高 flex 容器，前后各多一个空行就会把行高顶开。 */
+            text.textContent = heading.textContent.trim();
+
+            link.appendChild(text);
+            li.appendChild(link);
+
+            var parent = null;
+
+            if (heading.tagName === 'H3' && lastH2) {
+                if (!lastH2.child) {
+                    lastH2.child = document.createElement('ol');
+                    lastH2.child.className = 'toc-child';
+                    lastH2.li.appendChild(lastH2.child);
+                }
+                lastH2.child.appendChild(li);
+                parent = lastH2.li;
+            } else {
+                /* 第一个标题就三级、或者 h3 出现在任何 h2 之前：没有可挂的父项，
+                   直接当一级项排，目录不能因为正文少写一个 h2 就漏条目。 */
+                list.appendChild(li);
+
+                if (heading.tagName === 'H2') {
+                    lastH2 = { li: li, child: null };
+                    sectionLis.push(li);
+                }
+            }
+
+            items.push({ heading: heading, li: li, link: link, parent: parent });
+        });
+
+        card.hidden = false;
+
+        var topbar = parseInt(getComputedStyle(root).getPropertyValue('--topbar-h'), 10) || 60;
+        var EDGE = topbar + 24;
+
+        var current = null;
+        var queued = false;
+
+        /* 当前项变了才把列表滚到它那里——每次都硬对齐会把用户自己在列表里的
+           微调滚动手感顶掉。 */
+        function keepVisible(el) {
+            var box = content.getBoundingClientRect();
+            var rect = el.getBoundingClientRect();
+
+            if (rect.top < box.top + 8) {
+                content.scrollTop -= (box.top + 8 - rect.top);
+            } else if (rect.bottom > box.bottom - 8) {
+                content.scrollTop += (rect.bottom - box.bottom + 8);
+            }
+        }
+
+        function render() {
+            queued = false;
+
+            var active = null;
+
+            Array.prototype.forEach.call(items, function (item) {
+                if (item.heading.getBoundingClientRect().top - EDGE <= 0) {
+                    active = item;
+                }
+            });
+
+            /* 第一个标题还没进过判定线时不给预选：正文一开头就亮着某一行是假的。 */
+            var open = active ? (active.parent || active.li) : null;
+
+            Array.prototype.forEach.call(items, function (item) {
+                item.link.classList.toggle('is-active', item === active);
+            });
+            Array.prototype.forEach.call(sectionLis, function (li) {
+                li.classList.toggle('is-open', li === open);
+            });
+
+            if (active !== current) {
+                current = active;
+
+                if (active) {
+                    keepVisible(active.link);
+                }
+            }
+        }
+
+        function schedule() {
+            if (queued) {
+                return;
+            }
+            queued = true;
+            window.requestAnimationFrame(render);
+        }
+
+        window.addEventListener('scroll', schedule, { passive: true });
+        /* 图片补完高度、转屏、字体加载完都会挪动标题位置，不重算高亮就停在错的那一行 */
+        window.addEventListener('resize', schedule);
+        render();
+
+        list.addEventListener('click', function (event) {
+            var link = event.target && event.target.closest ? event.target.closest('.toc-link') : null;
+
+            if (!link) {
+                return;
+            }
+
+            var target = document.getElementById(link.getAttribute('href').slice(1));
+
+            if (!target) {
+                return;
+            }
+
+            /* 拦在这里就不可能走到 initTransition 那条淡出：它的双保险是
+               「event.defaultPrevented」和「同 pathname + 同 search 直接放行」，
+               两条都不依赖监听器的绑定顺序——这个 href 只有 hash、path 和 search
+               跟当前页完全一样，第二条一定命中。 */
+            event.preventDefault();
+
+            /* design.css 那条 html { scroll-padding-top } 会给 scrollIntoView 让出顶栏高度，
+               这里只管要不要动画。 */
+            target.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' });
+
+            if (window.history && window.history.replaceState) {
+                /* 只改地址栏、不产生历史记录：这条链接复制出去能指到同一节，
+                   后退键也不会把用户困在目录里一格一格地跳。 */
+                window.history.replaceState(null, '', '#' + target.id);
+            }
+        });
+    }
+
+    /* ==========================================================================
+       吸顶分类条右端那颗「更多」
+       --------------------------------------------------------------------------
+       药丸那一行是横向滚的，滚动条又被 CSS 藏掉了：鼠标用户既看不见进度，也不知道
+       右边还剩几颗。这颗按钮把「看不见的分类」变成一列点得着的东西。
+       面板内容每次打开的那一刻现算——判据是「此刻没有完整落在这行的可视区里」，
+       不是「第 N 颗往后」：用户可能已经把行往右滑过一段，那左边被推出可视区的
+       同样算没显示。
+       ========================================================================== */
+
+    function initFeedCats() {
+        var row = document.getElementById('feed-cats-scroll');
+        var btn = document.getElementById('feed-cats-more');
+        var pop = document.getElementById('feed-cats-pop');
+
+        if (!row || !btn || !pop) {
+            return;
+        }
+
+        /* 8px 容差：窗口拉到「只差一个描边宽度」那种临界值时，不留容差按钮会一闪一闪。 */
+        function hasOverflow() {
+            return row.scrollWidth - row.clientWidth > 8;
+        }
+
+        function cutOff(el) {
+            var a = el.getBoundingClientRect();
+            var b = row.getBoundingClientRect();
+
+            return a.left < b.left - 1 || a.right > b.right + 1;
+        }
+
+        /* 「全部」那颗只有裸文字，其余是 <span>名字</span> 加一颗计数。
+           先认 span，取不到才退回整颗的 textContent。 */
+        function textOf(el) {
+            var first = el.querySelector('span');
+
+            return (first ? first.textContent : el.textContent).trim();
+        }
+
+        function fill() {
+            while (pop.firstChild) {
+                pop.removeChild(pop.firstChild);
+            }
+
+            var made = 0;
+
+            Array.prototype.forEach.call(row.querySelectorAll('.feed-cat'), function (el) {
+                if (!cutOff(el)) {
+                    return;
+                }
+
+                var link = document.createElement('a');
+
+                /* 读原始属性而不是 el.href：这一行里拼的都是 permalink，两者此刻一样，
+                   但走 getAttribute 不需要假设核心输出的地址形态。 */
+                link.setAttribute('href', el.getAttribute('href'));
+                link.className = 'feed-cats-pop-item' + (el.classList.contains('active') ? ' active' : '');
+
+                var name = document.createElement('span');
+                name.textContent = textOf(el);
+                link.appendChild(name);
+
+                var count = el.querySelector('.feed-cat-count');
+
+                if (count) {
+                    var num = document.createElement('span');
+                    num.className = 'feed-cats-pop-count';
+                    num.textContent = count.textContent.trim();
+                    link.appendChild(num);
+                }
+
+                pop.appendChild(link);
+                made++;
+            });
+
+            return made;
+        }
+
+        function close() {
+            if (pop.hidden) {
+                return;
+            }
+            pop.hidden = true;
+            btn.classList.remove('is-open');
+            btn.setAttribute('aria-expanded', 'false');
+        }
+
+        function open(fromKeyboard) {
+            /* 一颗都没捞到就不开：空面板比没有面板更让人以为分类没了 */
+            if (fill() === 0) {
+                return;
+            }
+            pop.hidden = false;
+            btn.classList.add('is-open');
+            btn.setAttribute('aria-expanded', 'true');
+
+            /* 键盘打开的直接把焦点送进面板（面板就在按钮正下方，读者不会去找焦点去哪了）；
+               鼠标打开的不动焦点——点一下按钮就被抢走焦点，会让人下一次点击落在错的地方。 */
+            if (fromKeyboard) {
+                focusItem(items()[0]);
+            }
+        }
+
+        function items() {
+            return pop.querySelectorAll('.feed-cats-pop-item');
+        }
+
+        function focusItem(el) {
+            if (el) {
+                el.focus();
+            }
+        }
+
+        function step(list, from, delta) {
+            var i = Array.prototype.indexOf.call(list, from);
+
+            if (i < 0) {
+                return;
+            }
+            /* 到尽头就绕回另一头：面板可能有几十项，末端停住会让人以为下面没有了 */
+            focusItem(list[(i + delta + list.length) % list.length]);
+        }
+
+        /* 面板是 auto-fill 多列网格，左右按「项」走，上下得按「行」走，
+           否则按一次下移只是隔壁那一格，视觉上毫无规律。
+           列数不靠 getComputedStyle 去猜网格定义——按同一 top 值分组更直接，
+           而且字体缩放、滚动、换行列数变化都自动跟着对。 */
+        function rows(list) {
+            var out = [];
+            var lastTop = null;
+
+            Array.prototype.forEach.call(list, function (el) {
+                var top = Math.round(el.getBoundingClientRect().top);
+
+                if (lastTop === null || Math.abs(top - lastTop) > 4) {
+                    out.push([]);
+                    lastTop = top;
+                }
+                out[out.length - 1].push(el);
+            });
+
+            return out;
+        }
+
+        function stepRow(list, from, delta) {
+            var grid = rows(list);
+            var r = -1;
+            var c = 0;
+
+            grid.forEach(function (line, ri) {
+                line.forEach(function (el, ci) {
+                    if (el === from) {
+                        r = ri;
+                        c = ci;
+                    }
+                });
+            });
+
+            if (r < 0) {
+                return;
+            }
+
+            var nr = (r + delta + grid.length) % grid.length;
+            var line = grid[nr];
+
+            /* 最后一行常常不满一格，光标落到该行最后一项而不是消失 */
+            focusItem(line[Math.min(c, line.length - 1)]);
+        }
+
+        btn.addEventListener('click', function () {
+            if (pop.hidden) {
+                open(false);
+            } else {
+                close();
+            }
+        });
+
+        document.addEventListener('click', function (event) {
+            var to = event.target;
+
+            if (pop.hidden || to === btn || btn.contains(to) || pop.contains(to)) {
+                return;
+            }
+            close();
+        });
+
+        document.addEventListener('keydown', function (event) {
+            var list = items();
+            var active = document.activeElement;
+
+            if (pop.hidden) {
+                /* 焦点还在按钮上按方向键 = 想用键盘逛分类，那就开面板并把焦点交进去。
+                   Enter/空格不用管：button 元素自己就会触发 click。 */
+                if (!btn.hidden && active === btn && event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    open(true);
+                }
+                return;
+            }
+
+            if (event.key === 'Escape') {
+                close();
+                btn.focus();
+                return;
+            }
+
+            /* Tab 离开就是离开：面板隐藏后焦点若还停在里面的链接上，
+               下一次 Tab 会从一个看不见的元素开始。 */
+            if (event.key === 'Tab') {
+                close();
+                return;
+            }
+
+            /* 上下走整行、左右走相邻项，Home/End 到首尾 */
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                stepRow(list, active, 1);
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                stepRow(list, active, -1);
+            } else if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+                event.preventDefault();
+                step(list, active, event.key === 'ArrowRight' ? 1 : -1);
+            } else if (event.key === 'Home') {
+                event.preventDefault();
+                focusItem(list[0]);
+            } else if (event.key === 'End') {
+                event.preventDefault();
+                focusItem(list[list.length - 1]);
+            } else if (pop.contains(active) && /^[a-z0-9\u4e00-\u9fa5]$/i.test(event.key)) {
+                /* 打字定位：几十项的分类列表，按「前」直接跳到「前端」比连按方向键快得多 */
+                var target = null;
+                Array.prototype.forEach.call(list, function (el) {
+                    if (target === null && textOf(el).slice(0, event.key.length).toLowerCase() === event.key.toLowerCase()) {
+                        target = el;
+                    }
+                });
+                if (target !== null) {
+                    event.preventDefault();
+                    focusItem(target);
+                }
+            }
+        });
+
+        /* 布局一变「哪几颗没显示」就全变了，而面板里的内容是打开那一刻算的快照——
+           所以 resize 直接把面板收掉，不让它挂在一份过期的名单上。 */
+        function measure() {
+            close();
+            btn.hidden = !hasOverflow();
+        }
+
+        window.addEventListener('resize', measure);
+        /* 自定义字体到位之前，药丸量的是回退字的宽度，量早了会把「刚好放不下」判成
+           放得下。main.js 是 defer 的，一定跑在 load 之前，这个监听器不会漏掉事件。 */
+        window.addEventListener('load', measure);
+
+        /* 当前分类那颗如果被挤在可视区外面，一进页面就该把它挪进来：读者得知道自己
+           在哪个分类里，而且不挪的话它会被算进「更多」面板，等于把当前位置藏起来了。
+           只在初始化挪这一次，resize 时不碰，免得跟用户自己的横向滚动较劲。
+           增量用 rect 算而不是 offsetLeft：.feed-cats 是 sticky、已经「已定位」，
+           药丸的 offsetParent 是它而不是这一行，两个坐标系差一个行内的滚动量。 */
+        var current = row.querySelector('.feed-cat.active');
+
+        if (current && cutOff(current)) {
+            row.scrollLeft += current.getBoundingClientRect().left
+                              - row.getBoundingClientRect().left - 12;
+        }
+
+        measure();
+    }
+
+    /* ==========================================================================
+       搜索快捷键：⌘K / Ctrl+K 任何时候都管用，单键 / 只在「没在打字」时管用。
+       窄屏下搜索框在抽屉面板里，所以快捷键要先替把面板拉开——
+       对一个 offsetParent 为 null 的元素调 focus() 是点了个寂寞，一句错都不报。
+       ========================================================================== */
+    function initSearchShortcut() {
+        var input = document.getElementById('nav-search-input');
+        var kbd = document.getElementById('search-kbd');
+
+        if (!input) {
+            return;
+        }
+
+        /* 徽章上的符号是 JS 写的，不在 PHP 里赌平台：模板里留空，
+           Mac 系给 ⌘K，其余给 Ctrl K，不会出现「安卓上写着 ⌘K」这种笑话。 */
+        if (kbd) {
+            kbd.textContent = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent)
+                ? '⌘K' : 'Ctrl K';
+        }
+
+        function typing(el) {
+            if (!el || !el.tagName) {
+                return false;
+            }
+            var tag = el.tagName.toLowerCase();
+
+            return tag === 'input' || tag === 'textarea' || tag === 'select'
+                || el.isContentEditable === true;
+        }
+
+        function focusSearch() {
+            if (input.offsetParent === null && drawerToggle && drawerPanel
+                && !drawerPanel.classList.contains('is-open')) {
+                drawerToggle.click();
+            }
+            input.focus();
+            input.select();
+        }
+
+        document.addEventListener('keydown', function (event) {
+            /* 中文输入法组词过程中的按键 key 一律是 'Process'，
+               但部分浏览器仍会上报真实按键——这时候绝不能抢走 /。 */
+            if (event.isComposing) {
+                return;
+            }
+
+            if (event.key === 'Escape' && document.activeElement === input) {
+                /* 先清字，字本来就是空的才退出焦点：「搜一下、算了」是两次按键 */
+                if (input.value !== '') {
+                    input.value = '';
+                } else {
+                    input.blur();
+                }
+                return;
+            }
+
+            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+                event.preventDefault();
+                focusSearch();
+                return;
+            }
+
+            if (event.key === '/' && !typing(event.target)) {
+                event.preventDefault();
+                focusSearch();
+            }
+        });
+    }
+
+    /* ==========================================================================
+       回到顶部：滚过一屏才挂 .is-visible。passive 监听里直接 toggle——
+       阈值只在跨过一屏那一刻变一次，没有每帧更新的必要。 */
+    function initBackTop() {
+        var btn = document.getElementById('back-top');
+
+        if (!btn) {
+            return;
+        }
+
+        var shown = false;
+
+        function update() {
+            var y = window.pageYOffset || document.documentElement.scrollTop || 0;
+            var should = y > window.innerHeight;
+
+            if (should !== shown) {
+                shown = should;
+                btn.classList.toggle('is-visible', should);
+            }
+        }
+
+        window.addEventListener('scroll', update, { passive: true });
+        update();
+
+        btn.addEventListener('click', function () {
+            if (reduceMotion()) {
+                window.scrollTo(0, 0);
+            } else {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+    }
+
+    /* ==========================================================================
+       图片灯箱。事件委托：不在每张图上绑监听，无限滚动追加进来的图天然可用；
+       打开时才把图片地址写进 .lightbox-img，初始不加载任何资源。 */
+    function initLightbox() {
+        var box = document.getElementById('lightbox');
+
+        if (!box) {
+            return;
+        }
+
+        var img = box.querySelector('.lightbox-img');
+        var caption = box.querySelector('.lightbox-caption');
+        var closeBtn = box.querySelector('.lightbox-close');
+        var prevBtn = box.querySelector('.lightbox-prev');
+        var nextBtn = box.querySelector('.lightbox-next');
+        var items = [];
+        var index = 0;
+        var lastFocus = null;
+        var SELECTOR = '.post-content img, .status-content img';
+
+        function collect() {
+            items = [];
+            var nodes = document.querySelectorAll(SELECTOR);
+            Array.prototype.forEach.call(nodes, function (el) {
+                if (el.getAttribute('src')) {
+                    items.push(el);
+                }
+            });
+        }
+
+        function render() {
+            var el = items[index];
+            img.src = el.getAttribute('src');
+            img.alt = el.getAttribute('alt') || '';
+            caption.textContent = el.getAttribute('alt') || '';
+            prevBtn.hidden = items.length <= 1;
+            nextBtn.hidden = items.length <= 1;
+        }
+
+        function open(i) {
+            if (i < 0 || i >= items.length) {
+                return;
+            }
+            index = i;
+            lastFocus = document.activeElement;
+            render();
+            box.hidden = false;
+            document.documentElement.classList.add('lightbox-open');
+            closeBtn.focus();
+        }
+
+        function close() {
+            box.hidden = true;
+            document.documentElement.classList.remove('lightbox-open');
+            if (lastFocus && lastFocus.focus) {
+                lastFocus.focus();
+            }
+            lastFocus = null;
+        }
+
+        function step(delta) {
+            if (!items.length) {
+                return;
+            }
+            index = (index + delta + items.length) % items.length;
+            render();
+        }
+
+        document.addEventListener('click', function (event) {
+            var el = event.target;
+
+            if (!el || !el.matches || !el.matches(SELECTOR)) {
+                return;
+            }
+            /* 图片被包在链接里（如 [![alt](img)](url)）时交给链接，别抢导航 */
+            if (el.closest && el.closest('a[href]')) {
+                return;
+            }
+            event.preventDefault();
+            collect();
+            open(items.indexOf(el));
+        });
+
+        closeBtn.addEventListener('click', close);
+        prevBtn.addEventListener('click', function () { step(-1); });
+        nextBtn.addEventListener('click', function () { step(1); });
+        box.addEventListener('click', function (event) {
+            if (event.target === box) {
+                close();
+            }
+        });
+        document.addEventListener('keydown', function (event) {
+            if (box.hidden) {
+                return;
+            }
+            if (event.key === 'Escape') {
+                close();
+            } else if (event.key === 'ArrowLeft') {
+                step(-1);
+            } else if (event.key === 'ArrowRight') {
+                step(1);
+            }
+        });
+    }
+
+    /* ==========================================================================
+       动态取色（Material You 式）：后台没配强调色时，从站点头像抽主色派生一套
+       accent。noline_accent_style() 配了强调色会输出 <style id="noline-accent">，
+       没有它才走这里。结果按头像 URL 缓存进 localStorage，跨页面复用；
+       跨域头像 getImageData 会抛错，静默回退默认靛蓝。 */
+    function initDynamicAccent() {
+        if (document.getElementById('noline-accent')) {
+            return;
+        }
+
+        var avatar = document.querySelector('.topbar-logo');
+
+        if (!avatar || !avatar.src) {
+            return;
+        }
+
+        var src = avatar.src;
+        var cached = readStore(window.localStorage, 'noline-accent-v2-' + src);
+
+        if (cached) {
+            try {
+                applyAccent(JSON.parse(cached));
+                return;
+            } catch (e) {}
+        }
+
+        var img = document.createElement('img');
+        img.crossOrigin = 'anonymous';
+        img.onload = function () {
+            try {
+                var canvas = document.createElement('canvas');
+                var ctx = canvas.getContext('2d');
+                canvas.width = 16;
+                canvas.height = 16;
+                ctx.drawImage(img, 0, 0, 16, 16);
+                var rgb = dominantColor(ctx.getImageData(0, 0, 16, 16).data);
+                if (!rgb) {
+                    return;
+                }
+                var accent = deriveAccent(rgb);
+                writeStore(window.localStorage, 'noline-accent-v2-' + src, JSON.stringify(accent));
+                applyAccent(accent);
+            } catch (e) {}
+        };
+        img.src = src;
+    }
+
+    function applyAccent(a) {
+        var root = document.documentElement;
+        root.style.setProperty('--accent-user', a.light);
+        root.style.setProperty('--accent-user-rgb', a.rgb.join(', '));
+        root.style.setProperty('--accent-user-hover', a.hover);
+        root.style.setProperty('--accent-user-dark', a.dark);
+        root.style.setProperty('--accent-user-dark-rgb', a.darkRgb.join(', '));
+        root.style.setProperty('--accent-user-dark-hover', a.darkHover);
+    }
+
+    function dominantColor(data) {
+        var r = 0, g = 0, b = 0, n = 0, i;
+
+        for (i = 0; i < data.length; i += 4) {
+            if (data[i + 3] < 128) {
+                continue;
+            }
+            r += data[i];
+            g += data[i + 1];
+            b += data[i + 2];
+            n++;
+        }
+
+        if (n === 0) {
+            return null;
+        }
+
+        r /= n;
+        g /= n;
+        b /= n;
+
+        /* 底色太灰（白/黑/灰头像、普通照片）抽不出像样的强调色，直接放弃，
+           回退默认靛蓝——宁可不取色，也不拿一个发灰的颜色毁掉全站对比度 */
+        if (Math.max(r, g, b) - Math.min(r, g, b) < 40) {
+            return null;
+        }
+
+        return [Math.round(r), Math.round(g), Math.round(b)];
+    }
+
+    function hex(rgb) {
+        var out = '#';
+        rgb.forEach(function (c) {
+            var h = c.toString(16);
+            out += h.length === 1 ? '0' + h : h;
+        });
+        return out;
+    }
+
+    function mixRgb(rgb, target, ratio) {
+        return [
+            Math.round(rgb[0] + (target - rgb[0]) * ratio),
+            Math.round(rgb[1] + (target - rgb[1]) * ratio),
+            Math.round(rgb[2] + (target - rgb[2]) * ratio)
+        ];
+    }
+
+    function luminance(rgb) {
+        return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
+    }
+
+    /* 把亮度压进安全区间：浅色强调色要够深（能当白底上的文字/圆点），
+       深色强调色要够亮（能当黑底上的文字）。逐个往黑/白里混，混到达标为止。 */
+    function clampLightness(rgb, min, max) {
+        var out = rgb;
+        var i = 0;
+
+        while (luminance(out) > max && i < 10) {
+            out = mixRgb(out, 0, 0.22);
+            i++;
+        }
+        i = 0;
+        while (luminance(out) < min && i < 10) {
+            out = mixRgb(out, 255, 0.22);
+            i++;
+        }
+
+        return out;
+    }
+
+    function deriveAccent(rgb) {
+        var light = clampLightness(rgb, 0, 0.45);
+        var dark = clampLightness(rgb, 0.55, 1);
+        var hover = mixRgb(light, 0, 0.18);
+        var darkHover = mixRgb(dark, 255, 0.12);
+
+        return {
+            rgb: light,
+            light: hex(light),
+            hover: hex(hover),
+            dark: hex(dark),
+            darkRgb: dark,
+            darkHover: hex(darkHover)
+        };
+    }
+
     /* ========================================================================== */
 
+    initDynamicAccent();
     initTransition();
     initThemeToggle();
     initDrawer();
-    initNavGroups();
+    initSearchShortcut();
     initScrollPercent();
+    initNavCollapse();
+    initHeroTilt();
+    initBackTop();
+    initLightbox();
 
     ready(function () {
         initHighlight();
         initCopyButtons();
+        initListSemantics();
         initStatusFold();
+        initScrollReveal();
         /* 排在 initStatusFold 之后：自动加载不可能早于 DOMContentLoaded，
            整页那把量先跑完，后面追加进来的卡片只会被逐张量到，不会重复绑监听器。 */
         initFeedPaging();
+        initStatCount();
+        initToc();
+        initFeedCats();
     });
 })();

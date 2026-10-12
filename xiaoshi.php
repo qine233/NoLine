@@ -65,6 +65,7 @@ $this->need('public/header.php');
                 <h1 class="archive-title"><?php $this->title(); ?></h1>
                 <?php if ($categoryName !== null): ?>
                 <p class="archive-count">
+                    <?php noline_icon('file-lines'); ?>
                     <?php _e('分类「%s」 · 共 %d 篇', $categoryName, $total); ?>
                 </p>
                 <?php endif; ?>

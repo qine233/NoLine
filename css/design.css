@@ -26,37 +26,40 @@
     /* ---- 墨与纸 ----
        中性色只有这两个三元组是数据：文字是墨压在纸上，表面是墨薄薄一层，描边是更厚一层，
        同色相不同浓度而已。想给全站换墨色，改 --ink-rgb 一个数就够。
-       深色模式把墨翻成浅的、纸翻成深的，再把下面几档浓度调一调，不必逐个抄 hex。 */
-    --ink-rgb:   41, 60, 80;
+       深色模式把墨翻成浅的、纸翻成深的，再把下面几档浓度调一调，不必逐个抄 hex。
+       墨色取冷灰（#363636 / #f7f7fa）：底色和描边都是蓝调，暖墨压在蓝底上会显脏。 */
+    --ink-rgb:   54, 54, 54;
     --paper-rgb: 255, 255, 255;
 
     /* 浓度档位。名字是「用途 + 浓度」，比二十几个 hex 好核对。 */
     --ink-text-1: 1;        /* 标题、最强前景 */
-    --ink-text-2: .92;      /* 正文 */
-    --ink-text-3: .72;      /* 次要说明 */
-    --ink-text-4: .52;      /* 弱化信息、placeholder */
-    --ink-line-1: .08;      /* 发丝分隔线 */
-    --ink-line-2: .12;      /* 常规描边 */
-    --ink-line-3: .16;      /* 输入框这类要看清的描边 */
-    --ink-fill-1: .018;     /* 表格斑马纹 */
-    --ink-fill-2: .04;      /* 软表面：标签底、按钮底、hover */
-    --ink-fill-3: .07;      /* 代码底、输入底、头像占位 */
+    --ink-text-2: .90;      /* 正文 */
+    --ink-text-3: .78;      /* 次要说明 */
+    --ink-text-4: .50;      /* 弱化信息、placeholder */
+    --ink-line-1: .07;      /* 发丝分隔线 */
+    --ink-line-2: .13;      /* 常规描边 */
+    --ink-line-3: .20;      /* 输入框这类要看清的描边 */
+    --ink-fill-1: .02;      /* 表格斑马纹 */
+    --ink-fill-2: .05;      /* 软表面：标签底、按钮底、hover */
+    --ink-fill-3: .08;      /* 代码底、输入底、头像占位 */
 
-    /* 强调色：优先取后台配置，缺省回落到靛蓝 #4482e5。
+    /* 强调色：优先取后台配置，缺省回落到靛蓝 #425AEF。
        -rgb 是给 rgba() 用的三元组，避免依赖 color-mix() 的浏览器兼容性。 */
-    --accent:       var(--accent-user, #4482e5);
-    --accent-rgb:   var(--accent-user-rgb, 68, 130, 229);
-    --accent-hover: var(--accent-user-hover, #386bbc);
+    --accent:       var(--accent-user, #425aef);
+    --accent-rgb:   var(--accent-user-rgb, 66, 90, 239);
+    --accent-hover: var(--accent-user-hover, #3549c9);
     --accent-bg:    rgba(var(--accent-rgb), .10);
     --accent-ring:  rgba(var(--accent-rgb), .35);
+    /* tonal 层：container 是强调色的淡底，on-container 是配它的深字。 */
+    --accent-container: rgba(var(--accent-rgb), .14);
+    --on-accent-container: var(--accent-hover);
 
-    /* 品牌色：只当背景用，前景恒为 --on-brand。
-       浅色下它就是墨色本身（--brand 与 --text-main 同值，跟重构前一致），hover 加深到满浓度。
-       深色下要的是饱和深蓝块，靠浅墨调透明度出不来，那边单独给字面量。 */
-    --brand:       rgba(var(--ink-rgb), var(--ink-text-2));
-    --brand-hover: rgb(var(--ink-rgb));
-    --on-brand:       rgb(var(--paper-rgb));
-    --on-brand-muted: rgba(var(--paper-rgb), .72);
+    /* 品牌色：实心块直接铺强调色，前景恒为 --on-brand。
+       深色下 --accent 已被 helper 提亮，白字压上去会糊，那边单独给深字。 */
+    --brand:       var(--accent);
+    --brand-hover: var(--accent-hover);
+    --on-brand:       #ffffff;
+    --on-brand-muted: rgba(255, 255, 255, .82);
 
     /* 文字 */
     --text-strong:    rgb(var(--ink-rgb));
@@ -64,34 +67,67 @@
     --text-secondary: rgba(var(--ink-rgb), var(--ink-text-3));
     --text-light:     rgba(var(--ink-rgb), var(--ink-text-4));
 
-    /* 底色与表面。--bg-color 是整页的底，别的颜色都压在它上面，它自己没法从墨派生。 */
-    --bg-color:      #f2f5fa;
+    /* 底色与表面。整页底是带一点蓝的浅灰白，卡面才是纯白——两层差一点点，
+       卡片就不会在底上「浮」得太硬，描边也够用。 */
+    --bg-color:      #f7f9fe;
     --card-bg:       rgb(var(--paper-rgb));
-    --topbar-bg:     rgba(var(--paper-rgb), .86);
+    --topbar-bg:     var(--glass-bg);
     --surface-zebra: rgba(var(--ink-rgb), var(--ink-fill-1));
-    --surface-soft:  rgba(var(--ink-rgb), var(--ink-fill-2));
+    --surface-soft:  #f7f7f9;   /* 次级面：胶囊、计数、占位 */
     --surface-code:  rgba(var(--ink-rgb), var(--ink-fill-3));
-    /* 「凹陷」浅色下是往墨里沉、深色下是往黑里沉，方向相反，所以深色块要单独给一次 */
-    --surface-sunken: rgba(var(--ink-rgb), .055);
+    /* 「凹陷」浅色下是往蓝灰里沉、深色下是往黑里沉，方向相反，所以深色块要单独给一次 */
+    --surface-sunken: #f2f5f8;
 
-    /* 描边 */
+    /* 描边：卡片一律 1px 实线 --card-border，不用半透明墨——
+       蓝调描边压在浅灰白底上才是这套观感的核心。 */
     --border-color:  rgba(var(--ink-rgb), var(--ink-line-1));
     --border-soft:   rgba(var(--ink-rgb), var(--ink-line-2));
     --border-strong: rgba(var(--ink-rgb), var(--ink-line-3));
-    --card-border:   rgba(var(--ink-rgb), var(--ink-line-1));
+    --card-border:   #e3e8f7;
+
+    /* 玻璃浮层：顶栏、上下篇浮条、右下浮动按钮组共用这一套。
+       --glass-bg-deep 给需要读清文字的面，--glass-inset 是那一圈「磨砂边光」。 */
+    --glass-bg:      rgba(255, 255, 255, .72);
+    --glass-bg-deep: rgba(255, 255, 255, .88);
+    --glass-inset:
+        inset 0 1px 1px rgba(255, 255, 255, .60), inset 0 -1px 1px rgba(255, 255, 255, .60),
+        inset 1px 0 2px rgba(0, 0, 0, .06), inset -1px 0 2px rgba(0, 0, 0, .06);
+    --style-border:       1px solid var(--card-border);
+    --style-border-hover: 1px solid var(--accent);
 
     /* 局部装饰 */
     --avatar-ring: rgb(var(--paper-rgb));
-    --cover-fallback: #c7d4e8;
+    --cover-fallback: #e8ecf7;
+    /* 正文标题前那颗人字形标记。刻意不跟强调色走——强调色是蓝，蓝箭头压在蓝链接上
+       整页就一个颜色；换一支暖金，标题才有「这一段从这儿开始」的锚点。 */
+    --heading-marker: #f2ba4b;
     /* masthead 封面：图片上压一层渐变罩，文字换成 --on-cover 才读得清。
        两端分开给，深色模式下要把罩压得更重。 */
     --on-cover: #ffffff;
-    --hero-veil-top: rgba(15, 23, 42, .18);
-    --hero-veil-bottom: rgba(52, 73, 94, .62);
+    /* 三元组是给 rgba() 用的：封面上的半透明白（胶囊底、输入框底、跟手的高光）
+       全是同一个白换个浓度，不该各写一遍 hex/rgba 字面量。 */
+    --on-cover-rgb: 255, 255, 255;
+    --hero-veil-top: rgba(16, 20, 38, .28);
+    --hero-veil-bottom: rgba(16, 20, 38, .60);
     --warn-bg: #fef3c7;
     --warn-text: #b45309;
     --mark-bg: #fef08a;
+    /* 健康页的 BMI 四档。语义色压不住墨与纸的派生关系，两种主题各给一套；
+       成对使用：color 取主色，背景是同一支色掺一成透明度。 */
+    --health-thin:      #0c7489;
+    --health-thin-bg:   rgba(12, 116, 137, .10);
+    --health-normal:    #2f7a44;
+    --health-normal-bg: rgba(47, 122, 68, .11);
+    --health-over:      #a8600f;
+    --health-over-bg:   rgba(168, 96, 15, .12);
+    --health-obese:     #b3352f;
+    --health-obese-bg:  rgba(179, 53, 47, .11);
     --scrim: rgba(15, 23, 42, .45);
+    /* 灯箱：比 --scrim 更重的遮罩，配白字和半透明按钮底 */
+    --lightbox-bg: rgba(8, 12, 18, .82);
+    --lightbox-fg: #f2f5f9;
+    --lightbox-btn: rgba(255, 255, 255, .14);
+    --lightbox-btn-hover: rgba(255, 255, 255, .26);
 
     /* 代码块：两种主题都保持深色底，所以只有 --code-bg 需要跟着主题变 */
     --code-bg: #282c34;
@@ -105,26 +141,69 @@
         radial-gradient(circle at 40px 17px, #fdbc40 0 6px, transparent 6px),
         radial-gradient(circle at 60px 17px, #35cd4b 0 6px, transparent 6px);
 
-    /* 阴影：纯黑透明阴影在深色底上会消失，所以两种主题各一套 */
-    --shadow-sm: 0 1px 2px 0 rgba(53, 75, 96, .06);
-    --shadow-md: 0 4px 12px -2px rgba(53, 75, 96, .10);
-    --shadow-lg: 0 12px 28px -8px rgba(53, 75, 96, .18);
-    --shadow-lift: 0 34px 20px -24px rgba(96, 122, 179, .30);
+    /* 阴影：纯黑透明阴影在深色底上会消失，所以两种主题各一套。
+       这套整体比原来「远」一点——阴影只负责把卡片从浅灰白底上抬起来，
+       描边负责划线，两件事分开做，别叠在一起。 */
+    --shadow-sm: 0 8px 16px -4px rgba(44, 45, 48, .05);
+    --shadow-md: 0 8px 12px -3px rgba(44, 45, 48, .08);
+    --shadow-lg: 0 16px 32px -12px rgba(44, 45, 48, .14);
+    --shadow-lift: 0 24px 40px -18px rgba(44, 45, 48, .18);
+    /* 卡片静息态用的那层浅投影，和 hover 时的强调色投影成一对。 */
+    --shadow-border: 0 8px 16px -4px rgba(44, 45, 48, .05);
+    --shadow-main:   0 8px 12px -3px rgba(var(--accent-rgb), .20);
+    /* 玻璃浮层向远处投的那一大片，配 --glass-inset 用。 */
+    --shadow-glass: 0 5px 100px -5px rgba(140, 140, 140, .50);
 
-    /* 尺寸 */
-    --radius-lg: 16px;
+    /* 页顶环境光：只留强调色两层，淡到只能从卡片间隙透出来。 */
+    --page-glow:
+        radial-gradient(1100px 560px at 14% -10%, rgba(var(--accent-rgb), .10), transparent 60%),
+        radial-gradient(900px 520px at 100% -6%, rgba(var(--accent-rgb), .06), transparent 55%),
+        radial-gradient(760px 480px at 50% 108%, rgba(var(--ink-rgb), .04), transparent 60%);
+
+    /* 毛玻璃 + 动效曲线。--glass-bg 在上面的描边段之后给出，深浅色各一套。 */
+    --glass-blur: 20px;
+    --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+    --ease-ios: cubic-bezier(.32, .72, 0, 1);
+    /* 全站通用的「几乎所有属性都补间」。这套观感的「活」全靠它：
+       卡片 hover 时底色、描边、投影、位移同时过渡，分开写就会有一先一后。
+       只挂在组件自己的 transition 上，不上 * 通配。 */
+    --t: color .3s, background-color .3s, border-color .3s, opacity .3s,
+        transform .3s, box-shadow .3s, width .3s, padding .3s, margin .3s;
+    --t-fast: color .2s, background-color .2s, border-color .2s, opacity .2s,
+        transform .2s, box-shadow .2s;
+    --t-500: color .5s, background-color .5s, border-color .5s, opacity .5s,
+        transform .5s, box-shadow .5s;
+
+    /* 尺寸：卡片一律 12px，小面 8px，图片 16px，胶囊 999px。 */
+    --radius-lg: 12px;
     --radius-md: 8px;
+    --radius-img: 16px;
+    --radius-pill: 999px;
     --radius-full: 9999px;
-    --topbar-h: 56px;
+    --topbar-h: 60px;
+    /* 顶栏滚成玻璃胶囊之后的高度：胶囊比整条导航矮一截，上下各留一点空。 */
+    --nav-pill-h: 44px;
+    --layout-max: 1200px;
+    --aside-w: 300px;
+    /* 首屏高度：文章页 hero 的封面和标题都按这个数排。 */
+    --hero-h: 24rem;
+
+    /* 中文字体排在西文字体前面：这套观感里标点是全角，先命中苹方才不会掉到 Segoe 的方框。 */
+    --font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
     /* 层叠顺序：全站统一定标，不要再随手写 z-index 数字。
        顶栏压在遮罩之上——移动端导航面板是顶栏的孩子，遮罩只管盖住正文。 */
     --z-scrim: 800;
     --z-topbar: 1000;
     --z-progress: 2000;
-
-    --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
-    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    /* 浮动按钮压在遮罩之下（抽屉打开时跟着内容一起暗掉），灯箱则盖过顶栏 */
+    --z-float: 700;
+    --z-modal: 1500;
+    /* 信息流那条吸顶药丸带：要盖过跟着滚的卡片（卡片 hover 的 transform 会自己
+       生成层叠上下文，z-index:auto 时谁在后面谁压谁），但必须在顶栏之下——
+       顶栏滚成玻璃胶囊之后正好压在它上面。 */
+    --z-sticky: 600;
 }
 
 /* ==========================================================================
@@ -137,51 +216,78 @@
     color-scheme: dark;
 
     /* 翻转墨与纸：文字四档、表面三档、描边三档、卡片底、头像环全部跟着翻，不用逐个抄 hex */
-    --ink-rgb:   230, 236, 244;
-    --paper-rgb: 28, 34, 43;
+    --ink-rgb:   247, 247, 250;
+    --paper-rgb: 27, 28, 32;
 
     /* 深色下的浓度另调一套。文字要压低——浅墨在黑底上同样的透明度会显得刺眼；
        描边比浅色弱一点，深色界面里线条太重会显脏。 */
     --ink-text-1: 1;
-    --ink-text-2: .82;
-    --ink-text-3: .62;
-    --ink-text-4: .44;
-    --ink-line-1: .06;
-    --ink-line-2: .09;
-    --ink-line-3: .12;
-    --ink-fill-1: .018;
-    --ink-fill-2: .04;
-    --ink-fill-3: .06;
+    --ink-text-2: .86;
+    --ink-text-3: .66;
+    --ink-text-4: .46;
+    --ink-line-1: .07;
+    --ink-line-2: .11;
+    --ink-line-3: .16;
+    --ink-fill-1: .02;
+    --ink-fill-2: .05;
+    --ink-fill-3: .08;
 
-    --accent:       var(--accent-user-dark, #7ca7ed);
-    --accent-rgb:   var(--accent-user-dark-rgb, 124, 167, 237);
-    --accent-hover: var(--accent-user-dark-hover, #8cb2ef);
+    --accent:       var(--accent-user-dark, #8a9bff);
+    --accent-rgb:   var(--accent-user-dark-rgb, 138, 155, 255);
+    --accent-hover: var(--accent-user-dark-hover, #a3b2ff);
     /* 深底上 .10 太淡，抬到 .18 */
     --accent-bg:    rgba(var(--accent-rgb), .18);
     --accent-ring:  rgba(var(--accent-rgb), .45);
+    --accent-container: rgba(var(--accent-rgb), .20);
+    --on-accent-container: var(--accent-hover);
 
-    /* 品牌块要的是饱和深蓝，用浅色墨调透明度只会得到灰蓝 */
-    --brand: #33475c;
-    --brand-hover: #3f566e;
-    --on-brand: #e8eef6;
-    --on-brand-muted: rgba(232, 238, 246, .70);
+    /* 深色下强调色已被 helper 提亮，实心块上的前景要翻成深字才读得清 */
+    --brand: var(--accent);
+    --brand-hover: var(--accent-hover);
+    --on-brand: #14161c;
+    --on-brand-muted: rgba(20, 22, 28, .72);
 
-    /* 机身层：顶栏比卡片更暗一档，不能跟 --paper-rgb 同色，
-       否则深色下顶栏和内容卡糊成一片，只剩一条边框分界。 */
-    --bg-color:  #14181f;
-    --topbar-bg: rgba(23, 28, 36, .88);
+    /* 机身层：整页底比卡片更亮一丝（#17191d vs #1b1c20），
+       靠底色差分层，不靠重阴影——深色里阴影基本读不出来。 */
+    --bg-color:  #17191d;
+    --topbar-bg: var(--glass-bg);
+    --surface-soft: #21232a;
+    --card-border: #3d3d3f;
     /* 深色下的「凹陷」是往黑里沉，浅墨调透明度只会让它凸出来 */
-    --surface-sunken: rgba(0, 0, 0, .18);
+    --surface-sunken: rgba(0, 0, 0, .28);
 
-    --cover-fallback: #2a3340;
-    /* 深色下封面罩压得更重：亮色封面图配上浅色的 .18 罩，白字会糊掉 */
+    /* 深色玻璃：底色近黑，边光反而要更亮，才有那圈磨砂感 */
+    --glass-bg:      rgba(23, 25, 29, .72);
+    --glass-bg-deep: rgba(18, 20, 24, .88);
+    --glass-inset:
+        inset 0 1px 1px rgba(255, 255, 255, .85), inset 0 -1px 1px rgba(255, 255, 255, .85),
+        inset 2px 0 3px rgba(0, 0, 0, .16), inset -2px 0 3px rgba(0, 0, 0, .16);
+
+    --cover-fallback: #2a2d36;
+    /* 深底上同样的金要更亮一档、饱和降一档，否则标题标记看着像脏了一块 */
+    --heading-marker: #e8c476;
+    /* 深色下封面罩压得更重：亮色封面图配上浅色的罩，白字会糊掉 */
     --on-cover: #f2f5f9;
+    --on-cover-rgb: 242, 245, 249;
     --hero-veil-top: rgba(0, 0, 0, .34);
-    --hero-veil-bottom: rgba(10, 14, 20, .76);
+    --hero-veil-bottom: rgba(10, 14, 20, .78);
     --warn-bg: #3a2f14;
     --warn-text: #e0b25c;
     --mark-bg: #575019;
+    /* 深底上同样的低浓度彩灰读不出来：主色提亮，背景掺到 .16 */
+    --health-thin:      #58bdd0;
+    --health-thin-bg:   rgba(88, 189, 208, .16);
+    --health-normal:    #6ec389;
+    --health-normal-bg: rgba(110, 195, 137, .16);
+    --health-over:      #e2a75f;
+    --health-over-bg:   rgba(226, 167, 95, .16);
+    --health-obese:     #e0837a;
+    --health-obese-bg:  rgba(224, 131, 122, .16);
     --scrim: rgba(0, 0, 0, .62);
+    --lightbox-bg: rgba(0, 0, 0, .90);
+    --lightbox-fg: #e8eef6;
+    --lightbox-btn: rgba(255, 255, 255, .12);
+    --lightbox-btn-hover: rgba(255, 255, 255, .22);
 
     --code-bg: #1a1f27;
     --code-fg: #abb2bf;
@@ -192,10 +298,19 @@
         radial-gradient(circle at 40px 17px, #fdbc40 0 6px, transparent 6px),
         radial-gradient(circle at 60px 17px, #35cd4b 0 6px, transparent 6px);
 
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, .40);
-    --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, .45);
-    --shadow-lg: 0 12px 28px -8px rgba(0, 0, 0, .60);
-    --shadow-lift: 0 34px 20px -24px rgba(0, 0, 0, .60);
+    --shadow-sm: 0 8px 16px -4px rgba(0, 0, 0, .32);
+    --shadow-md: 0 8px 12px -3px rgba(0, 0, 0, .40);
+    --shadow-lg: 0 16px 32px -8px rgba(0, 0, 0, .55);
+    --shadow-lift: 0 24px 40px -18px rgba(0, 0, 0, .60);
+    --shadow-border: 0 8px 16px -4px rgba(0, 0, 0, .50);
+    --shadow-main:   0 8px 12px -3px rgba(var(--accent-rgb), .28);
+    --shadow-glass: 0 5px 100px -5px rgba(0, 0, 0, .55);
+
+    /* 深色下的环境光：只剩强调色两层，深度压到读得出「亮一层」就停 */
+    --page-glow:
+        radial-gradient(1100px 560px at 14% -10%, rgba(var(--accent-rgb), .12), transparent 60%),
+        radial-gradient(900px 520px at 100% -6%, rgba(var(--accent-rgb), .07), transparent 55%),
+        radial-gradient(760px 480px at 50% 108%, rgba(0, 0, 0, .30), transparent 60%);
 }
 
 /* ==========================================================================
@@ -232,6 +347,9 @@ html { scroll-padding-top: calc(var(--topbar-h) + 16px); }
 body {
     font-family: var(--font-sans);
     background-color: var(--bg-color);
+    /* 页顶环境光，锚在顶部不固定（避免 iOS 的 fixed 背景 bug），滚走后自然消失 */
+    background-image: var(--page-glow);
+    background-repeat: no-repeat;
     color: var(--text-main);
     line-height: 1.7;
     -webkit-font-smoothing: antialiased;
@@ -261,29 +379,45 @@ summary:focus-visible,
    布局
    ========================================================================== */
 
-/* 顶栏全站 sticky，它下方那段留白归 container 管，而不是 .grid-layout——
-   首页的 .site-hero 排在 .grid-layout 之前，挂在 grid-layout 上的顶距它拿不到。 */
+/* 页面壳：整站最大 1200px，视口到 2000 以上才放到 1500。
+   顶栏全站常驻，所以顶距归 container 管；首页的 hero 在 container 之外，
+   它自己带底距，靠这条撑不出来的那部分由 .grid-layout 的 margin-top 补。 */
 .container {
     width: 100%;
-    max-width: 1320px;
+    max-width: var(--layout-max);
     margin: 0 auto;
-    padding: 2rem 1.25rem;
+    padding: 1.5rem 1.25rem 3rem;
+    /* 站内跳转的淡出/揭示挂在这层（见 main.js 的软导航），别删——
+       删掉之后整页会变成硬切，观感直接退化。 */
     transition: opacity .34s ease, transform .34s ease;
+}
+
+/* 卡片之间的缝一律收窄：这套观感靠 1px 蓝灰描边分层，不靠留白，
+   缝太大整页会散成一张张孤岛。 */
+@media (min-width: 1300px) {
+    .container { padding: 2rem 1.5rem 4rem; }
+}
+
+@media (min-width: 2000px) {
+    .container { max-width: 1500px; }
 }
 
 .grid-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 2rem;
+    gap: 1rem;
     /* 侧边栏比正文长时不要把正文卡一起拉伸 */
     align-items: start;
 }
 
-/* 两列断点和导航面板的断点是同一个数（1024/1023）：<1024 是汉堡面板 + 单列全宽正文，
-   ≥1024 是完整顶栏 + 双列。1024 视口下 container 内容宽 984，减掉 32px 间距剩 952，
-   按 8fr/4fr 拆出正文 635px、右栏 317px——正文再窄就不好读了。 */
-@media (min-width: 1024px) {
-    .grid-layout { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); }
+/* ≥1200 才出右栏，而且固定 300px 不是一根 fr：右栏卡里的头像组、封面缩略图、
+   两列小卡全是按 300px 排的尺寸，用 fr 分它会随视口越长越胖，胶囊间距跟着失真。
+   1200 以下右栏整条沉到正文后面（.sidebar 还在文档流里，不需要 JS 搬）。 */
+@media (min-width: 1200px) {
+    .grid-layout {
+        grid-template-columns: minmax(0, 1fr) var(--aside-w);
+        column-gap: 1rem;
+    }
 
     /* 右栏必须撑满整行高度，.sidebar-sticky 才有地方可走：sticky 元素被父盒的
        内容框约束，而 grid 的 align-items:start 会把 .sidebar 压成内容高度。
@@ -293,14 +427,13 @@ summary:focus-visible,
 
     /* 右栏尾部（近期评论 + 站点信息）跟着页面滚。整栏都钉的话前面四张滚走以后
        右栏上半截是空的，一张都不钉的话滚过一屏之后右栏整个是空的。
-       max-height 是矮窗口下的保险丝：尾部约 580px，1024×600 那种窗口放不下，
+       max-height 是矮窗口下的保险丝：尾部约 580px，1200×600 那种窗口放不下，
        不设上限的话站点信息底部的版权行会永久留在视口外。
-       top 比 .container 的 2rem 顶距少 .25rem，正是下面那层 padding 的厚度，
-       这样钉住时第一张卡的位置和没这层壳时一模一样。 */
+       top 对齐滚动后那条玻璃胶囊的下沿。 */
     .sidebar-sticky {
         position: sticky;
-        top: calc(var(--topbar-h) + 1.75rem);
-        max-height: calc(100vh - var(--topbar-h) - 4rem);
+        top: calc(var(--topbar-h) + 1.25rem);
+        max-height: calc(100vh - var(--topbar-h) - 3rem);
         overflow-y: auto;
         scrollbar-width: thin;
         scrollbar-color: var(--border-strong) transparent;
@@ -311,6 +444,22 @@ summary:focus-visible,
         padding: .25rem;
     }
     .sidebar-sticky .card:last-child { margin-bottom: 0; }
+}
+
+/* 1200 以下右栏沉到正文后面。这时候它不再是 300px 的一竖列：裸排会把月历那排
+   七列拉成一整屏宽，格子大得不成比例。铺成两列，卡片维持「一张卡大概 300px」
+   的比例感；≤767 再退回单列——两列的话一格日历只剩 160px，一天 22px 按不准。
+   .sidebar-sticky 用 display:contents 让自己的盒子消失，两张卡直接当 grid 子项；
+   固定效果本来就只写在上面那条 ≥1200 的查询里，这里不用再关掉它。 */
+@media (min-width: 768px) and (max-width: 1199px) {
+    .sidebar {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: start;
+        gap: .75rem;
+    }
+    .sidebar .card-widget { margin-bottom: 0; }
+    .sidebar-sticky { display: contents; }
 }
 
 /* grid 子项默认 min-width:auto，长代码块/宽表格会把列撑破，必须显式归零 */
@@ -350,7 +499,7 @@ summary:focus-visible,
 .sr-only {
     position: absolute;
     width: 1px; height: 1px;
-    padding: 0; margin: -1px;   /* 和上面的 1px 宽高配套，一起留在 px */
+    padding: 0; margin: -.0625rem;   /* 和上面的 1px 宽高配套，一起留在 px */
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
@@ -360,20 +509,74 @@ summary:focus-visible,
 /* ==========================================================================
    顶栏
    --------------------------------------------------------------------------
-   全视口常驻的 sticky 导航条：左品牌、中导航、右一簇动作按钮。
+   固定在最上层，静息时完全透明、直接压在首屏 hero 上；滚过 hero 之后整条收成一颗
+   居中的玻璃胶囊（main.js 给 body 挂 .nav-fixed）。
    backdrop-filter 会给固定定位的后代建包含块，所以 #noline-progress 和
    遮罩都必须是 .topbar 的兄弟节点，塞进来就会跟着一起跑。
+
+   前景色一律走下面这组 --nav-* 开关，不在子元素里写死 hex 或语义色：
+   首屏带封面图时（body.hero-cover）它们整组翻成白字，胶囊态再整组翻回常规墨色。
+   一处开关管住品牌、导航、动作按钮、搜索框，加新组件时只要 inherit 就自动跟着走。
    ========================================================================== */
 
 .topbar {
-    position: sticky;
+    --nav-fg: var(--text-secondary);
+    --nav-fg-strong: var(--text-strong);
+    --nav-fg-accent: var(--accent);
+    --nav-hover-bg: var(--surface-soft);
+    --nav-active-bg: var(--accent-bg);
+    --nav-field-bg: var(--surface-soft);
+    --nav-field-border: transparent;
+    --nav-field-fg: var(--text-main);
+
+    position: fixed;
     top: 0;
+    right: 0;
+    left: 0;
     z-index: var(--z-topbar);
-    background-color: var(--topbar-bg);
-    -webkit-backdrop-filter: blur(12px);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border-color);
-    transition: background-color .25s ease;
+    background-color: transparent;
+    border-bottom: 0;
+    transition: var(--t);
+}
+
+/* 有首屏的页面顶栏盖在 hero 上，body 不让位；没有首屏的页面必须让出一条导航的高度。
+   has-hero 由 header.php 挂在 body 上，目前只有首页和文章页有首屏。 */
+body:not(.has-hero) { padding-top: calc(var(--topbar-h) + .75rem); }
+
+/* 封面图上的白字：满浓度白 + 半透明白底，不跟胶囊态共用一套墨色。 */
+body.hero-cover:not(.nav-fixed) .topbar {
+    --nav-fg: rgba(var(--on-cover-rgb), .86);
+    --nav-fg-strong: var(--on-cover);
+    --nav-fg-accent: var(--on-cover);
+    --nav-hover-bg: rgba(var(--on-cover-rgb), .18);
+    --nav-active-bg: rgba(var(--on-cover-rgb), .24);
+    --nav-field-bg: rgba(var(--on-cover-rgb), .16);
+    --nav-field-border: rgba(var(--on-cover-rgb), .28);
+    --nav-field-fg: var(--on-cover);
+}
+
+/* 胶囊态：整条收成一颗 44px 的玻璃药丸，边光 + 大半径投影是它的识别点。
+   自定义属性写在规则内部，靠级联把封面态那一组盖回去。 */
+body.nav-fixed .topbar-inner {
+    --nav-fg: var(--text-secondary);
+    --nav-fg-strong: var(--text-strong);
+    --nav-fg-accent: var(--accent);
+    --nav-hover-bg: var(--surface-soft);
+    --nav-active-bg: var(--accent-bg);
+    --nav-field-bg: var(--surface-soft);
+    --nav-field-border: transparent;
+    --nav-field-fg: var(--text-main);
+
+    min-height: var(--nav-pill-h);
+    margin: .5rem auto;
+    padding: 0 .75rem;
+    gap: .125rem .375rem;
+    border-radius: var(--radius-pill);
+    border: var(--style-border);
+    background-color: var(--glass-bg);
+    -webkit-backdrop-filter: saturate(180%) blur(var(--glass-blur));
+    backdrop-filter: saturate(180%) blur(var(--glass-blur));
+    box-shadow: var(--shadow-glass), var(--glass-inset);
 }
 
 /* 限宽和 .container 对齐，导航项才会和下面的卡片在同一条竖线上。
@@ -385,9 +588,12 @@ summary:focus-visible,
     flex-wrap: wrap;
     gap: .25rem .5rem;
     min-height: var(--topbar-h);
-    max-width: 1320px;
+    max-width: var(--layout-max);
     margin: 0 auto;
     padding: .375rem 1.25rem;
+    border-radius: var(--radius-pill);
+    border: 1px solid transparent;
+    transition: var(--t);
 }
 
 /* --- 品牌 --- */
@@ -425,7 +631,7 @@ summary:focus-visible,
     min-width: 0;
     font-size: .9375rem;
     font-weight: 700;
-    color: var(--text-strong);
+    color: var(--nav-fg-strong);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -454,12 +660,12 @@ summary:focus-visible,
     background: none;
     border: none;
     border-radius: var(--radius-md);
-    color: var(--text-secondary);
+    color: var(--nav-fg);
     font-size: 1.0625rem;
     cursor: pointer;
-    transition: background-color .18s, color .18s;
+    transition: var(--t-fast);
 }
-.icon-btn:hover { background-color: var(--surface-soft); color: var(--accent); }
+.icon-btn:hover { background-color: var(--nav-hover-bg); color: var(--nav-fg-accent); }
 
 /* 后台给社交链接配了显示名，方块就长成药丸把名字带上。
    顶栏是挤，但配置项不能悄悄失效——窄屏下才把名字收进气泡里。 */
@@ -485,7 +691,7 @@ summary:focus-visible,
     min-width: 2.5rem;
     font-size: .875rem;
     font-weight: 700;
-    color: var(--text-secondary);
+    color: var(--nav-fg);
     font-variant-numeric: tabular-nums;
 }
 /* 光有 hidden 属性不够：上面的 display:inline-flex 会把它盖掉 */
@@ -495,7 +701,8 @@ summary:focus-visible,
     margin-left: 1px;
     font-size: .6875rem;
     font-weight: 500;
-    color: var(--text-light);
+    color: var(--nav-fg);
+    opacity: .6;
 }
 
 /* --- 导航 --- */
@@ -520,120 +727,39 @@ summary:focus-visible,
     display: inline-flex;
     align-items: center;
     gap: .375rem;
-    height: 40px;
-    padding: 0 .75rem;
+    height: 36px;
+    padding: 0 .875rem;
     border: none;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-pill);
     background: none;
     font-family: inherit;
     font-size: .9375rem;
     font-weight: 500;
     line-height: 1;
-    color: var(--text-secondary);
+    color: var(--nav-fg);
     white-space: nowrap;
     cursor: pointer;
-    transition: background-color .18s, color .18s;
+    transition: var(--t-fast);
 }
-.nav-item:hover { background-color: var(--surface-soft); color: var(--accent); }
+.nav-item:hover { background-color: var(--nav-hover-bg); color: var(--nav-fg-accent); }
 .nav-item .noline-icon,
 .nav-item .noline-emoji { font-size: 1.0625rem; }
 
-.nav-item.active { color: var(--accent); font-weight: 600; }
-
-/* 下沿一粒强调色圆点做当前/hover 指示。用 opacity 而不是 display，过渡才跑得动。 */
-.nav-item::after {
-    content: "";
-    position: absolute;
-    left: 0; right: 0; bottom: 4px;
-    width: 5px; height: 5px;
-    margin: 0 auto;
-    border-radius: 50%;
-    background-color: var(--accent);
-    opacity: 0;
-    transition: opacity .3s ease;
+/* 当前项：淡强调色整颗填实，比原来那粒圆点读得清楚，也顶栏胶囊里的语言一致。 */
+.nav-item.active {
+    background-color: var(--nav-active-bg);
+    color: var(--nav-fg-accent);
+    font-weight: 600;
 }
-.nav-item:hover::after,
-.nav-item.active::after { opacity: 1; }
 
 /* 标题单独包一层才吃得到省略号：.nav-item 是 flex 容器，
    text-overflow 对匿名 flex 项不起作用。 */
 .nav-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
-/* --- 分类下拉 --- */
-
-.nav-group { position: relative; }
-
-/* 箭头是 CSS 画的，不占图标位：左下两边框的小方块，
-   转 -45° 得到「ˇ」，展开时转到 135° 变成「^」。 */
-.nav-caret { position: relative; width: 12px; height: 12px; flex-shrink: 0; }
-.nav-caret::before {
-    content: "";
-    position: absolute;
-    top: 2px; left: 3px;
-    width: 6px; height: 6px;
-    border-left: 2px solid currentColor;
-    border-bottom: 2px solid currentColor;
-    transform: rotate(-45deg);
-    transition: transform .22s ease;
-}
-
-/* 面板贴着触发器下沿，中间不留缝：留缝的话鼠标斜着移过去就掉出 :hover，
-   面板会在半路关掉。位移交给 transform，动画照跑。
-   必须带 visibility:hidden——只靠 opacity:0 的话，看不见的链接仍然能被 Tab 到。 */
-.nav-sub {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    min-width: 13rem;
-    margin: 0;
-    padding: .375rem;
-    list-style: none;
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-.375rem);
-    transition: opacity .18s ease, transform .18s ease, visibility .18s;
-}
-
-.nav-sub-item a {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: .75rem;
-    padding: .5rem .625rem;
-    border-radius: var(--radius-md);
-    font-size: .875rem;
-    color: var(--text-main);
-    transition: background-color .16s, color .16s;
-}
-.nav-sub-item a:hover { background-color: var(--surface-soft); color: var(--accent); }
-.nav-sub-item .nav-sub-count {
-    flex-shrink: 0;
-    font-size: .75rem;
-    color: var(--text-light);
-    font-variant-numeric: tabular-nums;
-}
-
-/* is-open 是点击/触摸路径，由 main.js 挂上去；两种宽度都生效，
-   桌面端点一下能把面板钉住，不至于鼠标一歪就关。 */
-.nav-group.is-open > .nav-sub { opacity: 1; visibility: visible; transform: none; }
-.nav-group.is-open > .nav-group-btn .nav-caret::before { transform: rotate(135deg); }
-
-/* hover / focus-within 只在宽屏开：触屏没有 hover，
-   窄屏下面板里的分组一律走点击。 */
-@media (min-width: 1024px) {
-    .nav-group:hover > .nav-sub,
-    .nav-group:focus-within > .nav-sub { opacity: 1; visibility: visible; transform: none; }
-    .nav-group:hover > .nav-group-btn .nav-caret::before,
-    .nav-group:focus-within > .nav-group-btn .nav-caret::before { transform: rotate(135deg); }
-}
-
 /* --- 搜索 --- */
 
 .topbar-search {
+    position: relative;      /* 快捷键徽章挂在这上面，别让它漂到顶栏去 */
     display: flex;
     align-items: center;
     gap: .125rem;
@@ -643,21 +769,60 @@ summary:focus-visible,
 .topbar-search input {
     width: 9.5rem;
     padding: .4375rem .875rem;
-    border: 1px solid var(--border-strong);
+    border: 1px solid var(--nav-field-border);
     border-radius: var(--radius-full);
-    background-color: var(--surface-soft);
+    background-color: var(--nav-field-bg);
     font-family: inherit;
     font-size: .875rem;
-    color: var(--text-main);
+    color: var(--nav-field-fg);
     outline: none;
-    transition: border-color .2s, background-color .2s, box-shadow .2s, width .2s;
+    transition: var(--t);
 }
-.topbar-search input::placeholder { color: var(--text-light); }
+.topbar-search input::placeholder { color: var(--nav-fg); opacity: .7; }
 .topbar-search input:focus {
     width: 13rem;
     background-color: var(--card-bg);
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-bg);
+    color: var(--text-main);
+}
+/* 封面图上聚焦时不能落回白底：白底配白字会直接把输入框洗白。
+   留一层半透明白，环也换成白，读得清比「和胶囊态一致」重要。 */
+body.hero-cover:not(.nav-fixed) .topbar-search input:focus {
+    background-color: rgba(var(--on-cover-rgb), .26);
+    border-color: rgba(var(--on-cover-rgb), .6);
+    box-shadow: 0 0 0 3px rgba(var(--on-cover-rgb), .22);
+    color: var(--on-cover);
+}
+/* 快捷键徽章。它只是提示，不是控件：pointer-events 一律关掉，
+   免得读者照着按之前先去点它一下。位置贴着输入框右缘、提交按钮左缘。 */
+.search-kbd {
+    position: absolute;
+    top: 50%;
+    right: 2.75rem;
+    transform: translateY(-50%);
+    pointer-events: none;
+    font-family: inherit;
+    font-size: .6875rem;
+    line-height: 1.4;
+    letter-spacing: .02em;
+    padding: .0625rem .3125rem;
+    border: 1px solid var(--nav-field-border);
+    border-radius: .3125rem;
+    color: var(--nav-fg);
+    opacity: .55;
+    transition: opacity var(--t-fast);
+}
+/* 一聚焦就消失：光标已经在里面了，再挂着提示就是噪音。
+   已经打了字同样消失——这时候该看到的是自己的字，不是快捷键。 */
+.topbar-search:focus-within .search-kbd,
+.topbar-search input:not(:placeholder-shown) ~ .search-kbd {
+    opacity: 0;
+}
+body.hero-cover:not(.nav-fixed) .search-kbd {
+    color: var(--on-cover);
+    border-color: rgba(var(--on-cover-rgb), .45);
+    opacity: .75;
 }
 /* 提交按钮直接复用 .icon-btn，顶栏里所有方形按钮才是一副面孔 */
 
@@ -686,46 +851,30 @@ summary:focus-visible,
         max-height: calc(100vh - var(--topbar-h) - 1rem);
         overflow-y: auto;
         padding: .5rem .75rem .875rem;
-        background-color: var(--card-bg);
+        background-color: var(--glass-bg);
+        -webkit-backdrop-filter: blur(var(--glass-blur));
+        backdrop-filter: blur(var(--glass-blur));
         border-bottom: 1px solid var(--border-color);
         box-shadow: var(--shadow-lg);
         opacity: 0;
         visibility: hidden;
         transform: translateY(-.5rem);
-        transition: opacity .2s ease, transform .2s ease, visibility .2s;
+        transition: opacity .2s ease, transform .24s var(--ease-spring), visibility .2s;
     }
     .topnav.is-open { opacity: 1; visibility: visible; transform: none; }
 
     /* 竖排里项撑满整行，下沿圆点没有位置可待 */
     .topnav .nav-item { display: flex; width: 100%; height: 44px; }
     .topnav .nav-item::after { display: none; }
-    .topnav .nav-item.active { background-color: var(--accent-bg); }
-
-    /* 分类分组在面板里摊平：子列表回到文档流，左侧一道竖线表示层级。
-       用 display 而不是 visibility 收放——静态定位的元素藏起来仍然占高度，
-       面板里会留一大块空白。 */
-    .nav-group { display: block; }
-    .nav-group > .nav-sub {
-        display: none;
-        position: static;
-        min-width: 0;
-        margin: 0 0 .25rem;
-        padding: 0 0 0 .25rem;
-        background: none;
-        border: 0;
-        border-left: 2px solid var(--border-color);
-        border-radius: 0;
-        box-shadow: none;
-        opacity: 1;
-        visibility: visible;
-        transform: none;
-    }
-    .nav-group.is-open > .nav-sub { display: block; }
+    .topnav .nav-item.active { background-color: var(--accent-container); color: var(--on-accent-container); }
 
     /* 搜索落到面板底部，撑满整行 */
     .topbar-search { width: 100%; margin: .5rem 0 0; }
     .topbar-search input,
     .topbar-search input:focus { flex: 1; width: auto; }
+    /* 窄屏没有快捷键可提示：触屏上读者只会点，不会去按 ⌘K。
+       而且输入框撑满整行后，徽章会压在提交按钮上。 */
+    .search-kbd { display: none; }
 
     .nav-scrim {
         display: block;
@@ -756,13 +905,16 @@ summary:focus-visible,
    通用卡片
    ========================================================================== */
 
+/* 描边是这套观感的骨架：卡面靠 1px 蓝灰线和浅灰白底分层，投影只负责抬起来一点点。
+   原来只有投影，浅色下卡和底的差值不到 2% 亮度，整页会糊成一片白。 */
 .card {
     background-color: var(--card-bg);
+    border: var(--style-border);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-border);
     overflow: hidden;
     margin-bottom: 1.5rem;
-    transition: box-shadow .3s ease, background-color .25s ease;
+    transition: box-shadow .3s ease, border-color .3s ease, background-color .25s ease;
 }
 
 /* 只有列表卡片做上浮。文章正文卡不能加 transform——
@@ -774,11 +926,314 @@ summary:focus-visible,
 }
 .post-card:hover { transform: translateY(-3px); }
 
-.post-card { padding: 1.75rem 2rem; transition: box-shadow .3s ease, transform .3s ease, background-color .25s ease; }
+/* 列表卡 hover 时顶部一条强调色发丝线。left/right 收在圆角内侧，配合 .card 的
+   overflow:hidden 自然裁剪；.link-card 没设 overflow，但头顶是平的，不裁也不越界。 */
+.post-card::after,
+.link-card::after {
+    content: "";
+    position: absolute;
+    left: 1.25rem;
+    right: 1.25rem;
+    top: 0;
+    height: 2px;
+    background-color: var(--accent);
+    border-radius: 0 0 2px 2px;
+    opacity: 0;
+    transform: scaleX(.6);
+    transition: opacity .3s ease, transform .3s ease;
+}
+.post-card:hover::after,
+.link-card:hover::after { opacity: 1; transform: scaleX(1); }
+
+/* 滚动进场：initScrollReveal() 给列表卡挂 .reveal，进视口加 .is-visible。
+   .reveal 只由 JS 添加——无 JS 或 reduced-motion 时卡片永远不透明，天然兜底。 */
+.reveal {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity .55s ease, transform .55s ease;
+}
+.reveal.is-visible { opacity: 1; transform: none; }
+
+.post-card { position: relative; padding: 1.75rem 2rem; transition: box-shadow .3s ease, transform .3s var(--ease-spring), background-color .25s ease; }
 .article-card { padding: 2.25rem 3rem; }
 @media (max-width: 640px) {
     .post-card { padding: 1.25rem; }
     .article-card { padding: 1.5rem 1.125rem; }
+}
+
+/* ==========================================================================
+   信息流：一张卡片的三种形态
+   --------------------------------------------------------------------------
+   基准（<1200，右栏还没出现）：封面横铺卡顶，正文在下方。
+   1200–1299：正文列只剩 ~880px，与其让标题被 16:9 的封面压扁，不如借 heo 的
+              左右分栏——封面 40%、正文 60%，逐张交替。
+   ≥1300：   同一个 ~880px 改成两列。列宽放不下分栏，于是退回封面上置的竖版，
+              一屏能多看两张。
+   .flip 是模板按「(当前页 - 1) × 每页条数 + 本页序号」算出来的朝向位，不是
+   nth-of-type：动态卡也是 <article>，数标签的奇偶会被它打乱；自动加载拼进来的
+   第 2 页更会让两张同侧。
+   --------------------------------------------------------------------------
+   .post-card 在信息流里 padding 归零，内边距全部交给 .post-card-body，
+   这样封面才能贴着卡片圆角铺满——.card 的 overflow:hidden 负责切圆角。
+   xiaoshi.php 复用 .post-card 但没有 .post-card-body，所以归零只作用于 .feed。
+   ========================================================================== */
+
+/* 容器用 flex-wrap 而不是 grid：吸顶药丸条是容器的直接子项，而 grid 子项的
+   sticky 包含块是它自己那一格的 row box——行高就是它自身高度，等于哪儿也去不了，
+   吸顶会静默失效。flex 子项的包含块是整个容器，hence heo 一直用 flex-wrap。
+   卡间距交给 gap，.card 那条 1.5rem 下边距在信息流里必须清掉。 */
+.main-content.feed {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 1.25rem;
+}
+.main-content.feed > * { flex: 1 1 100%; min-width: 0; }
+.main-content.feed > .card,
+.main-content.feed > .archive-header,
+.main-content.feed > .page-navigator,
+.main-content.feed > .feed-status { margin-bottom: 0; }
+
+.main-content.feed .post-card { padding: 0; }
+.post-card-body { padding: 1.375rem 1.5rem 1.5rem; min-width: 0; }
+@media (max-width: 639px) { .post-card-body { padding: 1.125rem 1rem 1.25rem; } }
+
+/* 卡片封面：贴着卡顶铺满。没有 thumb 自定义字段时整块不渲染，卡片维持文字形态。 */
+.post-cover {
+    display: block;
+    height: 12.5rem;
+    overflow: hidden;
+    background-color: var(--cover-fallback);
+}
+.post-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform .45s ease;
+}
+.post-card:hover .post-cover img { transform: scale(1.04); }
+/* 压在照片上的强调色发丝线只会像一条错位的进度条，带封面的卡不要它 */
+.post-card.has-cover::after { content: none; }
+
+@media (min-width: 1200px) and (max-width: 1299px) {
+    .main-content.feed .post-card.has-cover {
+        display: flex;
+        align-items: stretch;
+        min-height: 13.75rem;
+    }
+    /* height:auto 让封面跟着 flex 的拉伸走；写死 12.5rem 的话正文比它高时，
+       封面底下会露出一条卡片底色。 */
+    .main-content.feed .post-card.has-cover .post-cover {
+        width: 40%;
+        height: auto;
+        flex-shrink: 0;
+    }
+    .main-content.feed .post-card.has-cover .post-card-body {
+        flex: 1 1 auto;
+        padding: 1.75rem 2rem;
+    }
+    .post-card.has-cover.flip .post-cover { order: 2; }
+}
+
+@media (min-width: 1300px) {
+    .main-content.feed { gap: 1rem; }
+    /* 只有文章卡成双成对。公告、动态、药丸条、页码、状态区、归档抬头一律占满一行。
+       50% 再减掉半个 gap，两个正好塞进一行；grow 配 max-width 封顶，
+       落单的最后一张也不会自己撑满。 */
+    .main-content.feed > .post-card {
+        flex-basis: calc(50% - .5rem);
+        max-width: calc(50% - .5rem);
+    }
+    .main-content.feed > .feed-cats,
+    .main-content.feed > .archive-header,
+    .main-content.feed > .status-card,
+    .main-content.feed > .card:not(.post-card),
+    .main-content.feed > .page-navigator,
+    .main-content.feed > .feed-status {
+        flex-basis: 100%;
+        max-width: 100%;
+    }
+}
+
+/* ==========================================================================
+   吸顶分类药丸条（public/feed-cats.php）
+   --------------------------------------------------------------------------
+   条本身透明——heo 的这条带就没有底，药丸自己是不透明的卡片色，压在滑过的
+   正文上读得清，缝隙里露出页面底色反而是想要的效果。给它铺底会成一条横贯
+   正文列的色带，把 --page-glow 那层环境光切断。
+   横向溢出滚动而不是换行：一行是这套观感的前提，换行之后吸顶高度会吃掉半屏。
+   溢出交给右端那颗「更多」兜底：滚动条已经藏了，鼠标用户既看不见进度也不知道
+   右边还有东西，Tab 逐个跳过去才算是一条可用的退路。
+   ========================================================================== */
+
+/* sticky 的这层不滚动，只负责钉住、当弹层的定位参照，并把行和按钮排在一条线上。
+   position: sticky 本身就是「已定位」元素，绝对定位的弹层会以她为包含块，
+   不需要再补一句 position: relative。 */
+.feed-cats {
+    position: sticky;
+    top: calc(var(--topbar-h) + .5rem);
+    z-index: var(--z-sticky);
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+    padding: .125rem 0;
+}
+
+/* 真正横向溢出的这一行。min-width: 0 是必需的：flex 项默认按内容撑开，
+   不给它封顶的话 overflow 永远不会触发，整行会把正文列顶宽。 */
+.feed-cats-scroll {
+    min-width: 0;
+    flex: 0 1 auto;
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.feed-cats-scroll::-webkit-scrollbar { display: none; }
+
+.feed-cat {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    min-height: 38px;
+    padding: .5rem 1.125rem;
+    border: var(--style-border);
+    border-radius: var(--radius-pill);
+    background-color: var(--card-bg);
+    box-shadow: var(--shadow-border);
+    font-size: .875rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text-strong);
+    transition: var(--t);
+}
+.feed-cat:hover {
+    background-color: var(--surface-soft);
+    border-color: var(--accent-ring);
+    color: var(--accent);
+}
+.feed-cat.active {
+    background-color: var(--brand);
+    border-color: var(--brand);
+    color: var(--on-brand);
+    box-shadow: var(--shadow-main);
+}
+/* 计数挂在名字后面：读者点之前最想知道的就是这个分类有没有东西 */
+.feed-cat-count {
+    font-size: .75rem;
+    font-weight: 500;
+    opacity: .62;
+}
+
+/* --- 右端那颗「更多」 --- */
+
+/* 尺寸、描边、圆角全都照 .feed-cat 抄：这颗按钮必须看起来就是这一行的最后一颗药丸，
+   只是点不开、而是掀开一层。flex-shrink: 0——行挤的时候先裁药丸，按钮不能被压扁。 */
+.feed-cat-more {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    min-height: 38px;
+    padding: .5rem .9375rem;
+    border: var(--style-border);
+    border-radius: var(--radius-pill);
+    background-color: var(--card-bg);
+    box-shadow: var(--shadow-border);
+    font-family: inherit;
+    font-size: .875rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text-strong);
+    cursor: pointer;
+    transition: var(--t);
+}
+/* .feed-cat-more 自己声明了 display: inline-flex，会把 UA 那条
+   [hidden] { display: none } 压掉，所以每个被 JS 揭开/盖上的组件都要补这一笔。 */
+.feed-cat-more[hidden] { display: none; }
+.feed-cat-more:hover {
+    background-color: var(--surface-soft);
+    border-color: var(--accent-ring);
+    color: var(--accent);
+}
+.feed-cat-more .noline-icon { font-size: .9375rem; color: var(--accent); }
+/* 展开时填成品牌色，和 .feed-cat.active 是同一副面孔：这一行的「当前项」永远只有一枚。 */
+.feed-cat-more.is-open {
+    background-color: var(--brand);
+    border-color: var(--brand);
+    color: var(--on-brand);
+    box-shadow: var(--shadow-main);
+}
+.feed-cat-more.is-open .noline-icon { color: var(--on-brand); }
+
+/* --- 溢出的分类面板 --- */
+
+/* 靠右对齐：触发它的那颗按钮就在右端，面板往左展开才不会指到别处去。
+   宽度取 min()：分类名长短不一，但绝不能比正文列还宽。 */
+.feed-cats-pop {
+    position: absolute;
+    top: calc(100% + .375rem);
+    right: 0;
+    z-index: calc(var(--z-sticky) + 1);
+    width: min(22rem, 88vw);
+    max-height: 22rem;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+    gap: .125rem;
+    padding: .375rem;
+    background-color: var(--card-bg);
+    border: var(--style-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+}
+.feed-cats-pop[hidden] { display: none; }
+/* 从 display:none 翻回 grid 时动画会重新起播，正好是「掀开」该有的那一下。
+   减弱动效那条全局规则会把时长压到 0，这里不用再判一次。 */
+.feed-cats-pop:not([hidden]) { animation: feed-cats-pop-in .2s var(--ease-spring); }
+@keyframes feed-cats-pop-in {
+    from { opacity: 0; transform: translateY(-.375rem); }
+}
+
+.feed-cats-pop-item {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .5rem;
+    min-width: 0;
+    padding: .5rem .625rem;
+    border-radius: var(--radius-md);
+    font-size: .875rem;
+    color: var(--text-main);
+    transition: var(--t-fast);
+}
+.feed-cats-pop-item:hover { background-color: var(--surface-soft); color: var(--accent); }
+/* 名字先截断，计数留在行尾：这一格里最不能丢的是「点的是哪个分类」 */
+.feed-cats-pop-item span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.feed-cats-pop-item.active {
+    background-color: var(--accent-container);
+    color: var(--on-accent-container);
+    font-weight: 700;
+}
+.feed-cats-pop-count {
+    flex-shrink: 0;
+    font-size: .75rem;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+}
+.feed-cats-pop-item.active .feed-cats-pop-count { color: inherit; opacity: .72; }
+
+/* 窄屏上 22rem 的面板快顶到屏幕边了，收到 18rem：面板是右对齐的，
+   左边留出至少一截能看见的正文，用户才知道自己是掀开了一个浮层而不是滚到了新页。 */
+@media (max-width: 639px) {
+    .feed-cats-pop { width: min(18rem, 92vw); }
 }
 
 .post-header { display: flex; align-items: center; margin-bottom: .875rem; min-width: 0; }
@@ -807,11 +1262,24 @@ summary:focus-visible,
 .meta-item { display: inline-flex; align-items: center; gap: .25rem; }
 
 .category-tag {
-    color: var(--accent);
-    background-color: var(--accent-bg);
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    color: var(--on-accent-container);
+    background-color: var(--accent-container);
     padding: .125rem .5rem;
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     font-weight: 500;
+}
+/* 分类标签前那粒点：它顶替的是「这一段属于一个分类」的语义标记，
+   不是装饰——卡片标题的圆点已经跟着药丸一起退了，这里这颗还在。 */
+.category-tag::before {
+    content: "";
+    width: .375rem;
+    height: .375rem;
+    border-radius: 50%;
+    background-color: var(--accent);
+    flex-shrink: 0;
 }
 
 /* ==========================================================================
@@ -819,17 +1287,32 @@ summary:focus-visible,
    ========================================================================== */
 
 .post-title {
-    font-size: 1.625rem;
+    font-size: 1.25rem;
     font-weight: 800;
-    line-height: 1.35;
+    line-height: 1.4;
     letter-spacing: -.01em;
     color: var(--text-strong);
-    margin-bottom: .75rem;
+    margin-bottom: .625rem;
     overflow-wrap: break-word;
 }
-.post-title-link { transition: color .2s; }
-.post-title-link:hover { color: var(--accent); }
-@media (max-width: 640px) { .post-title { font-size: 1.375rem; } }
+/* 标题 hover 下划线从 0 扫到满宽：背景渐变 + background-size 过渡，比 border-bottom 平滑 */
+.post-title-link {
+    background-image: linear-gradient(var(--accent), var(--accent));
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0 2px;
+    transition: color .2s, background-size .3s ease;
+}
+.post-title-link:hover { color: var(--accent); background-size: 100% 2px; }
+/* 两列并排时标题长度不一会把卡片拉得高一块矮一块，信息流里统一收两行。
+   只作用于 .feed：page.php 那批 h1.post-title.page-title 不该被裁。 */
+.main-content.feed .post-title {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
 
 .page-title {
     text-align: center;
@@ -851,6 +1334,9 @@ summary:focus-visible,
 }
 /* page.php 的标题下面直接就是正文，没有副标题来撑开间距 */
 .page-title + .post-content { margin-top: 1.75rem; }
+/* 副标题后面那段内容不保证有：归档页一篇文章都没有时，页头的图标加列表都是空的，
+   副标题就成了卡里最后一个元素，它那 2.25rem 的下边距会在卡底凭空多出一段空。 */
+.page-subtitle:last-child { margin-bottom: 0; }
 
 .post-excerpt {
     color: var(--text-secondary);
@@ -887,7 +1373,7 @@ summary:focus-visible,
     color: var(--text-light);
     background-color: var(--surface-soft);
     padding: .25rem .625rem;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     transition: color .2s, background-color .2s;
 }
 a.stat-item:hover { color: var(--accent); background-color: var(--accent-bg); }
@@ -900,12 +1386,13 @@ a.stat-item:hover { color: var(--accent); background-color: var(--accent-bg); }
     gap: .375rem;
     font-size: .8125rem;
     font-weight: 600;
-    color: var(--accent);
+    color: var(--on-accent-container);
+    background-color: var(--accent-container);
     padding: .375rem .875rem;
     border-radius: var(--radius-full);
-    transition: background-color .2s;
+    transition: background-color .2s, transform .2s var(--ease-spring);
 }
-.read-more:hover { background-color: var(--accent-bg); color: var(--accent); }
+.read-more:hover { background-color: rgba(var(--accent-rgb), .22); color: var(--on-accent-container); transform: translateY(-1px); }
 
 /* ---------- 卡片底部的评论预览 ---------- */
 
@@ -938,7 +1425,7 @@ a.stat-item:hover { color: var(--accent); background-color: var(--accent-bg); }
 .card-comments-face {
     width: 26px;
     height: 26px;
-    margin-right: -8px;
+    margin-right: -.5rem;
     border: 2px solid var(--card-bg);
     border-radius: 50%;
     background-color: var(--surface-code);
@@ -1007,47 +1494,94 @@ a.stat-item:hover { color: var(--accent); background-color: var(--accent-bg); }
 
 .archive-header { margin-bottom: 1.5rem; padding: .25rem .25rem 0; }
 .archive-title { font-size: 1.375rem; font-weight: 800; line-height: 1.3; color: var(--text-strong); }
-.archive-count { font-size: .8125rem; color: var(--text-light); margin-top: .25rem; }
+.archive-count {
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+    font-size: .8125rem;
+    color: var(--text-light);
+    margin-top: .25rem;
+}
+/* 标题下那行小字前的图标染强调色：跟着 .8125rem 的浅灰走，一颗灰图标看着像没加载完。 */
+.archive-count .noline-icon,
+.page-subtitle .noline-icon { color: var(--accent); }
 
 .empty-state { padding: 5rem 1.25rem; text-align: center; color: var(--text-light); }
-.empty-state-icon { font-size: 2.5rem; margin-bottom: 1rem; color: var(--border-soft); }
+
+/* 空态 + 404 插画：图标坐在虚线圆环里，底垫一层强调色圆。
+   ::after 的 z-index:-1 需要容器自己成 stacking context（relative + z-index:0）。 */
+.empty-state-icon,
+.error-illustration {
+    position: relative;
+    z-index: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 5rem;
+    height: 5rem;
+    color: var(--accent);
+}
+.empty-state-icon::before,
+.error-illustration::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1.5px dashed var(--border-strong);
+}
+.empty-state-icon::after,
+.error-illustration::after {
+    content: "";
+    position: absolute;
+    inset: .5rem;
+    border-radius: 50%;
+    background-color: var(--accent-bg);
+    z-index: -1;
+}
+.empty-state-icon .noline-icon,
+.error-illustration .noline-icon { position: relative; z-index: 1; }
+.empty-state-icon { font-size: 2.25rem; margin-bottom: 1.25rem; }
+.error-illustration { font-size: 2.25rem; margin-bottom: .75rem; }
 .empty-state-text { font-size: .9375rem; }
 
 /* ==========================================================================
    右侧栏卡片
    ========================================================================== */
 
-/* 药丸标题。原先是横贯整卡的一行文字，现在收成贴着左上角的一枚胶囊，
-   和顶栏的 .nav-item 同一套语言。
+/* card-widget 是 heo 右栏的壳：8px/12px 内缩 + 卡内 8px 纵向 gap。
+   只在带 .card-widget 的卡上生效——正文卡、列表卡的内边距各有一套，
+   挂到 .card 基础规则里会把它们全挤歪。 */
+.card-widget {
+    padding: .5rem .75rem;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    transition: var(--t);
+}
 
-   间距必须用 margin 不能用 padding——padding 会把底色铺满整行，药丸就不成药丸了。
-   首子元素的上外边距本该穿透到 .card 外面去，但 .card 是 overflow:hidden，
-   自成 BFC，外边距被关在里面，所以这里是安全的。 */
+/* 一栏只有 300px 宽，卡间距跟着收到 8px：缝一大，右栏就散成一张张孤岛，
+   不再是「一列」。 */
+.sidebar .card-widget { margin-bottom: .5rem; }
+
+/* 标题：一枚图标 + 一行粗字。横向内缩全部交给卡片的 padding，标题和内容
+   因此共用同一条竖线。
+   原来的「圆点 + 药丸底」必须自己带横向 margin 才像药丸，卡片一旦有了
+   padding 就会双重内缩，所以底色和 ::before 那颗点一起删掉。 */
 .card-header {
     display: flex;
     align-items: center;
-    width: fit-content;
-    gap: .4375rem;
-    margin: 1.25rem 1.5rem 0;
-    padding: .375rem .8125rem;
-    border-radius: var(--radius-full);
-    background-color: var(--surface-soft);
-    font-size: .875rem;
+    gap: .25rem;
+    margin: 0;
+    font-size: 1rem;
     font-weight: 700;
+    line-height: 1.5;
     color: var(--text-strong);
 }
-.card-header::before {
-    content: "";
-    width: .375rem;
-    height: .375rem;
-    border-radius: 50%;
-    background-color: var(--accent);
-    flex-shrink: 0;
-}
+/* 18px 是 heo 那排 item-headline 图标的字号。颜色没照抄它的正文字色，
+   跟着站内其它标题图标（评论数、相关文章）走强调色——六枚灰图标会让整栏发闷。 */
+.card-header .noline-icon { font-size: 1.125rem; color: var(--accent); }
 
-/* 药丸不再自带下间距，三个兄弟容器各自补一段头顶留白；
-   左右一律收到 1.5rem，让卡片里的内容和药丸左边缘在同一条竖线上。 */
-.tags-container { padding: .875rem 1.5rem 1.25rem; display: flex; flex-wrap: wrap; gap: .5rem; }
+.tags-container { padding: 0 .25rem .25rem; display: flex; flex-wrap: wrap; gap: .375rem; }
 .tag {
     display: inline-flex;
     align-items: center;
@@ -1056,14 +1590,14 @@ a.stat-item:hover { color: var(--accent); background-color: var(--accent-bg); }
     font-size: .75rem;
     padding: .25rem .625rem;
     border-radius: var(--radius-md);
-    transition: background-color .2s, color .2s;
+    transition: background-color .2s, color .2s, transform .15s var(--ease-spring), box-shadow .2s ease;
 }
-.tag:hover { background-color: var(--brand); color: var(--on-brand); }
+.tag:hover { background-color: var(--brand); color: var(--on-brand); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
 .tag-count { margin-left: .3125rem; color: var(--text-light); font-size: .6875rem; }
 .tag:hover .tag-count { color: var(--on-brand-muted); }
 
 .site-footer-note {
-    padding: .75rem 1.5rem 1.25rem;
+    padding: 0 .25rem .25rem;
     font-size: .75rem;
     line-height: 1.9;
     color: var(--text-light);
@@ -1075,7 +1609,9 @@ a.stat-item:hover { color: var(--accent); background-color: var(--accent-bg); }
    文章列表（404.php 的最新文章、dcument.php 的归档）
    ========================================================================== */
 
-.archive-list { padding: .5rem 0 .75rem; }
+/* 行自己带 .25rem 上下 margin，列表容器不再补底 padding：
+   card-widget 已经有 8px 下内缩，再叠一层会比别的卡松。 */
+.archive-list { padding: 0 .25rem; }
 
 /* dcument.php 的按年分组归档。它嵌在 .article-card 里，
    横向内边距要去掉，否则和卡片自己的 48px 叠起来正文会明显偏窄。 */
@@ -1098,11 +1634,32 @@ a.stat-item:hover { color: var(--accent); background-color: var(--accent-bg); }
     display: flex;
     align-items: baseline;
     gap: .875rem;
-    padding: .5625rem 1.5rem;
+    padding: .5rem .625rem;
     font-size: .875rem;
-    transition: background-color .18s;
+    transition: var(--t-fast);
 }
 .archive-item:hover { background-color: var(--surface-soft); }
+
+/* card-widget 里的行是一颗颗描边胶囊，不是一行行裸文字——壳自己已经有 12px 内缩，
+   行再靠 1px 线撑开，一栏才读得出「六条可以点的东西」而不是「一段列表文本」。
+   dcument.php 的按年归档嵌在正文卡里、不带 .card-widget，保持裸行。 */
+.card-widget .archive-item {
+    margin: .25rem 0;
+    border: var(--style-border);
+    border-radius: var(--radius-md);
+}
+.card-widget .archive-item:hover { border-color: var(--accent-ring); }
+
+/* 侧栏的分类胶囊整颗刷成品牌色——heo 在这一排就是整颗刷蓝。
+   只给真有 hover 的设备：触屏上 :hover 会粘在最后点过的那颗上不放。 */
+@media (hover: hover) {
+    .sidebar .card-widget .archive-item:hover {
+        background-color: var(--brand);
+        border-color: var(--brand);
+    }
+    .sidebar .card-widget .archive-item:hover .archive-item-title a,
+    .sidebar .card-widget .archive-item:hover .archive-item-meta { color: var(--on-brand); }
+}
 .archive-date {
     flex: 0 0 auto;
     min-width: 72px;
@@ -1158,47 +1715,6 @@ a.stat-item:hover { color: var(--accent); background-color: var(--accent-bg); }
 .post-archive .archive-item:hover::before { box-shadow: 0 0 0 5px var(--accent-bg); }
 
 /* ==========================================================================
-   碎语（talk.php）
-   ========================================================================== */
-
-.talk-list { padding: .5rem 0; }
-/* 时间线用的是不带 class 的 <ol>，全局重置只管 ul[class]/ol[class]，得在这里单独收掉 */
-.talk-list ol { list-style: none; margin: 0; padding: 0; }
-.talk-item {
-    display: flex;
-    gap: 1rem;
-    padding: 1.375rem 1.75rem;
-    border-bottom: 1px solid var(--border-color);
-}
-.talk-item:last-child { border-bottom: 0; }
-/* talk.php 把列表直接放在 .article-card 里，卡片自己已经有 48px 横向内边距，
-   条目的横向内边距要归零，否则时间线会明显往内缩。 */
-.article-card .talk-item { padding-left: 0; padding-right: 0; }
-.talk-avatar {
-    width: 42px; height: 42px;
-    border-radius: 50%;
-    object-fit: cover;
-    flex-shrink: 0;
-    background-color: var(--surface-code);
-    border: 2px solid var(--avatar-ring);
-}
-.talk-body { min-width: 0; flex: 1; }
-.talk-meta {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: .5rem;
-    font-size: .75rem;
-    color: var(--text-light);
-    margin-bottom: .375rem;
-}
-.talk-meta .talk-author { font-size: .875rem; font-weight: 700; color: var(--text-strong); }
-.talk-content { font-size: .9375rem; line-height: 1.8; overflow-wrap: break-word; }
-.talk-content p:last-child { margin-bottom: 0; }
-.talk-content img { border-radius: var(--radius-md); margin-top: .5rem; }
-@media (max-width: 640px) { .talk-item { padding: 1.125rem 1.25rem; gap: .75rem; } }
-
-/* ==========================================================================
    动态卡（日记分类）
    --------------------------------------------------------------------------
    public/status-card.php 用的微博式动态卡。版式刻意对齐微博：头像独占左列，
@@ -1215,7 +1731,7 @@ a.stat-item:hover { color: var(--accent); background-color: var(--accent-bg); }
 }
 .status-card:hover {
     box-shadow: var(--shadow-lift);
-    border-color: rgba(var(--accent-rgb), .35);
+    border-color: var(--accent-ring);
     transform: translateY(-3px);
 }
 @media (max-width: 640px) { .status-card { padding: 1.125rem 1rem; } }
@@ -1358,13 +1874,14 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     display: inline-block;
     background-color: var(--card-bg);
     color: var(--text-secondary);
-    border: 1px solid var(--border-strong);
+    border: var(--style-border);
     padding: .625rem 1.5rem;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-pill);
+    box-shadow: var(--shadow-border);
     font-size: .875rem;
     font-weight: 500;
     cursor: pointer;
-    transition: background-color .2s, color .2s, border-color .2s;
+    transition: var(--t-fast);
 }
 .btn-load-more:hover { background-color: var(--brand); border-color: var(--brand); color: var(--on-brand); }
 
@@ -1385,14 +1902,24 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     text-align: center;
     font-size: .875rem;
     background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-full);
+    border: var(--style-border);
+    border-radius: var(--radius-pill);
+    box-shadow: var(--shadow-border);
     color: var(--text-secondary);
-    transition: background-color .2s, color .2s, border-color .2s;
+    transition: var(--t-fast);
 }
-.page-navigator li a:hover { border-color: var(--accent); color: var(--accent); }
+.page-navigator li a:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: var(--shadow-main);
+}
 .page-navigator .current a,
-.page-navigator .current span { background-color: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+.page-navigator .current span {
+    background-color: var(--brand);
+    border-color: var(--accent);
+    color: var(--on-brand);
+    box-shadow: var(--shadow-main);
+}
 /* 无限滚动接管后 JS 把页码设成 hidden 留作退路；上面那条 display:flex 会压掉 UA 的 [hidden] */
 .page-navigator[hidden] { display: none; }
 
@@ -1435,39 +1962,233 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
 
 @keyframes feed-spin { to { transform: rotate(360deg); } }
 
+/* 无限滚动骨架屏：load() 抓取时插在 #feed-status 前的占位卡。
+   feed-skeleton / sk-head / sk-avatar / sk-line* 都是 JS 运行时造的，模板里没有。 */
+.feed-skeleton { pointer-events: none; }
+.sk-head { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+.sk-avatar,
+.sk-line {
+    background: linear-gradient(90deg, var(--surface-soft) 25%, var(--surface-zebra) 50%, var(--surface-soft) 75%);
+    background-size: 200% 100%;
+    animation: sk-shimmer 1.2s linear infinite;
+}
+.sk-avatar { width: 40px; height: 40px; border-radius: 50%; }
+.sk-line { height: 14px; border-radius: 4px; }
+.sk-line + .sk-line { margin-top: .625rem; }
+.sk-line-sm { width: 40%; }
+.sk-line-70 { width: 70%; }
+
+@keyframes sk-shimmer { to { background-position: -200% 0; } }
+
 /* ==========================================================================
    文章底部上一篇 / 下一篇
    thePrev()/theNext() 在没有相邻文章时什么都不输出，
    所以这里用 flex 而不是两列 grid——否则只剩一篇时卡片会被钉在半宽的位置。
    ========================================================================== */
 
-.article-nav { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+/* 随机去往：文章页正文下方一句轻提示 + 复用 .btn-primary 的动作按钮 */
+.random-card {
+    padding: 1.5rem 1.25rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+.random-card p {
+    margin: 0 0 1rem;
+    font-size: .9375rem;
+    color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   上下篇 dock
+   --------------------------------------------------------------------------
+   一整条半透明面板切成左右两格，鼠标进到哪格哪格整块刷成品牌色。
+   用 --glass-bg-deep 而不是 --card-bg，是为了让身后那圈 --page-glow 微微透出来——
+   但刻意不加 backdrop-filter：这条 dock 不会滚到别的东西底下，模糊只在
+   「后方有内容穿过」时才有意义，这里省下的是每帧一次的高斯模糊。
+   ========================================================================== */
+
+.article-nav { margin-bottom: 1.5rem; }
+.article-nav-dock {
+    display: flex;
+    overflow: hidden;
+    border: var(--style-border);
+    border-radius: var(--radius-md);
+    background-color: var(--glass-bg-deep);
+    box-shadow: var(--shadow-border);
+    transition: border-color .3s ease-in-out, box-shadow .3s ease-in-out;
+}
+.article-nav-dock:hover { border-color: var(--accent); }
+
 .article-nav-cell {
-    flex: 1 1 260px;
+    position: relative;      /* 给标题那个铺满一格的 ::after 当包含块 */
+    flex: 1 1 0;
     min-width: 0;
+    height: 150px;
     display: flex;
     flex-direction: column;
-    gap: .375rem;
-    padding: 1.125rem 1.375rem;
-    background-color: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: var(--radius-md);
-    transition: border-color .2s, box-shadow .2s, background-color .25s ease;
+    justify-content: center;
+    gap: .75rem;
+    padding: 1.125rem 1.5rem;
+    transition: background-color .25s ease;
 }
-.article-nav-cell:hover { border-color: var(--accent); box-shadow: var(--shadow-sm); }
-.article-nav-label { font-size: .75rem; color: var(--text-light); }
+/* 中间那道分栏线只画在「左边还有另一格」的时候：最早/最新的文章只有一格，
+   线留着会在面板内侧孤零零立一道。核心只 printf 出格子，两格都是 .article-nav-cell。 */
+.article-nav-cell + .article-nav-cell { border-left: 1px solid var(--card-border); }
+.article-nav-next { text-align: right; }
+
+.article-nav-label {
+    font-size: .75rem;
+    color: var(--text-light);
+    transition: color .25s ease;
+}
+/* 标题限两行。锚点是 position:static，所以它那个 ::after 的包含块是整格而不是锚点自己，
+   「两行截断」和「整格可点」因此不打架——display:-webkit-box 只管锚点内部的排版。 */
 .article-nav-title {
-    font-size: .875rem;
-    font-weight: 600;
-    color: var(--text-main);
+    font-size: .9375rem;
+    font-weight: 700;
+    line-height: 1.5;
+    color: var(--text-strong);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    transition: color .25s ease;
 }
-.article-nav-cell:hover .article-nav-title { color: var(--accent); }
-.article-nav-next { align-items: flex-end; text-align: right; }
+.article-nav-title::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+}
+
+/* 刷成品牌色这套只给真有 hover 的设备：触屏上 :hover 会粘在最后点过的那格不放，
+   一整条 dock 就半截变成实心蓝，看着像坏了。 */
+@media (hover: hover) {
+    .article-nav-cell:hover { background-color: var(--brand); }
+    .article-nav-cell:hover .article-nav-label,
+    .article-nav-cell:hover .article-nav-title { color: var(--on-brand); }
+}
+@media (hover: none) {
+    .article-nav-cell:active { background-color: var(--surface-soft); }
+}
+
+@media (max-width: 767px) {
+    /* 窄屏上下叠，分栏线跟着翻成横线（还是那条 + 选择器，不用另写规则） */
+    .article-nav-dock { flex-direction: column; }
+    .article-nav-cell { height: 118px; }
+    .article-nav-cell + .article-nav-cell { border-left: 0; border-top: 1px solid var(--card-border); }
+    .article-nav-next { text-align: left; }
+}
+
+/* ==========================================================================
+   相关文章
+   --------------------------------------------------------------------------
+   一条标题 + 三张横条，封面占四成、文字占六成；窄屏把封面收掉只留文字。
+   和上面那条 dock 用同一种 hover（整块刷品牌色 + 白字），站内「可点的横条」
+   只此一套语言。heo 在这里刷的是每篇封面自己抽出来的主色，我们没有取色的
+   那一步（要 GD 调色板，还要缓存），所以统一落回品牌色。
+   ========================================================================== */
+
+.related { margin-top: 2rem; }
+.related-headline {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin: 0 0 .875rem;
+    font-size: 1.25rem;
+    font-weight: 800;
+    line-height: 1.4;
+    letter-spacing: -.01em;
+    color: var(--text-strong);
+}
+.related-headline .noline-icon { color: var(--accent); }
+.related-lead { margin-right: auto; }
+.related-random {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 .75rem;
+    border: var(--style-border);
+    border-radius: var(--radius-full);
+    background-color: var(--surface-soft);
+    font-size: .8125rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    transition: var(--t);
+}
+.related-random:hover {
+    background-color: var(--brand);
+    border-color: var(--brand);
+    color: var(--on-brand);
+}
+
+.related-list { display: flex; flex-wrap: wrap; gap: .75rem; }
+.related-item {
+    position: relative;
+    flex: 1 1 100%;
+    min-width: 0;
+    display: flex;
+    align-items: stretch;
+    height: 150px;
+    overflow: hidden;
+    border: var(--style-border);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-soft);
+    transition: background-color .3s ease, box-shadow .3s ease;
+}
+.related-cover {
+    flex: 0 0 40%;
+    max-width: 40%;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-color: var(--cover-fallback);
+}
+.related-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: .5rem;
+    padding: 1rem 1.25rem;
+}
+.related-title {
+    font-size: .9375rem;
+    font-weight: 700;
+    line-height: 1.5;
+    color: var(--text-strong);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    transition: color .3s ease;
+}
+.related-date {
+    font-size: .75rem;
+    color: var(--text-light);
+    transition: color .3s ease;
+}
+
+@media (hover: hover) {
+    .related-item:hover { background-color: var(--brand); box-shadow: var(--shadow-sm); }
+    .related-item:hover .related-title,
+    .related-item:hover .related-date { color: var(--on-brand); }
+}
+@media (hover: none) {
+    .related-item:active { background-color: var(--card-bg); }
+}
+
+@media (max-width: 767px) {
+    /* 窄屏不放封面：一张 40% 宽的图挤在两行字旁边，标题只剩下几个字 */
+    .related-item { height: auto; align-items: center; }
+    .related-cover { display: none; }
+    .related-text { padding: 1rem 1.125rem; }
+    .related-title { -webkit-line-clamp: 2; line-clamp: 2; }
+}
+
 
 /* ==========================================================================
    按钮
@@ -1503,6 +2224,18 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
 .error-message { font-size: 1.0625rem; font-weight: 600; color: var(--text-strong); margin-top: .75rem; }
 .error-hint { font-size: .875rem; color: var(--text-light); margin-top: .375rem; }
 .error-actions { margin-top: 2rem; display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
+
+/* 评论空态：没人评论且开放评论时，表单下方一行轻提示 */
+.comment-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    padding: 1.25rem 0;
+    font-size: .875rem;
+    color: var(--text-light);
+}
+.comment-empty .noline-icon { font-size: 1rem; color: var(--border-strong); }
 @media (max-width: 640px) { .error-code { font-size: 4.5rem; } }
 
 /* ==========================================================================
@@ -1517,14 +2250,15 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
 }
 
 .link-card {
+    position: relative;
     display: flex;
     align-items: center;
     background-color: var(--card-bg);
     padding: .9375rem;
-    border-radius: 12px;
-    border: 1px solid var(--card-border);
+    border-radius: var(--radius-lg);
+    border: var(--style-border);
     height: 90px;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-border);
     transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease, background-color .25s ease;
 }
 .link-card:hover { transform: translateY(-3px); }
@@ -1563,9 +2297,233 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
 }
 
 /* ==========================================================================
+   健康记录页（health.php）
+   数据由 NolineApi 插件给，这一节只管画：四块统计磁贴、一条 SVG 折线、一张记录表。
+   折线里的元素只带 class，颜色与描边全在这里赋值，深色模式跟着令牌走。
+   ========================================================================== */
+
+.health-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: .75rem;
+    margin-top: 1.5rem;
+}
+.health-tile {
+    display: flex;
+    flex-direction: column;
+    gap: .1875rem;
+    padding: .8125rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-soft);
+    transition: transform .25s var(--ease-spring), box-shadow .25s ease, background-color .25s ease;
+}
+.health-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    background-color: var(--card-bg);
+}
+.health-tile-label {
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+    font-size: .75rem;
+    font-weight: 600;
+    color: var(--text-light);
+}
+.health-tile-value {
+    font-size: 1.625rem;
+    font-weight: 800;
+    line-height: 1.25;
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+.health-tile-value i {
+    margin-left: .1875rem;
+    font-size: .8125rem;
+    font-style: normal;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+.health-tile-note { font-size: .75rem; color: var(--text-secondary); }
+
+/* 折线与记录表：卡片里再套一层极淡的底，和正文段落分开，但不再叠第二层阴影 */
+.health-chart,
+.health-log {
+    margin-top: 1.5rem;
+    padding: 1.125rem 1.125rem 1.25rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-zebra);
+}
+.health-block-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-bottom: 1rem;
+}
+.health-block-range {
+    font-size: .75rem;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 折线把纵轴上下界正好铺到画布上下边缘，只留 10/170 的内边距——刻度就压在那两行上，
+   所以偏移量是百分比而不是固定值，画布被拉宽拉窄都对得齐。左列让出等宽给数字。 */
+.health-plot { position: relative; padding-left: 2.5rem; }
+.health-axis {
+    position: absolute;
+    left: 0;
+    width: 2.125rem;
+    text-align: right;
+    font-size: .6875rem;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+}
+.health-axis:first-child { top: 5.9%; transform: translateY(-50%); }
+.health-axis:last-child { bottom: 5.9%; transform: translateY(50%); }
+
+.health-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.health-grid { stroke: var(--border-color); stroke-width: 1; }
+.health-area { fill: var(--accent-bg); stroke: none; }
+.health-line {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    /* 折线自绘：pathLength=1 让虚线长度与路径实际长度无关，一条 dasharray 通吃所有数据量 */
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: health-draw 1.1s var(--ease-ios) .12s forwards;
+}
+@keyframes health-draw { to { stroke-dashoffset: 0; } }
+.health-dot { fill: var(--card-bg); stroke: var(--accent); stroke-width: 2; }
+.health-dot.is-last {
+    fill: var(--accent);
+    stroke: var(--card-bg);
+    filter: drop-shadow(0 0 4px var(--accent-ring));
+}
+
+/* 7 / 30 / 90 天涨跌 */
+.health-deltas { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+.health-delta {
+    display: inline-flex;
+    align-items: baseline;
+    gap: .375rem;
+    padding: .3125rem .6875rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-full);
+    background-color: var(--card-bg);
+    font-size: .75rem;
+}
+.health-delta b {
+    font-weight: 700;
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+.health-delta i { font-style: normal; color: var(--text-light); }
+.health-delta.is-up b { color: var(--health-over); }
+.health-delta.is-down b { color: var(--health-normal); }
+.health-delta.is-quiet b { color: var(--text-light); }
+
+/* BMI 分档徽标：只给分档那一个字上色，数字本身保持中性 */
+.health-badge {
+    display: inline-block;
+    padding: .125rem .4375rem;
+    border-radius: var(--radius-full);
+    font-size: .6875rem;
+    font-weight: 700;
+    line-height: 1.5;
+}
+.health-badge.is-thin { color: var(--health-thin); background-color: var(--health-thin-bg); }
+.health-badge.is-normal { color: var(--health-normal); background-color: var(--health-normal-bg); }
+.health-badge.is-over { color: var(--health-over); background-color: var(--health-over-bg); }
+.health-badge.is-obese { color: var(--health-obese); background-color: var(--health-obese-bg); }
+
+.health-row {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .5625rem .25rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: .8125rem;
+    transition: background-color .2s ease;
+}
+/* 最后一行的下边框要去掉：.health-more 是 <p>，所以按 div 的末尾算，不是子元素末尾 */
+.health-row:last-of-type { border-bottom: 0; }
+.health-row:hover { background-color: var(--surface-soft); }
+.health-row-date {
+    flex-shrink: 0;
+    width: 3.125rem;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+}
+.health-row-weight {
+    flex-shrink: 0;
+    min-width: 4.375rem;
+    font-weight: 700;
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+.health-row-weight i {
+    margin-left: .125rem;
+    font-size: .6875rem;
+    font-style: normal;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+.health-row-delta {
+    flex-shrink: 0;
+    width: 3.75rem;
+    text-align: right;
+    font-size: .75rem;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+}
+.health-row-delta.is-up { color: var(--health-over); }
+.health-row-delta.is-down { color: var(--health-normal); }
+.health-row-bmi { flex-shrink: 0; width: 2.875rem; text-align: right; font-variant-numeric: tabular-nums; }
+.health-row-note {
+    min-width: 0;
+    margin-left: auto;
+    font-size: .75rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.health-more {
+    margin: .875rem 0 0;
+    font-size: .75rem;
+    color: var(--text-light);
+}
+.health-foot {
+    margin: 1.5rem 0 0;
+    padding-top: .875rem;
+    border-top: 1px solid var(--border-color);
+    font-size: .75rem;
+    color: var(--text-light);
+}
+
+@media (max-width: 640px) {
+    /* 磁贴保持 2×2，不因为放不下而掉成一列一列的长条 */
+    .health-stats { grid-template-columns: repeat(2, 1fr); }
+    .health-plot { padding-left: 2.125rem; }
+    .health-axis { width: 1.75rem; }
+    /* 一行五列在窄屏放不下：备注整段换行，缩进到体重那一列的左边缘 */
+    .health-row { flex-wrap: wrap; gap: .5rem; }
+    .health-row-note { flex: 1 1 100%; margin-left: 3.875rem; white-space: normal; }
+}
+
+/* ==========================================================================
    评论区
    ========================================================================== */
 
+/* heo 的评论头只有一行粗字，没有下划线：它下面紧跟的是输入框那一整块，
+   块自己有底和边，分隔已经够了。留着 border-bottom 反而像两张卡叠在一张里。 */
 .comments-header {
     display: flex;
     align-items: center;
@@ -1574,8 +2532,6 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     font-weight: 700;
     margin-bottom: 1.875rem;
     color: var(--text-strong);
-    padding-bottom: .9375rem;
-    border-bottom: 1px solid var(--border-color);
 }
 .comments-header .noline-icon { color: var(--accent); }
 .comments-header .count { color: var(--text-light); font-weight: 500; font-size: .9375rem; }
@@ -1628,7 +2584,7 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     color: var(--warn-text);
     background-color: var(--warn-bg);
     padding: .125rem .5rem;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     margin-left: .5rem;
 }
 
@@ -1636,7 +2592,7 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     width: 100%;
     padding: .75rem 1rem;
     border: 1px solid var(--border-strong);
-    border-radius: 10px;
+    border-radius: var(--radius-md);
     background-color: var(--card-bg);
     font-size: .875rem;
     color: var(--text-main);
@@ -1676,13 +2632,18 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
 .comment-list ol { list-style: none; margin: 0; padding-left: 0; }
 .comment-list > ol > li { margin-bottom: 1.25rem; }
 
+/* 一条评论 = 白底 + 1px 描边，和外面那张卡、右栏那叠 widget 是同一套语言。
+   原来填的是 2% 墨的斑马底：卡片本身已经是白的，这 2% 在浅色列里几乎看不出边界，
+   评论之间只靠空隙分组，读到第三层嵌套就分不清谁回复谁了。 */
 .comment-body {
     position: relative;
     padding: 1.125rem 1.375rem;
-    background-color: var(--surface-zebra);
-    border-radius: var(--radius-md);
-    transition: background-color .25s ease;
+    background-color: var(--card-bg);
+    border: var(--style-border);
+    border-radius: var(--radius-lg);
+    transition: var(--t-fast);
 }
+.comment-body:hover { border-color: var(--accent-ring); }
 
 .comment-author { display: flex; align-items: center; flex-wrap: wrap; margin-bottom: .75rem; }
 .comment-author .avatar {
@@ -1690,7 +2651,9 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     border-radius: 50%;
     margin-right: .875rem;
     border: 2px solid var(--avatar-ring);
-    box-shadow: var(--shadow-md);
+    background-color: var(--surface-code);
+    object-fit: cover;
+    flex-shrink: 0;
 }
 .comment-author .fn { font-style: normal; font-weight: 700; font-size: .9375rem; color: var(--text-strong); margin-right: .625rem; }
 .comment-author .fn a { color: inherit; }
@@ -1701,7 +2664,7 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     color: var(--text-light);
     background-color: var(--surface-sunken);
     padding: .125rem .5rem;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
 }
 .comment-meta a { color: inherit; }
 
@@ -1736,7 +2699,7 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     color: var(--accent);
     padding: .25rem .75rem;
     background-color: var(--accent-bg);
-    border-radius: 20px;
+    border-radius: var(--radius-pill);
     font-weight: 500;
     opacity: .85;
     transition: opacity .2s, background-color .2s, color .2s;
@@ -1757,42 +2720,85 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
 }
 
 /* ==========================================================================
-   首页 masthead 与公告
-   顶栏管导航，masthead 管站点身份：居中头像 + 站名 + 座右铭，只出现在首页。
+   首屏
+   --------------------------------------------------------------------------
+   首页 .site-hero 和文章页 .post-hero 共用这一套：通栏一块，固定顶栏直接压在它上面，
+   所以它自己让出 --topbar-h 那一截，标题才不会被胶囊盖住。
+   底沿 .hero-lip 把整页底色翻成一个 16px 的圆角唇、往上打一层强调色辉光——
+   首屏和正文之间因此不是硬切。
+
+   封面处理照抄目标站：整块背景是这张图放大、斜切 10°、模糊掉之后的氛围，
+   真正读得清的封面是右侧那张 16:9 小卡，跟着鼠标倾斜并泛一圈白光。
    ========================================================================== */
 
-/* 高度写 min-height 而不是 height：横幅要够高才像横幅，
-   但座右铭长起来的时候不能被 overflow:hidden 裁掉一截。 */
-.site-hero {
+.site-hero,
+.post-hero {
+    /* 首屏通栏，但里面的文字要和下面 .container 的列对齐：
+       两侧留白取「窄屏下限」和「(自身宽度 - 版心) / 2 + 版心内边距」的较大值。
+       百分比按包含块宽度算，不用 100vw——vw 把滚动条也算进去，会挤出横向滚动。 */
+    --hero-pad-x: max(1.25rem, calc((100% - var(--layout-max)) / 2 + 1.5rem));
+
     position: relative;
     display: flex;
     align-items: center;
-    justify-content: center;
-    min-height: 24rem;
-    padding: 2rem 1.25rem;
-    margin-bottom: 1.5rem;
-    border-radius: var(--radius-lg);
+    min-height: var(--hero-h);
+    padding: calc(var(--topbar-h) + 2.5rem) var(--hero-pad-x) 3.5rem;
     overflow: hidden;
-    text-align: center;
+    /* isolation 让 hero-lip 的 z-index 只在首屏内部比较，不会盖过顶栏 */
+    isolation: isolate;
+    /* 和 .container 同一条转场曲线，见「页面转场」一节 */
+    transition: opacity .34s ease, transform .34s ease;
 }
 
-/* 封面图 + 压在上面的一层渐变罩。罩不是装饰：亮色照片直接衬文字会读不清，
-   两端浓度是令牌，深色模式下压得更重。没配封面图时这一层整个不输出。 */
-.site-hero-cover {
+.site-hero { justify-content: center; text-align: center; }
+.post-hero { justify-content: flex-start; }
+
+/* 封面氛围层：内缩负值 + 斜切 + 模糊，图四周都溢出去，模糊边缘才不会露出色块边界。
+   压在它上面的罩（::after）从主色往页底色过渡，标题才立得住。 */
+.site-hero-cover,
+.post-hero-cover {
     position: absolute;
-    inset: 0;
+    inset: -3rem;
+    z-index: -2;
     background-color: var(--cover-fallback);
     background-size: cover;
-    background-position: center;
+    background-position: center 30%;
+    filter: blur(26px) saturate(1.15);
+    transform: scale(1.12);
+    opacity: .55;
 }
-.site-hero-cover::after {
+.site-hero-cover::after,
+.post-hero-cover::after {
     content: "";
     position: absolute;
     inset: 0;
-    background-image: linear-gradient(to bottom, var(--hero-veil-top), var(--hero-veil-bottom));
+    background-image:
+        linear-gradient(to bottom, var(--hero-veil-top), var(--hero-veil-bottom)),
+        radial-gradient(120% 90% at 80% 10%, var(--accent-bg), transparent 60%);
 }
 
-/* 内容层必须显式抬到封面之上，否则绝对定位的封面会盖住它 */
+/* 没配封面图时也不能秃：一层主色辉光顶上去，比纯底色有层次。
+   ::before 挂在 hero 上，省掉一个空 div。 */
+.site-hero:not(.has-cover),
+.post-hero:not(.has-cover) {
+    background-image:
+        radial-gradient(60% 90% at 12% -10%, var(--accent-bg), transparent 62%),
+        radial-gradient(50% 80% at 92% 6%, var(--accent-container), transparent 60%);
+    background-color: var(--bg-color);
+}
+
+/* 底沿那道圆角唇。左右负值抵掉 hero 自己的 --hero-pad-x，让它真的通栏。 */
+.hero-lip {
+    position: absolute;
+    right: calc(var(--hero-pad-x) * -1);
+    bottom: 0;
+    left: calc(var(--hero-pad-x) * -1);
+    height: 16px;
+    background-color: var(--bg-color);
+    border-radius: var(--radius-img) var(--radius-img) 0 0;
+    box-shadow: 0 -7px 20px 0 var(--accent-bg);
+}
+
 .site-hero-inner { position: relative; z-index: 1; min-width: 0; }
 
 .site-hero-avatar {
@@ -1856,20 +2862,183 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     opacity: .5;
 }
 
-/* 手机上 24rem 会把首屏吃光（667px 高的屏减掉顶栏只剩 ~37rem）。
-   只收横幅高度，头像和字号不动——窄屏本来就更窄，再缩一档只会更难读。 */
-@media (max-width: 639px) {
-    .site-hero { min-height: 20rem; padding: 1.5rem 1rem; }
+/* --- 文章页首屏 --- */
+
+/* 信息整体压在左侧，最大 44rem：再宽下去一行标题横跨整个首屏，
+   右边那张封面小卡就被推得看不清了。 */
+.post-hero-info {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    max-width: 44rem;
+    margin-right: auto;
 }
 
-/* 公告卡：药丸标题 + 内层凹陷灰块，喇叭坐在块首 */
+.post-hero-top {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+
+/* 原创 / 置顶这类标记：满浓度底 + 反色字，和标题的白不在一个层级上。 */
+.post-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: .2rem .55rem;
+    border-radius: var(--radius-md);
+    background-color: var(--on-cover);
+    color: var(--accent);
+    font-size: .6875rem;
+    font-weight: 700;
+    line-height: 1.5;
+    white-space: nowrap;
+    user-select: none;
+}
+.post-hero-top .post-cats { color: var(--on-cover); font-size: .8125rem; opacity: .88; }
+.post-hero-top .post-cats a { color: inherit; }
+.post-hero-top .post-cats a:hover { color: var(--on-cover); opacity: 1; text-decoration: underline; }
+
+.post-hero-title {
+    margin: .5rem 0 0;
+    max-width: 44rem;
+    font-size: 2.625rem;
+    font-weight: 700;
+    line-height: 1.38;
+    color: var(--on-cover);
+    /* 两行封顶：再长的标题也不该把首屏撑成整页 */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+}
+
+.post-hero-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .375rem;
+    margin-top: .75rem;
+    font-size: .8125rem;
+    color: var(--on-cover);
+}
+
+/* 元信息一颗颗做成胶囊：整颗都能点，hover 时反白成底白字，
+   比「只有文字变色」的反馈明确得多。 */
+.meta-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .25rem .625rem;
+    border-radius: var(--radius-pill);
+    color: var(--on-cover);
+    background-color: rgba(var(--on-cover-rgb), .14);
+    line-height: 1.4;
+    transition: var(--t-fast);
+}
+.meta-pill .noline-icon { font-size: .875rem; }
+a.meta-pill:hover,
+.meta-pill:hover {
+    background-color: var(--on-cover);
+    color: var(--accent);
+}
+/* 日期是信息不是入口，静息态就不给它一层底，免得整排胶囊看着都能点 */
+.meta-pill.is-plain { background-color: transparent; }
+.meta-pill b { font-weight: 700; }
+
+/* 右侧那张跟手的封面小卡：16:9、12px 圆角、轻微透视倾斜。
+   --tilt-x/--tilt-y/--glow-* 由 main.js 写在元素上，静止时全是中性值。 */
+.post-hero-card {
+    --tilt-x: 0deg;
+    --tilt-y: 0deg;
+    --glow-x: 50%;
+    --glow-y: 50%;
+    --glow-opacity: 0;
+
+    position: absolute;
+    right: var(--hero-pad-x);
+    top: 50%;
+    z-index: 1;
+    width: 300px;
+    aspect-ratio: 16 / 9;
+    margin-top: -1rem;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    transform: translateY(-50%) perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+    transform-style: preserve-3d;
+    border: var(--style-border);
+    box-shadow: var(--shadow-lg), var(--glass-inset);
+    transition: transform .18s ease-out, box-shadow .3s ease;
+    will-change: transform;
+}
+.post-hero-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: inherit;
+}
+/* 跟手的那圈白光：::after 是面光（screen 混合），::before 是边缘一圈高光。
+   两层都靠 --glow-opacity 起落，鼠标离开就归零。 */
+.post-hero-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at var(--glow-x) var(--glow-y),
+        rgba(var(--on-cover-rgb), .22), rgba(var(--on-cover-rgb), .08) 22%, rgba(var(--on-cover-rgb), 0) 55%);
+    mix-blend-mode: screen;
+    opacity: var(--glow-opacity);
+    transition: opacity .18s ease-out;
+}
+.post-hero-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    padding: 2px;
+    border-radius: inherit;
+    background: radial-gradient(circle at var(--glow-x) var(--glow-y),
+        rgba(var(--on-cover-rgb), .9), rgba(var(--on-cover-rgb), .7) 20%, rgba(var(--on-cover-rgb), .1) 46%, rgba(var(--on-cover-rgb), 0) 62%);
+    opacity: var(--glow-opacity);
+    transition: opacity .18s ease-out;
+    /* mask 只看 alpha，颜色取封面前景色即可，省得再写一遍 #fff 字面量 */
+    -webkit-mask: linear-gradient(var(--on-cover) 0 0) content-box, linear-gradient(var(--on-cover) 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(var(--on-cover) 0 0) content-box, linear-gradient(var(--on-cover) 0 0);
+    mask-composite: exclude;
+}
+
+/* 手机上 24rem 会把首屏吃光（667px 高的屏减掉顶栏只剩 ~37rem）。
+   只收横幅高度，头像和字号不动——窄屏本来就更窄，再缩一档只会更难读。
+   那张跟手的封面小卡直接不出现：窄屏没有鼠标，标题也得自己占满整行。 */
+@media (max-width: 639px) {
+    .site-hero, .post-hero { --hero-pad-x: 1rem; }
+    .site-hero { min-height: 20rem; padding-block: calc(var(--topbar-h) + 1.5rem) 3rem; }
+    .post-hero { min-height: 18rem; padding-block: calc(var(--topbar-h) + 1.5rem) 3rem; }
+    .post-hero-title { font-size: 1.5rem; -webkit-line-clamp: 3; line-clamp: 3; }
+    .post-hero-card { display: none; }
+}
+
+/* 有封面时首屏文字统一换白，没封面时（走底色辉光那套）文字得留墨色——
+   罩层是主色往页底色过渡，白字压在浅底上会读不出来。 */
+.post-hero:not(.has-cover) .post-hero-title,
+.post-hero:not(.has-cover) .post-hero-meta { color: var(--text-strong); }
+.post-hero:not(.has-cover) .post-hero-top .post-cats { color: var(--text-secondary); opacity: 1; }
+.post-hero:not(.has-cover) .meta-pill { background-color: var(--surface-soft); color: var(--text-secondary); }
+.post-hero:not(.has-cover) .meta-pill.is-plain { background-color: transparent; }
+.post-hero:not(.has-cover) .post-badge { background-color: var(--brand); color: var(--on-brand); }
+
+/* 公告卡：图标标题 + 内层凹陷灰块，喇叭坐在块首。
+   卡片自己已经是白面 + 1px 描边，内层再铺 2% 浓度的 zebra 灰就看不见了，
+   改用「凹陷」那一档；外边距全部交给 card-widget 的 gap。 */
 .notice-body {
     display: flex;
     align-items: flex-start;
     gap: .625rem;
-    margin: .875rem 1.5rem 1.5rem;
+    margin: 0;
     padding: 1rem 1.25rem;
-    background-color: var(--surface-zebra);
+    background-color: var(--surface-sunken);
     border-radius: var(--radius-md);
 }
 .notice-icon { font-size: 1rem; line-height: 1.9; }
@@ -1883,11 +3052,96 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
 .notice-text p:last-child { margin-bottom: 0; }
 
 /* ==========================================================================
+   文章版权卡
+   --------------------------------------------------------------------------
+   作者头像骑在卡顶沿外（top 是负的半张头像），整块因此不是「一行小字加个图标」，
+   而是把「谁写的」提成主角。上面留出的 3.5rem 就是给它腾的位置，
+   改头像尺寸要同时改 top / left / width / height 这四个跟着 66px 走的数。
+   ========================================================================== */
+
+.post-copyright {
+    position: relative;
+    margin-top: 3.5rem;
+    padding: 2.75rem 1.5rem 1.25rem;
+    text-align: center;
+    background-color: var(--surface-soft);
+    border: var(--style-border);
+    border-radius: var(--radius-lg);
+}
+.post-copyright-avatar {
+    position: absolute;
+    top: -33px;
+    left: calc(50% - 33px);
+    width: 66px;
+    height: 66px;
+    overflow: hidden;
+    border: var(--style-border);
+    border-radius: 50%;
+    /* 头像还在路上的时候先露出这一圈品牌色，而不是一块灰 */
+    background-color: var(--brand);
+    box-shadow: var(--shadow-main);
+}
+.post-copyright-avatar img {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    transition: transform .3s var(--ease-ios);
+}
+/* 同一个头像摆两层：后面那层负责 hover 时退开一圈，前面那层放大 1.05 盖掉接缝。
+   鼠标进来前面回落到 1、后面缩到 .8，头像是「往下沉了一格」而不是整块变色。 */
+.post-copyright-avatar-back {
+    z-index: 1;
+    background-color: var(--surface-code);
+}
+.post-copyright-avatar-front {
+    z-index: 2;
+    transform: scale(1.05) translateY(2px);
+}
+.post-copyright-avatar:hover .post-copyright-avatar-front { transform: scale(1) translateY(3px); }
+.post-copyright-avatar:hover .post-copyright-avatar-back  { transform: scale(.8); }
+.post-copyright-name {
+    margin: 0;
+    font-size: 1.375rem;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--text-strong);
+}
+.post-copyright-desc {
+    margin: .5rem 0 0;
+    font-size: .9375rem;
+    line-height: 1.8;
+    color: var(--text-light);
+}
+.post-copyright-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .375rem;
+    justify-content: center;
+    margin-top: 1rem;
+}
+/* 反色徽章：满墨底 + 纸色字。它是「声明」不是「标签」，
+   所以不跟 .tag 共用强调色淡底那一套。 */
+.post-copyright-badge {
+    padding: .25rem .625rem;
+    border-radius: var(--radius-md);
+    background-color: var(--text-strong);
+    color: var(--card-bg);
+    font-size: .6875rem;
+    font-weight: 500;
+    line-height: 1.5;
+}
+
+/* ==========================================================================
    右栏组件：日历 / 那年今日 / 近期评论 / 站点信息
    ========================================================================== */
 
-/* 月历。七列等宽网格；今天是一枚实色强调圆角格，有文章的日子数字下加一粒点 */
-.calendar-wrap { padding: .875rem 1.25rem 1.375rem; }
+/* 月历。七列等宽网格；今天是一枚实色强调圆角格，有文章的日子数字下加一粒点。
+   横向内缩交给 card-widget 的 12px，这里只留一点点，让日历的左右边缘和标题图标对齐。 */
+.calendar-wrap { padding: 0 .25rem .25rem; }
 .calendar-head,
 .calendar-week {
     display: grid;
@@ -1928,25 +3182,48 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     background-color: var(--accent);
 }
 
-/* 那年今日。每行一块浅灰气泡：年份大字在左，标题在右 */
+/* 那年今日：竖向时间轴。一条发丝线从左缘垂下，每行一个强调色节点圆点，
+   年份当徽标，标题跟在右侧。
+   左内缩 1.5rem 是给时间轴留的位置：card-widget 已经垫了 .75rem，而圆点的左缘
+   在行左缘往上 1.25rem 处（即列表左缘 + .25rem），宽 .5rem——所以线落在 .5rem
+   那条竖线上正好穿过每个圆点的圆心。 */
 .history-list {
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: .625rem;
-    padding: .875rem 1.25rem 1.375rem;
+    gap: .875rem;
+    padding: 0 .25rem .25rem 1.5rem;
+}
+.history-list::before {
+    content: "";
+    position: absolute;
+    left: .5rem;
+    top: .6rem;
+    bottom: .6rem;
+    width: 1px;
+    background-color: var(--border-soft);
 }
 .history-item {
+    position: relative;
     display: flex;
     align-items: flex-start;
     gap: .875rem;
-    padding: .75rem 1rem;
-    background-color: var(--surface-zebra);
-    border-radius: var(--radius-md);
+}
+.history-item::before {
+    content: "";
+    position: absolute;
+    left: -1.25rem;
+    top: .35rem;
+    width: .5rem;
+    height: .5rem;
+    border-radius: 50%;
+    background-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-bg);
 }
 .history-year {
     flex-shrink: 0;
-    width: 3.5rem;
-    font-size: 1.125rem;
+    min-width: 3.25rem;
+    font-size: 1rem;
     font-weight: 800;
     line-height: 1.3;
     color: var(--accent);
@@ -1972,14 +3249,15 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     display: flex;
     flex-direction: column;
     gap: .875rem;
-    padding: .875rem 1.5rem 1.375rem;
+    padding: 0 .25rem .25rem;
 }
 .rcomment-list::before {
     content: "";
     position: absolute;
-    top: 1.5rem;
-    bottom: 1.75rem;
-    left: calc(1.5rem + 16px);
+    top: .625rem;
+    bottom: .625rem;
+    /* 16px = 头像半径，线正好穿过一摞头像的圆心 */
+    left: calc(.25rem + 16px);
     width: 1px;
     background-color: var(--border-color);
 }
@@ -2042,7 +3320,7 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: .5rem;
-    padding: .875rem 1.5rem 0;
+    padding: 0 .25rem;
 }
 .site-stat {
     display: flex;
@@ -2057,14 +3335,253 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
 }
 .site-stat b { font-size: .9375rem; font-weight: 700; color: var(--accent); }
 
+/* 数字统一用等宽数字：滚动计数、百分比、阅读数变化时不会左右抖 */
+.site-stat b,
+.stat-item,
+.topbar-percent,
+.feed-text,
+.tag-count,
+.archive-item-meta { font-variant-numeric: tabular-nums; }
+
+/* ==========================================================================
+   文章目录（右栏 .sidebar-toc）
+   --------------------------------------------------------------------------
+   列表由 main.js 现搭（initToc），模板里只有那个空的 <ol class="toc-list">。
+   招牌动作照抄 heo：整栏默认糊掉、虚化，只有当前那一节显影并放大加粗；
+   鼠标进到这张卡上时全部显影，方便跳去任意一节。
+   ========================================================================== */
+
+/* 跳转落点不用另配：第 345 行那条 html { scroll-padding-top } 已经给所有锚点
+   （目录点上去、首屏那颗「N 条评论」跳 #comments）留好了顶栏的高度。 */
+
+/* .card-widget 的 display:flex 会压掉 UA 那条 [hidden]{display:none}（作者样式优先级更高），
+   不补这一条，目录卡在 JS 数出足够标题之前就会带着空列表先出现。 */
+.sidebar-toc[hidden] { display: none; }
+
+/* 卡在 sticky 组里，而那一组自己有 max-height + 内部滚动。这里再压一道 40vh：
+   长文的目录动辄二三十条，不设限会把下面的近期评论、站点信息整张挤出可视区。
+   刻意没加 overscroll-behavior:contain——鼠标停在目录上滚到底就该继续往下读正文，
+   把滚动链掐断会让整页卡住，比多滚过一张卡更糟。 */
+.toc-content {
+    max-height: 40vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+    padding: 0 .25rem .25rem;
+}
+
+.toc-list { width: 100%; }
+/* h3 挂在所属 h2 那一行下面：缩进一半字宽够读，而且默认收起——
+   没展开的 h3 在正文里好好地在那儿，只是不占目录的高度。 */
+.toc-child {
+    display: none;
+    padding-left: .75rem;
+}
+
+.toc-link {
+    display: flex;
+    align-items: center;
+    /* 透明左边框先占好位：is-active 只是把它染成品牌色，不是插入一条边框，
+       否则当前项一变，整列文字会跟着横向跳 2px。 */
+    border-left: 2px solid transparent;
+    min-height: 2.25rem;
+    padding: .4375rem .5rem;
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    font-size: .8125rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    transition: var(--t);
+}
+.toc-link span {
+    width: 100%;
+    opacity: .6;
+    filter: blur(1px);
+    transition: var(--t);
+}
+
+/* 当前节：显影 + 放大 + 品牌色左竖条。字号从 .8125 跳到 1rem，这一跳是故意的——
+   300px 宽的一列里，只有大小差别能让眼睛立刻认出「读到这儿了」。 */
+.toc-link.is-active {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background-color: var(--surface-soft);
+}
+.toc-link.is-active span { opacity: 1; filter: none; }
+
+/* 子列表只在所属那一节被读到时才展开（heo 同款）。收起不是藏内容：
+   没展开的 h3 在正文里好好地在那儿，只是不占目录的高度。 */
+.toc-child { display: none; }
+.toc-item.is-open > .toc-child { display: block; }
+
+@media (hover: hover) {
+    /* 整卡 hover 一起显影，单条 hover 才给底色。触屏不挂这两条——
+       手指点下去会粘在最后 hover 的那一行上，目录看起来像坏了。 */
+    .sidebar-toc:hover .toc-link span { opacity: 1; filter: none; }
+    .toc-link:hover { background-color: var(--surface-sunken); }
+    .toc-link:hover span { color: var(--accent); }
+}
+
+/* 40vh 在矮屏上大概只剩五六行，此时收起子项会让「当前节」以外的内容完全够不着。
+   ≤767 直接把两档都摊平成一个扁平列表：窄屏的目录本来也只是个跳转表。 */
+@media (max-width: 767px) {
+    .toc-child { display: block; }
+}
+
+/* ==========================================================================
+   回到顶部 + 图片灯箱
+   ========================================================================== */
+
+/* 回到顶部：滚过一屏才挂 .is-visible（main.js 控制），初始透明且不接指针事件 */
+.back-top {
+    position: fixed;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    z-index: var(--z-float);
+    width: 2.75rem;
+    height: 2.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-soft);
+    border-radius: 50%;
+    background-color: var(--card-bg);
+    color: var(--text-secondary);
+    box-shadow: var(--shadow-md);
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(.5rem);
+    pointer-events: none;
+    transition: opacity .25s ease, transform .25s var(--ease-spring), color .2s, border-color .2s;
+}
+.back-top .noline-icon { font-size: 1.125rem; }
+.back-top.is-visible { opacity: 1; transform: none; pointer-events: auto; }
+.back-top:hover { color: var(--accent); border-color: var(--accent); }
+
+/* 灯箱遮罩。整块初始 hidden，打开才揭开——display:flex 会压掉 UA 的 [hidden]，补一条 */
+.lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--lightbox-bg);
+    animation: lightbox-in .32s var(--ease-ios);
+}
+.lightbox[hidden] { display: none; }
+
+.lightbox-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .75rem;
+    max-width: min(92vw, 1200px);
+    margin: 0;
+    /* 左右让出按钮位 */
+    padding: 0 4rem;
+}
+.lightbox-img {
+    display: block;
+    max-width: 100%;
+    max-height: 80vh;
+    object-fit: contain;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+}
+.lightbox-caption {
+    max-width: 100%;
+    font-size: .8125rem;
+    color: var(--lightbox-fg);
+    opacity: .8;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lightbox-btn {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border: none;
+    border-radius: 50%;
+    background-color: var(--lightbox-btn);
+    color: var(--lightbox-fg);
+    cursor: pointer;
+    transition: background-color .2s;
+}
+.lightbox-btn:hover { background-color: var(--lightbox-btn-hover); }
+.lightbox-btn[hidden] { display: none; }
+.lightbox-close { top: 1.25rem; right: 1.25rem; }
+.lightbox-prev { left: 1.25rem; top: 50%; transform: translateY(-50%); }
+.lightbox-next { right: 1.25rem; top: 50%; transform: translateY(-50%); }
+
+/* 关闭钮：两条 45° 交叉线，纯 CSS 画，不占图标位 */
+.lightbox-close::before,
+.lightbox-close::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 2px;
+    height: 1.125rem;
+    background-color: currentColor;
+}
+.lightbox-close::before { transform: translate(-50%, -50%) rotate(45deg); }
+.lightbox-close::after { transform: translate(-50%, -50%) rotate(-45deg); }
+
+/* 左右箭头：旋转的边框三角 */
+.lightbox-prev::before,
+.lightbox-next::before {
+    content: "";
+    width: .875rem;
+    height: .875rem;
+    border-top: 2px solid currentColor;
+    border-left: 2px solid currentColor;
+}
+.lightbox-prev::before { transform: translateX(.2rem) rotate(-45deg); }
+.lightbox-next::before { transform: translateX(-.2rem) rotate(135deg); }
+
+/* 可点图的手型提示（正文和动态卡里的图都能开灯箱） */
+.post-content img,
+.status-content img { cursor: zoom-in; }
+
+/* 灯箱打开时锁住背景滚动（main.js 往 <html> 上挂） */
+html.lightbox-open { overflow: hidden; }
+
+@keyframes lightbox-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* 按压反馈：Material/iOS 的「按下去会瘪一点」。:active 放在后面，
+   和 :hover 同特异性时靠源码顺序盖过 hover 的位移。 */
+.btn-primary:active,
+.read-more:active,
+.feed-retry:active,
+.icon-btn:active,
+.nav-item:active,
+.tag:active { transform: scale(.95); }
+
 /* ==========================================================================
    页面转场
    html.is-loading / html.is-leaving 这两个类由 header.php 的内联脚本和 main.js 添加。
-   只动 .container，不动 .topbar——顶栏是全站常驻骨架，跟着一起淡入会显得整页在闪。
+   首屏 hero 现在住在 .container 外面（通栏不能给版心框住），所以它得和 container
+   一起淡入淡出，否则跳转时是「上半页硬出现、下半页淡进来」。
+   不动 .topbar——顶栏是全站常驻骨架，跟着一起淡入会显得整页在闪。
    ========================================================================== */
 
-html.is-loading .container { opacity: 0; transform: translateY(14px); }
-html.is-leaving .container { opacity: 0; transform: translateY(-8px); transition-duration: .18s; }
+html.is-loading .container,
+html.is-loading .site-hero,
+html.is-loading .post-hero { opacity: 0; transform: translateY(14px); }
+html.is-leaving .container,
+html.is-leaving .site-hero,
+html.is-leaving .post-hero { opacity: 0; transform: translateY(-8px); transition-duration: .18s; }
 
 /* 顶部进度条。用 scaleX 而不是 width，走合成层不触发重排。 */
 #noline-progress {
@@ -2091,7 +3608,9 @@ html.is-leaving .container { opacity: 0; transform: translateY(-8px); transition
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
     html.is-loading .container,
-    html.is-leaving .container { opacity: 1; transform: none; }
+    html.is-leaving .container,
+    html.is-loading .site-hero, html.is-loading .post-hero,
+    html.is-leaving .site-hero, html.is-leaving .post-hero { opacity: 1; transform: none; }
 }
 
 /* ==========================================================================
@@ -2100,10 +3619,17 @@ html.is-leaving .container { opacity: 0; transform: translateY(-8px); transition
 
 @media print {
     .topbar, .nav-scrim, #noline-progress,
-    .article-nav, .comment-form { display: none !important; }
-    .site-hero { min-height: 0; padding: 0 0 1rem; }
-    .site-hero-cover { display: none !important; }
+    .article-nav, .comment-form,
+    .related, .random-card,
+    .post-hero-card, .hero-lip { display: none !important; }
+    body, body:not(.has-hero) { padding-top: 0; }
+    .site-hero, .post-hero { min-height: 0; padding: 0 0 1rem; }
+    .site-hero-cover, .post-hero-cover { display: none !important; }
     .card { box-shadow: none !important; }
+    .post-card::after,
+    .link-card::after { display: none; }
     html.is-loading .container,
-    html.is-leaving .container { opacity: 1 !important; transform: none !important; }
+    html.is-leaving .container,
+    html.is-loading .site-hero, html.is-loading .post-hero,
+    html.is-leaving .site-hero, html.is-leaving .post-hero { opacity: 1 !important; transform: none !important; }
 }

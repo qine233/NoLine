@@ -15,8 +15,11 @@
 
 .post-content {
     color: var(--text-main);
-    font-size: 1rem;
-    line-height: 1.8;
+    /* 17px 正文 + 1.7 行高 + .035em 字距。字号必须用 rem：站点的密度旋钮挂在 html 上，
+       写成 px 的话调旋钮时顶栏、卡片都跟着走，只有正文不动。 */
+    font-size: 1.0625rem;
+    line-height: 1.7;
+    letter-spacing: .035em;
     /* break-all 会把英文单词从中间截断，这里换成只在必要时断行 */
     overflow-wrap: break-word;
     word-break: normal;
@@ -32,7 +35,10 @@
 
 /* ---------- 段落与块级间距 ---------- */
 
-.post-content p,
+.post-content p {
+    margin: 1.5rem 0;
+}
+
 .post-content blockquote,
 .post-content dl,
 .post-content ol,
@@ -40,11 +46,14 @@
 .post-content pre,
 .post-content table,
 .post-content details {
-    margin: 0 0 1rem;
+    margin: 0 0 1.5rem;
 }
 
-/* ---------- 标题 ---------- */
-/* 原先只给了 margin-bottom，配合 design.css 的全局 margin 归零后标题会全部粘在一起 */
+/* ---------- 标题 ----------
+   参考站在二级到六级标题前挂一颗人字形标记，而且标记吊在正文左边缘之外
+   （padding-left 给位、::before 绝对定位到 left:0），标题和段落因此仍然左对齐。
+   悬停时 padding-left 长大一点、标记换成强调色——就是那一下「有反应」的手感。
+   标记不跟强调色走而单开一支暖金：强调色是蓝，蓝箭头压在同一页的蓝链接上没层次。 */
 
 .post-content h1,
 .post-content h2,
@@ -52,41 +61,116 @@
 .post-content h4,
 .post-content h5,
 .post-content h6 {
-    margin: 2rem 0 1rem;
+    position: relative;
+    margin: 2.25rem 0 1rem;
     line-height: 1.3;
     font-weight: 700;
     color: var(--text-strong);
+    /* 标题收回正常字距：那 .035em 是给长段落透气用的，字号一大就变松 */
+    letter-spacing: 0;
 }
 
-.post-content h1 { font-size: 1.75rem; }
-.post-content h2 { font-size: 1.5rem; }
-.post-content h3 { font-size: 1.25rem; }
-.post-content h4 { font-size: 1.1rem; }
-.post-content h5 { font-size: 1rem; }
-.post-content h6 { font-size: 0.95rem; color: var(--text-secondary); }
+.post-content h1 { font-size: 1.5rem; }
+.post-content h2 { font-size: 1.3rem; }
+.post-content h3 { font-size: 1.1rem; }
+.post-content h4 { font-size: 1rem; }
+.post-content h5 { font-size: .9375rem; }
+.post-content h6 { font-size: .875rem; color: var(--text-secondary); }
 
-.post-content h1,
-.post-content h2 {
-    padding-bottom: 0.3em;
-    border-bottom: 1px solid var(--border-color);
+.post-content h2,
+.post-content h3,
+.post-content h4,
+.post-content h5,
+.post-content h6 {
+    padding-left: 1.2em;
+    transition: padding-left .25s ease;
 }
 
-/* ---------- 列表 ---------- */
-/* design.css 的重置只作用于 ul[class]，正文里没 class 的列表不受影响；
-   这里显式声明是为了把浏览器默认的 40px 缩进收成统一的 1.75em */
+.post-content h2::before,
+.post-content h3::before,
+.post-content h4::before,
+.post-content h5::before,
+.post-content h6::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    /* 对着整个标题盒居中，而不是首行：两行的二级标题标记会挂在半空 */
+    top: 50%;
+    width: .42em;
+    height: .42em;
+    border-top: 2px solid var(--heading-marker);
+    border-right: 2px solid var(--heading-marker);
+    transform: translateY(-50%) rotate(45deg);
+    transition: border-color .25s ease;
+}
 
-.post-content ul { list-style: disc; }
-.post-content ol { list-style: decimal; }
+.post-content h2:hover,
+.post-content h3:hover,
+.post-content h4:hover,
+.post-content h5:hover,
+.post-content h6:hover { padding-left: 1.5em; }
+
+.post-content h2:hover::before,
+.post-content h3:hover::before,
+.post-content h4:hover::before,
+.post-content h5:hover::before,
+.post-content h6:hover::before { border-color: var(--accent); }
+
+/* ---------- 列表 ----------
+   标记全部自绘：无序项是带一圈光晕的强调色圆点，有序项是强调色序号药丸。
+   list-style 关掉之后缩进也得自己给——浏览器默认的 40px 配不上这套紧凑排版。
+
+   list-style:none 会让 WebKit 把 <ul>/<ol> 的列表语义从无障碍树里摘掉，
+   main.js 的 initListSemantics() 给正文列表补 role="list" 兜这一手。 */
 
 .post-content ul,
 .post-content ol {
-    padding-left: 1.75em;
+    list-style: none;
+    padding: 0;
+    /* 两个不同名的 counter 会互相干扰，统一用一个，嵌套的 ol 各自归零 */
+    counter-reset: noline-li;
 }
 
-.post-content li { margin-bottom: 0.35em; }
+.post-content li {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: .5em;
+    margin: .25rem 0;
+}
+
+.post-content ul > li::before {
+    content: "";
+    flex: 0 0 .45em;
+    width: .45em;
+    height: .45em;
+    /* 行高 1.7 → 首行中线约 .85em，圆点 .45em，所以从 .62em 处起画 */
+    margin-top: .62em;
+    border-radius: 50%;
+    background-color: var(--accent);
+    box-shadow: 0 0 0 .18em rgba(var(--accent-rgb), .24);
+}
+
+.post-content ol > li::before {
+    content: counter(noline-li);
+    counter-increment: noline-li;
+    flex: 0 0 1.45em;
+    height: 1.45em;
+    margin-top: .125em;
+    border-radius: 50%;
+    background-color: var(--accent);
+    color: var(--on-brand);
+    font-size: .8em;
+    font-weight: 700;
+    line-height: 1.45em;
+    text-align: center;
+}
+
 .post-content li > ul,
-.post-content li > ol { margin-top: 0.35em; margin-bottom: 0; }
-.post-content li::marker { color: var(--accent); }
+.post-content li > ol {
+    margin: .25rem 0 0;
+    padding-left: .9em;
+}
 
 /* ---------- 引用 ---------- */
 
@@ -101,19 +185,33 @@
 .post-content blockquote > :first-child { margin-top: 0; }
 .post-content blockquote > :last-child { margin-bottom: 0; }
 
-/* ---------- 行内元素 ---------- */
+/* ---------- 行内元素 ----------
+   正文链接的正常态只有一条虚线底，悬停整块翻成强调色底 + 反白。
+   上方两个角收圆、下方不收（4px 4px 0 0）——色块和虚线之间不留圆角，
+   才像压在文字底下的一张标签，而不是一个悬浮按钮。 */
 
 .post-content a {
-    color: var(--accent);
-    font-weight: 500;
+    color: var(--text-strong);
+    font-weight: 700;
     text-decoration: none;
-    border-bottom: 1px solid rgba(var(--accent-rgb), .35);
-    transition: border-color .2s, color .2s;
+    border-bottom: 2px dotted var(--accent);
+    border-radius: 4px 4px 0 0;
+    padding: 0 .15em;
+    transition: color .2s, background-color .2s, border-color .2s;
 }
 
 .post-content a:hover {
-    color: var(--accent-hover);
-    border-bottom-color: var(--accent-hover);
+    background-color: var(--brand);
+    color: var(--on-brand);
+    border-bottom-color: transparent;
+}
+
+/* 图片外面套了链接（Markdown 的 [![图](src)](href)）时，虚线和悬停色块会绕着
+   图框出一圈没有意义的装饰。:has() 认不出来时退化回上一条，不影响别的链接。 */
+.post-content a:has(img) {
+    border-bottom: 0;
+    padding: 0;
+    background-color: transparent;
 }
 
 .post-content strong { color: var(--text-strong); font-weight: 700; }
@@ -221,23 +319,42 @@
     .btn-copy-code { opacity: 1; }
 }
 
-/* ---------- 图片 ---------- */
+/* ---------- 图片 ----------
+   和参考站一致：图居中、两侧各留一成、16px 大圆角。
+   唯一不改的是 object-fit:cover——参考站给 450px 上限再配 cover，长截图会被
+   拦腰裁掉；这里两个 max-* 都只约束框子，图片本身按 max-height 缩，不裁内容。 */
 
 .post-content img {
     display: block;
-    max-width: 100%;
-    max-height: 36rem;
+    max-width: 90%;
+    max-height: 28rem;
     height: auto;
-    margin: 1rem auto;
-    object-fit: contain;
-    border-radius: 6px;
+    margin: 1.5rem auto;
+    border-radius: var(--radius-img);
 }
 
 .post-content picture {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin: 1rem 0;
+    margin: 1.5rem 0;
+}
+
+.post-content figcaption {
+    margin: -.75rem 0 1.5rem;
+    font-size: .8125rem;
+    line-height: 1.6;
+    letter-spacing: 0;
+    color: var(--text-light);
+    text-align: center;
+}
+
+/* ---------- 引用 ----------
+   段距交给上面那条 blockquote p，这里只管比正文小一号、行高收紧一点。 */
+
+.post-content blockquote p {
+    font-size: .9375rem;
+    line-height: 1.7;
 }
 
 /* ---------- 表格 ---------- */

@@ -70,6 +70,10 @@ $this->comments()->to($comments);
     <p class="comment-closed"><?php _e('评论已关闭'); ?></p>
     <?php endif; ?>
 
+    <?php if (!$comments->have() && $this->allow('comment')): ?>
+    <p class="comment-empty"><?php noline_icon('comments'); ?><?php _e('还没有评论，来抢沙发'); ?></p>
+    <?php endif; ?>
+
     <?php if ($comments->have()): ?>
     <div class="comment-list">
         <?php $comments->listComments(array(

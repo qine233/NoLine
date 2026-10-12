@@ -7,9 +7,10 @@
  * 这里只管全站常驻的顶栏。站点身份（头像大图 / 站名 / 座右铭 / 头图）是首页 masthead 的事，
  * 见 index.php——其余页面没有 masthead，也就不需要那几个字段。
  *
- * 分类下拉必须在这里遍历 Widget_Metas_Category_List，顺手把每行存进 noline_categories()，
- * 右栏的分类卡改读那份缓存。Typecho 的 widget() 只按类名缓存实例、Rows 又没有 rewind()，
- * 同一个 widget 全站只能遍历一次，两处各遍历一遍的话后跑的那个必然是空的。
+ * 分类必须在这里遍历一次 Widget_Metas_Category_List，逐行存进 noline_categories()：
+ * 信息流顶上那条吸顶药丸条和右栏的分类卡都只读这份缓存。Typecho 的 widget() 只按类名
+ * 缓存实例、Rows 又没有 rewind()，同一个 widget 全站只能遍历一次，两处各遍历一遍的话
+ * 后跑的那个必然是空的。顶栏本身不再显示分类——导航只留首页和独立页面。
  */
 $name = trim((string)$this->options->logoName);
 if ($name === '') {
@@ -25,6 +26,16 @@ $bilibiliName = trim((string)$this->options->BliBliname);
 /* 窄屏下显示名被 CSS 藏起来了，title 与 aria-label 是它仅剩的出口，所以两边都要有值 */
 $githubTitle   = $githubName !== '' ? $githubName : 'GitHub';
 $bilibiliTitle = $bilibiliName !== '' ? $bilibiliName : 'Bilibili';
+/* 顶栏压在首屏上时要白字，压在页底色上时要墨色——这两件事由 body 上这两个类决定，
+   design.css 里的 --nav-* 开关跟着换（见「顶栏」一节）。
+ * has-hero：这一页有没有首屏。首页和文章页有，其它页面没有，
+ *           没有的页面 body 要让出一条导航的高度。
+ * hero-cover：首屏有没有封面图。有图才有照片做背景，白字才立得住。 */
+$hasHero = $this->is('index') || $this->is('post');
+$heroCover = $this->is('post')
+    ? noline_post_cover($this) !== ''
+    : trim((string)$this->options->logobgcolor) !== '';
+$bodyClass = ($hasHero ? ' has-hero' : '') . ($heroCover ? ' hero-cover' : '');
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -51,6 +62,141 @@ $bilibiliTitle = $bilibiliName !== '' ? $bilibiliName : 'Bilibili';
     <?php $favicon = trim((string)$this->options->logoCss); if ($favicon !== ''): ?>
     <link rel="shortcut icon" href="<?php echo htmlspecialchars($favicon, ENT_QUOTES, 'UTF-8'); ?>">
     <?php endif; ?>
+
+    <?php
+    /**
+     * canonical + Open Graph + JSON-LD。
+     *
+     * 核心 header() 输出的只有 description / keywords / 三个订阅链接——1.2.1 的
+     * var/Widget/Archive.php 里 header() 拼的就是这几样，没有 canonical，也没有任何
+     * og: 标签。所以链接发到微信、Telegram、X 不带头图和摘要，搜索引擎也拿不到结构化数据。
+     *
+     * URL 走 getArchiveUrl()：核心在 index / 单页 / 分类 / 标签 / 作者 / 日期 / 搜索
+     * 每一种归档里都赋过值（分别是 siteUrl、permalink、各归档的 permalink）。
+     * 分页（/page/2）拿到的是不带页码的那一份，这是有意的：
+     * 第 2 页之后的列表没有独立收录价值，文章本体有自己的 permalink 规范链接。
+     */
+    $canonical = method_exists($this, 'getArchiveUrl') ? trim((string)$this->getArchiveUrl()) : '';
+    if ($canonical === '') {
+        $canonical = $this->is('single')
+            ? trim((string)$this->permalink)
+            : rtrim((string)$this->options->siteUrl, '/') . '/';
+    }
+
+    $ogTitle = $name;
+    if ($this->is('single')) {
+        $ogTitle = trim((string)$this->title);
+    } elseif (method_exists($this, 'getArchiveTitle') && $this->getArchiveTitle() !== null) {
+        $ogTitle = trim((string)$this->getArchiveTitle()) . ' · ' . $name;
+    }
+
+    /* 描述优先用文章自己的正文，其次核心给归档配的说明，最后才是站点的副标题 */
+    $ogDesc = '';
+    if ($this->is('single')) {
+        $ogDesc = noline_plain_excerpt(noline_plain_text((string)$this->text), 120);
+    }
+    if ($ogDesc === '' && method_exists($this, 'getDescription')) {
+        $ogDesc = trim((string)$this->getDescription());
+    }
+    if ($ogDesc === '') {
+        $ogDesc = trim((string)$this->options->description);
+    }
+
+    /* 图：文章有 thumb 自定义字段就用封面，其余场景用站点头像。
+       两者都必须是绝对地址——社交爬虫不会替相对路径补域名。 */
+    $ogImage = '';
+    if ($this->is('post')) {
+        $ogImage = noline_post_cover($this);
+    }
+    if ($ogImage === '') {
+        $ogImage = trim((string)$this->options->logoCss);
+    }
+    if ($ogImage !== '' && strpos($ogImage, '://') === false) {
+        $ogImage = rtrim((string)$this->options->siteUrl, '/') . '/' . ltrim($ogImage, '/');
+    }
+    ?>
+    <link rel="canonical" href="<?php echo htmlspecialchars($canonical, ENT_QUOTES, 'UTF-8'); ?>">
+    <meta property="og:type" content="<?php echo $this->is('single') ? 'article' : 'website'; ?>">
+    <meta property="og:site_name" content="<?php echo htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?>">
+    <meta property="og:title" content="<?php echo htmlspecialchars($ogTitle, ENT_QUOTES, 'UTF-8'); ?>">
+    <meta property="og:url" content="<?php echo htmlspecialchars($canonical, ENT_QUOTES, 'UTF-8'); ?>">
+    <?php if ($ogDesc !== ''): ?>
+    <meta property="og:description" content="<?php echo htmlspecialchars($ogDesc, ENT_QUOTES, 'UTF-8'); ?>">
+    <?php endif; ?>
+    <?php if ($ogImage !== ''): ?>
+    <meta property="og:image" content="<?php echo htmlspecialchars($ogImage, ENT_QUOTES, 'UTF-8'); ?>">
+    <?php endif; ?>
+    <meta name="twitter:card" content="<?php echo $ogImage !== '' ? 'summary_large_image' : 'summary'; ?>">
+    <meta name="twitter:title" content="<?php echo htmlspecialchars($ogTitle, ENT_QUOTES, 'UTF-8'); ?>">
+    <?php if ($ogDesc !== ''): ?>
+    <meta name="twitter:description" content="<?php echo htmlspecialchars($ogDesc, ENT_QUOTES, 'UTF-8'); ?>">
+    <?php endif; ?>
+    <?php if ($ogImage !== ''): ?>
+    <meta name="twitter:image" content="<?php echo htmlspecialchars($ogImage, ENT_QUOTES, 'UTF-8'); ?>">
+    <?php endif; ?>
+
+    <?php
+    /**
+     * JSON-LD：文章给 BlogPosting，首页给 WebSite + 搜索动作。
+     * 其它归档类型不输出——列不出一个诚实的 schema 比列出一个错的更省事。
+     */
+    $jsonLd = null;
+
+    if ($this->is('post')) {
+        /* 和 noline_author_avatar() 同一个理由：先取对象再判空，
+           直接链式 ->author->screenName 在 author 为 null 时会抛出 PHP 8 警告，
+           警告文本会印在 <head> 里，把整页结构弄脏。 */
+        $ldAuthor   = $this->author;
+        $authorName = trim((string)($ldAuthor !== null ? $ldAuthor->screenName : ''));
+
+        $jsonLd = array(
+            '@context'      => 'https://schema.org',
+            '@type'         => 'BlogPosting',
+            'headline'      => $ogTitle,
+            'url'           => $canonical,
+            'mainEntityOfPage' => array('@type' => 'WebPage', '@id' => $canonical),
+            'datePublished' => date('c', (int)$this->created),
+            'dateModified'  => date('c', (int)($this->modified ?: $this->created)),
+            'inLanguage'    => 'zh-CN',
+            'author'        => array(
+                '@type' => 'Person',
+                'name'  => $authorName !== '' ? $authorName : $name,
+            ),
+            'publisher'     => array(
+                '@type' => 'Organization',
+                'name'  => $name,
+            ),
+        );
+        if ($ogImage !== '') {
+            $jsonLd['image'] = $ogImage;
+        }
+        if ($ogDesc !== '') {
+            $jsonLd['description'] = $ogDesc;
+        }
+    } elseif ($this->is('index') && $this->getCurrentPage() <= 1) {
+        $jsonLd = array(
+            '@context'    => 'https://schema.org',
+            '@type'       => 'WebSite',
+            'name'        => $name,
+            'url'         => $canonical,
+            'description' => $ogDesc,
+            'potentialAction' => array(
+                '@type'       => 'SearchAction',
+                'target'      => $canonical . '?s={search_term_string}',
+                'query-input' => 'required name=search_term_string',
+            ),
+        );
+    }
+
+    if ($jsonLd !== null) {
+        /* JSON_HEX_* 是必须的：正文里出现 </script> 或 & 时，
+           不转义就会把这段脚本就地截断，整页 head 跟着烂掉。 */
+        echo '<script type="application/ld+json">'
+            . json_encode($jsonLd, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)
+            . '</script>' . "\n";
+    }
+    ?>
 
     <?php
     /**
@@ -92,8 +238,13 @@ $bilibiliTitle = $bilibiliName !== '' ? $bilibiliName : 'Bilibili';
         && (strpos((string)$this->text, '```') !== false || stripos((string)$this->text, '<pre') !== false);
     ?>
 
-    <link rel="stylesheet" href="<?php $this->options->themeUrl('css/design.css'); ?>?v=<?php echo NOLINE_VERSION; ?>">
-    <link rel="stylesheet" href="<?php $this->options->themeUrl('css/article.css'); ?>?v=<?php echo NOLINE_VERSION; ?>">
+    <link rel="stylesheet" href="<?php echo noline_css_url('css/design.css'); ?>?v=<?php echo NOLINE_VERSION; ?>">
+    <?php /* article.css 通篇只服务 .post-content 和 .btn-copy-code，
+            而首页/归档/搜索列表的摘要卡片里根本没有这两个容器（已逐个模板核对），
+            所以只在单页和文章页发。 */ ?>
+    <?php if ($this->is('single')): ?>
+    <link rel="stylesheet" href="<?php echo noline_css_url('css/article.css'); ?>?v=<?php echo NOLINE_VERSION; ?>">
+    <?php endif; ?>
     <?php if ($needHighlight): ?>
     <link rel="stylesheet" href="<?php $this->options->themeUrl('css/vendor/atom-one-dark.min.css'); ?>?v=<?php echo NOLINE_VERSION; ?>">
     <script defer src="<?php $this->options->themeUrl('js/vendor/highlight.min.js'); ?>?v=<?php echo NOLINE_VERSION; ?>"></script>
@@ -101,7 +252,7 @@ $bilibiliTitle = $bilibiliName !== '' ? $bilibiliName : 'Bilibili';
 
     <script defer src="<?php $this->options->themeUrl('js/main.js'); ?>?v=<?php echo NOLINE_VERSION; ?>"></script>
 </head>
-<body>
+<body class="<?php echo $bodyClass; ?>">
 
 <?php /* 进度条和遮罩都必须是 .topbar 的兄弟：顶栏有 backdrop-filter，
          它会给固定定位的后代建包含块，塞进去就会跟着顶栏一起跑。 */ ?>
@@ -135,41 +286,27 @@ $bilibiliTitle = $bilibiliName !== '' ? $bilibiliName : 'Bilibili';
             <?php endwhile; ?>
 
             <?php
-            /* 全站只在这里遍历一次分类，逐行存进 noline_categories()，
-               右栏的分类卡改读那份缓存。原因见本文件顶部的注释。 */
+            /* 全站只在这里遍历一次分类，逐行存进 noline_categories()：
+               吸顶药丸条（public/feed-cats.php）和右栏分类卡都读这份缓存。
+               原因见本文件顶部的注释——顶栏自己不再出分类。 */
             $this->widget('Widget_Metas_Category_List')->to($cats);
             while ($cats->next()) {
                 noline_categories(array(
                     'name'      => (string)$cats->name,
+                    'slug'      => (string)$cats->slug,
                     'permalink' => (string)$cats->permalink,
                     'count'     => (int)$cats->count,
                     'levels'    => (int)$cats->levels,
                 ));
             }
-            $navCats = noline_categories();
             ?>
-            <?php if (!empty($navCats)): ?>
-            <div class="nav-group">
-                <button type="button" class="nav-item nav-group-btn<?php if ($this->is('category')): ?> active<?php endif; ?>" aria-haspopup="true" aria-expanded="false" aria-controls="nav-cats">
-                    <?php noline_icon('folder'); ?><span class="nav-label"><?php _e('分类'); ?></span><span class="nav-caret" aria-hidden="true"></span>
-                </button>
-                <ul class="nav-sub" id="nav-cats">
-                    <?php foreach ($navCats as $c): ?>
-                    <?php /* levels 是层级深度，缩进每行动态算，没法写成静态 class，只能走内联样式 */ ?>
-                    <li class="nav-sub-item"<?php if ($c['levels'] > 0): ?> style="padding-left:<?php echo $c['levels'] * 12; ?>px"<?php endif; ?>>
-                        <a href="<?php echo htmlspecialchars($c['permalink'], ENT_QUOTES, 'UTF-8'); ?>">
-                            <span><?php echo htmlspecialchars($c['name'], ENT_QUOTES, 'UTF-8'); ?></span>
-                            <span class="nav-sub-count"><?php echo $c['count']; ?></span>
-                        </a>
-                    </li>
-                    <?php endforeach; ?>
-                </ul>
-            </div>
-            <?php endif; ?>
 
             <form class="topbar-search" method="get" action="<?php $this->options->siteUrl(); ?>" role="search">
                 <label class="sr-only" for="nav-search-input"><?php _e('搜索文章'); ?></label>
                 <input type="search" id="nav-search-input" name="s" placeholder="<?php _e('搜索文章…'); ?>" autocomplete="off">
+                <?php /* 快捷键徽章：里面写什么由 main.js 按平台决定（⌘K 或 Ctrl K）。
+                        聚焦、已有输入、窄屏这三种情况下 CSS 会把它收掉。 */ ?>
+                <kbd class="search-kbd" id="search-kbd" aria-hidden="true"></kbd>
                 <button type="submit" class="icon-btn" aria-label="<?php _e('搜索'); ?>">
                     <?php noline_icon('magnifying-glass'); ?>
                 </button>

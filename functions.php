@@ -4,7 +4,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
 /**
  * 主题版本号。同时用作静态资源的缓存指纹（?v=），改版本即可强制刷新客户端缓存。
  */
-define('NOLINE_VERSION', '1.7.0');
+define('NOLINE_VERSION', '1.18.0');
 
 /* ==========================================================================
    后台设置
@@ -59,6 +59,15 @@ function themeConfig($form)
         _t('显示在首页内容区顶部的公告卡里，留空则整张卡不出现。支持 HTML。'));
     $form->addInput($notice);
 
+    /* 只有一个选项的多选框就是开关。不勾选时浏览器根本不会提交这个字段，
+       存下来的配置里它是 null 或者压根不存在——模板侧统一用 !empty() 判，两种都算关。 */
+    $showSidebarCats = new Typecho_Widget_Helper_Form_Element_Checkbox('showSidebarCats',
+        array('1' => _t('在右栏显示「分类」卡')), NULL,
+        _t('右栏分类卡'),
+        _t('默认关闭。分类导航已经在信息流顶上那条吸顶药丸条里出现了一次，右栏再来一张是重复；'
+           . '需要一张能一眼看全分类和各自篇数的卡时再勾上。'));
+    $form->addInput($showSidebarCats);
+
     $gtihubname = new Typecho_Widget_Helper_Form_Element_Text('gtihubname', NULL, _t('GitHub'),
         _t('GitHub 显示名'),
         _t('写在顶栏 GitHub 按钮上，配了之后按钮会从方块长成药丸。窄屏收成纯图标，名字只在气泡和读屏标签里出现。留空则始终只显示图标。'));
@@ -110,8 +119,47 @@ function themeInit($archive)
         return;
     }
 
+    // 恰恰是「不带 cookie 的请求」绕过了上面这道闸：爬虫每次抓取都没有这个 cookie，
+    // 一篇文章能被搜索蜘蛛刷出几千阅读。
+    if (noline_is_bot()) {
+        return;
+    }
+
     noline_bump_views($cid);
     setcookie($cookie, '1', time() + 86400, '/');
+}
+
+/**
+ * 看起来像爬虫就返回 true。只做子串匹配，不做 DNS 反查。
+ *
+ * 误伤的代价是「少计一次阅读」，漏掉的代价是阅读数虚高几个数量级，
+ * 所以判断宁可偏严：空 UA 也当爬虫（真实浏览器不会不带 UA）。
+ */
+function noline_is_bot()
+{
+    $ua = isset($_SERVER['HTTP_USER_AGENT']) ? strtolower((string)$_SERVER['HTTP_USER_AGENT']) : '';
+
+    if ($ua === '') {
+        return true;
+    }
+
+    static $needles = array(
+        'bot', 'spider', 'crawl', 'slurp', 'curl', 'wget', 'python', 'httpclient',
+        'java/', 'go-http', 'feed', 'axios', 'node-fetch', 'unirest', 'okhttp',
+        'lighthouse', 'headless', 'phantom', 'selenium', 'puppeteer', 'scrapy',
+        'baiduspider', 'sogou', 'yandex', 'bytespider', 'petalbot', '360spider',
+        'ahrefs', 'semrush', 'majestic', 'mj12bot', 'dotbot', 'duckduckbot',
+        'facebookexternalhit', 'telegrambot', 'whatsapp', 'twitterbot', 'slackbot',
+        'discordbot', 'linkedinbot', 'skypebot', 'notionbot', 'linear',
+    );
+
+    foreach ($needles as $needle) {
+        if (strpos($ua, $needle) !== false) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -195,6 +243,102 @@ function noline_bump_views($cid)
     }
 
     fclose($fp);
+}
+
+/* ==========================================================================
+   轻量文件缓存（右栏那几个「一天之内不会变」的区块）
+   --------------------------------------------------------------------------
+   放在 usr/uploads/noline_cache/，不进主题目录，升级主题不会把缓存连带删掉。
+   ========================================================================== */
+
+/**
+ * 缓存目录。不可写时返回 null，调用方直接现场计算——
+ * 缓存是优化，优化失败不能把页面弄坏或者刷一排警告。
+ */
+function noline_cache_dir()
+{
+    static $dir = false;
+
+    if ($dir === false) {
+        $path = __TYPECHO_ROOT_DIR__ . '/usr/uploads/noline_cache';
+        if (!is_dir($path)) {
+            @mkdir($path, 0755, true);
+        }
+        $dir = (is_dir($path) && is_writable($path)) ? $path : null;
+    }
+
+    return $dir;
+}
+
+/**
+ * 内容版本：发新文章、来新评论都会让它变。
+ *
+ * 缓存键里带上它，「刚发布的东西右栏要等过期才更新」就不会发生；
+ * 带上日期，日历和「那年今日」在零点自然换新。两个 MAX 都走主键，代价恒定。
+ */
+function noline_content_version()
+{
+    static $version = null;
+
+    if ($version !== null) {
+        return $version;
+    }
+
+    try {
+        $db = Typecho_Db::get();
+        $posts = $db->fetchObject(
+            $db->select(['MAX(table.contents.cid)' => 'v'])->from('table.contents')
+        );
+        $comments = $db->fetchObject(
+            $db->select(['MAX(table.comments.coid)' => 'v'])->from('table.comments')
+        );
+
+        if ($posts === false || $comments === false || !isset($posts->v) || !isset($comments->v)) {
+            // 拿不到版本号就退回纯 TTL 过期，别把缓存变成永远命中不了
+            $version = 'plain';
+        } else {
+            $version = (int)$posts->v . '-' . (int)$comments->v;
+        }
+    } catch (Exception $e) {
+        $version = 'plain';
+    }
+
+    return $version;
+}
+
+/**
+ * 命中且没过期就直接返回，否则现算并落盘。
+ * 载荷必须是纯数组——json 往返是它的存储格式。
+ */
+function noline_cached($key, $ttl, callable $produce)
+{
+    $dir = noline_cache_dir();
+    if ($dir === null) {
+        return $produce();
+    }
+
+    $file = $dir . '/' . md5($key) . '.json';
+    $now = time();
+
+    if (is_file($file)) {
+        $raw = @file_get_contents($file);
+        if ($raw !== false) {
+            $hit = json_decode($raw, true);
+            if (is_array($hit) && isset($hit['expires'], $hit['value'])
+                && (int)$hit['expires'] > $now && $hit['key'] === $key) {
+                return $hit['value'];
+            }
+        }
+    }
+
+    $value = $produce();
+    @file_put_contents(
+        $file,
+        json_encode(array('expires' => $now + (int)$ttl, 'key' => $key, 'value' => $value)),
+        LOCK_EX
+    );
+
+    return $value;
 }
 
 /* ==========================================================================
@@ -338,6 +482,26 @@ function noline_mix($rgb, $target, $ratio)
 }
 
 /**
+ * 样式表 URL：同目录存在 .min.css 就用压缩版，否则退回源文件。
+ *
+ * 压缩产物由 _dev/minify.py 生成，它只删注释和空白，并用「非空白字符序列 + 字符串字面量
+ * 逐条相等」自证没有改动语义；_dev/build.py 在打包前会拒绝过期的 .min.css。
+ * 这里只判断存在与否：本机改了 design.css 忘了重跑压缩，最坏是线上多发 60KB 未压缩样式，
+ * 不会出现「样式指向一个还没生成的 404」。
+ */
+function noline_css_url($rel)
+{
+    if (substr($rel, -4) === '.css') {
+        $min = substr($rel, 0, -4) . '.min.css';
+        if ($min !== $rel && is_file(__DIR__ . '/' . $min)) {
+            $rel = $min;
+        }
+    }
+
+    return Typecho_Widget::widget('Widget_Options')->themeUrl($rel);
+}
+
+/**
  * 输出后台强调色对应的 CSS 变量。没配置过就什么都不输出，样式表自己回落到默认靛蓝。
  */
 function noline_accent_style()
@@ -452,7 +616,7 @@ function noline_is_diary($post)
    ========================================================================== */
 
 /**
- * 相对时间，用在"说说"这类时间线页面上。
+ * 相对时间（「3 天前」），动态卡的时间戳和右栏近期评论都用它。
  */
 function noline_time_ago($timestamp)
 {
@@ -665,8 +829,10 @@ function noline_categories($row = null)
  *
  * 可用名称见 public/icons.php：
  *   导航  house box-archive file-lines comments link circle-info folder
- *   界面  bars magnifying-glass sun moon clock eye comment tag
+ *   界面  bars magnifying-glass sun moon clock eye comment tag scale heart
+ *         calendar history bullhorn chart-line
  *   品牌  github bilibili
+ *   自绘  sprout compass paper-plane arrow-up scale heart
  */
 function noline_icon($name, $class = '')
 {
@@ -889,7 +1055,7 @@ function noline_post_rows()
     if ($rows === null) {
         $db = Typecho_Db::get();
         $rows = $db->fetchAll(
-            $db->select('title, created')
+            $db->select('cid, slug, title, created')
                 ->from('table.contents')
                 ->where('type = ?', 'post')
                 ->where('status = ?', 'publish')
@@ -904,45 +1070,51 @@ function noline_post_rows()
  */
 function noline_calendar_data()
 {
-    $now   = time();
-    $year  = (int)date('Y', $now);
-    $month = (int)date('n', $now);
-    $first = mktime(0, 0, 0, $month, 1, $year);
+    return noline_cached(
+        'calendar-' . date('Ymd') . '-' . noline_content_version(),
+        86400,
+        function () {
+            $now   = time();
+            $year  = (int)date('Y', $now);
+            $month = (int)date('n', $now);
+            $first = mktime(0, 0, 0, $month, 1, $year);
 
-    $posted = array();
-    foreach (noline_post_rows() as $row) {
-        $ts = (int)$row['created'];
-        if ((int)date('Y', $ts) === $year && (int)date('n', $ts) === $month) {
-            $posted[(int)date('j', $ts)] = true;
+            $posted = array();
+            foreach (noline_post_rows() as $row) {
+                $ts = (int)$row['created'];
+                if ((int)date('Y', $ts) === $year && (int)date('n', $ts) === $month) {
+                    $posted[(int)date('j', $ts)] = true;
+                }
+            }
+
+            /* date('w') 周日为 0，和表头「日一二三四五六」的顺序正好对上 */
+            $weeks = array();
+            $week  = array_fill(0, (int)date('w', $first), 0);
+            $days  = (int)date('t', $first);
+
+            for ($d = 1; $d <= $days; $d++) {
+                $week[] = $d;
+                if (count($week) === 7) {
+                    $weeks[] = $week;
+                    $week = array();
+                }
+            }
+            if (!empty($week)) {
+                $weeks[] = array_pad($week, 7, 0);
+            }
+
+            return array(
+                'year'   => $year,
+                'month'  => $month,
+                'today'  => (int)date('j', $now),
+                'weeks'  => $weeks,
+                'posted' => $posted,
+            );
         }
-    }
-
-    /* date('w') 周日为 0，和表头「日一二三四五六」的顺序正好对上 */
-    $weeks = array();
-    $week  = array_fill(0, (int)date('w', $first), 0);
-    $days  = (int)date('t', $first);
-
-    for ($d = 1; $d <= $days; $d++) {
-        $week[] = $d;
-        if (count($week) === 7) {
-            $weeks[] = $week;
-            $week = array();
-        }
-    }
-    if (!empty($week)) {
-        $weeks[] = array_pad($week, 7, 0);
-    }
-
-    return array(
-        'year'   => $year,
-        'month'  => $month,
-        'today'  => (int)date('j', $now),
-        'weeks'  => $weeks,
-        'posted' => $posted,
     );
 }
 
-/** 中文月名：日历药丸标题要写「十月历」而不是「10月历」。 */
+/** 中文月名：日历标题要写「十月历」而不是「10月历」。 */
 function noline_month_name($month)
 {
     static $names = array('一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二');
@@ -960,26 +1132,34 @@ function noline_month_name($month)
  */
 function noline_history_today($limit = 4)
 {
-    $now      = time();
-    $monthDay = date('n-j', $now);
-    $year     = (int)date('Y', $now);
+    $limit = max(1, (int)$limit);
 
-    $hits = array();
-    foreach (noline_post_rows() as $row) {
-        $ts = (int)$row['created'];
-        if (date('n-j', $ts) !== $monthDay || (int)date('Y', $ts) >= $year) {
-            continue;
+    return noline_cached(
+        'history-' . $limit . '-' . date('Ymd') . '-' . noline_content_version(),
+        86400,
+        function () use ($limit) {
+            $now      = time();
+            $monthDay = date('n-j', $now);
+            $year     = (int)date('Y', $now);
+
+            $hits = array();
+            foreach (noline_post_rows() as $row) {
+                $ts = (int)$row['created'];
+                if (date('n-j', $ts) !== $monthDay || (int)date('Y', $ts) >= $year) {
+                    continue;
+                }
+                $hits[] = array(
+                    'year'  => (int)date('Y', $ts),
+                    'ago'   => $year - (int)date('Y', $ts),
+                    'title' => trim((string)$row['title']),
+                );
+            }
+
+            usort($hits, function ($a, $b) { return $b['year'] - $a['year']; });
+
+            return array_slice($hits, 0, $limit);
         }
-        $hits[] = array(
-            'year'  => (int)date('Y', $ts),
-            'ago'   => $year - (int)date('Y', $ts),
-            'title' => trim((string)$row['title']),
-        );
-    }
-
-    usort($hits, function ($a, $b) { return $b['year'] - $a['year']; });
-
-    return array_slice($hits, 0, max(1, (int)$limit));
+    );
 }
 
 /**
@@ -988,34 +1168,460 @@ function noline_history_today($limit = 4)
  */
 function noline_site_stats()
 {
-    static $stats = null;
+    return noline_cached(
+        'stats-' . date('Ymd') . '-' . noline_content_version(),
+        86400,
+        function () {
+            $db = Typecho_Db::get();
 
-    if ($stats === null) {
-        $db   = Typecho_Db::get();
-        $rows = noline_post_rows();
+            /* 原来这里是「把每一行都 SELECT 出来再 count()」——评论上万条时就真的拖几万行。
+               换成聚合：['COUNT(x)' => 'num'] 这个写法是核心自己在 Widget/Base/Contents.php
+               里到处用的形态。本机没有 PHP 环境验证不了，所以每个都留了退路：
+               聚合取不到就退回数行数，宁可多查一次也不让右栏显示 0。 */
+            $posts = $db->fetchObject(
+                $db->select(['COUNT(table.contents.cid)' => 'num'])
+                    ->from('table.contents')
+                    ->where('type = ?', 'post')
+                    ->where('status = ?', 'publish')
+            );
+            $comments = $db->fetchObject(
+                $db->select(['COUNT(table.comments.coid)' => 'num'])
+                    ->from('table.comments')
+                    ->where('status = ?', 'approved')
+            );
+            $categories = $db->fetchObject(
+                $db->select(['COUNT(table.metas.mid)' => 'num'])
+                    ->from('table.metas')
+                    ->where('type = ?', 'category')
+            );
+            $oldest = $db->fetchObject(
+                $db->select(['MIN(table.contents.created)' => 'ts'])
+                    ->from('table.contents')
+                    ->where('type = ?', 'post')
+                    ->where('status = ?', 'publish')
+            );
 
-        $oldest = time();
+            // 只在聚合查询真的拿不到时才去扫全表——平时一次都不该走到
+            $rows = function () {
+                return noline_post_rows();
+            };
+
+            $postCount = ($posts === false || !isset($posts->num))
+                ? count($rows()) : (int)$posts->num;
+            $commentCount = ($comments === false || !isset($comments->num))
+                ? count($db->fetchAll($db->select('coid')->from('table.comments')
+                    ->where('status = ?', 'approved'))) : (int)$comments->num;
+            $categoryCount = ($categories === false || !isset($categories->num))
+                ? count($db->fetchAll($db->select('mid')->from('table.metas')
+                    ->where('type = ?', 'category'))) : (int)$categories->num;
+
+            // MIN 拿不到就从已经查出来的文章行里扫最早的一条
+            $first = ($oldest === false || !isset($oldest->ts) || (int)$oldest->ts <= 0)
+                ? null : (int)$oldest->ts;
+            if ($first === null) {
+                $first = time();
+                foreach ($rows() as $row) {
+                    $ts = (int)$row['created'];
+                    if ($ts < $first) {
+                        $first = $ts;
+                    }
+                }
+            }
+
+            return array(
+                'posts'      => $postCount,
+                'comments'   => $commentCount,
+                'categories' => $categoryCount,
+                'days'       => max(1, (int)floor((time() - $first) / 86400)),
+            );
+        }
+    );
+}
+
+/**
+ * 列表卡封面缩略图。作者在文章「自定义字段」里填 key=thumb、value=图片 URL。
+ * 只查一次 fields 表（按 name 过滤），不逐卡 N+1；键是 cid，模板里按 cid 取。
+ */
+function noline_thumbs()
+{
+    static $thumbs = null;
+
+    if ($thumbs === null) {
+        $thumbs = array();
+        $db = Typecho_Db::get();
+        $rows = $db->fetchAll(
+            $db->select('cid, str_value')->from('table.fields')->where('name = ?', 'thumb')
+        );
         foreach ($rows as $row) {
-            $ts = (int)$row['created'];
-            if ($ts < $oldest) {
-                $oldest = $ts;
+            $thumbs[(int)$row['cid']] = trim((string)$row['str_value']);
+        }
+    }
+
+    return $thumbs;
+}
+
+/**
+ * 文章首屏封面。沿用列表卡那份 thumb 自定义字段，直接读 noline_thumbs() 的静态缓存，
+ * 不为一张图再查一次 fields 表。
+ */
+function noline_post_cover($archive)
+{
+    $thumbs = noline_thumbs();
+    $cid = (int)$archive->cid;
+
+    return isset($thumbs[$cid]) ? $thumbs[$cid] : '';
+}
+
+/**
+ * 正文「字数」：中文按字计、英文按词计，用来估阅读时长。
+ * 入参是未渲染的 Markdown 原文（$this->text），先剥 HTML 标签、图片/链接语法、
+ * 行内代码再数，避免把 URL 和反引号也算进阅读量。
+ */
+/**
+ * 把「给人读」的部分从正文里剥出来：HTML 标签、图片、链接语法、行内代码都去掉。
+ * 字数统计和社交分享的摘要都走这一条，别再各自正则一遍。
+ */
+function noline_plain_text($text)
+{
+    $plain = (string)$text;
+
+    $plain = preg_replace('/<[^>]+>/', ' ', $plain);
+    $plain = preg_replace('/!\[[^\]]*\]\([^)]*\)/', ' ', $plain);
+    $plain = preg_replace('/\[([^\]]*)\]\([^)]*\)/', '$1', $plain);
+    $plain = preg_replace('/`[^`]*`/', ' ', $plain);
+
+    return $plain;
+}
+
+/**
+ * 正文「字数」：中文按字计、英文按词计，用来估阅读时长。
+ */
+function noline_word_count($text)
+{
+    $plain = noline_plain_text($text);
+
+    $cjk   = preg_match_all('/[\x{4e00}-\x{9fff}]/u', $plain);
+    $rest  = preg_replace('/[\x{4e00}-\x{9fff}]/u', ' ', $plain);
+    $latin = preg_match_all('/[A-Za-z0-9]+/', $rest);
+
+    return (int)$cjk + (int)$latin;
+}
+
+/**
+ * 随机一篇文章（含「日记」——日记只是分类，表里同为 type=post）的链接。
+ * 随机挑选在 PHP 侧完成（order('RAND()') 会被查询构造器当列名包反引号报错），
+ * 再补上 category slug，交给 Typecho_Router::url 拼固定链接——不手拼 URL，
+ * 开/关伪静态、各种固定链接格式都靠核心这一条兼容。
+ */
+function noline_random_url()
+{
+    $rows = noline_post_rows();
+
+    if (empty($rows)) {
+        return '';
+    }
+
+    $row = $rows[array_rand($rows)];
+
+    $db = Typecho_Db::get();
+    $cat = $db->fetchRow(
+        $db->select('table.metas.slug')
+            ->from('table.metas')
+            ->join('table.relationships', 'table.relationships.mid = table.metas.mid')
+            ->where('table.relationships.cid = ?', (int)$row['cid'])
+            ->where('table.metas.type = ?', 'category')
+            ->limit(1)
+    );
+
+    $options = Typecho_Widget::widget('Widget_Options');
+
+    $params = array(
+        'cid'      => (int)$row['cid'],
+        'slug'     => (string)$row['slug'],
+        'created'  => (int)$row['created'],
+        'year'     => date('Y', (int)$row['created']),
+        'month'    => date('m', (int)$row['created']),
+        'day'      => date('d', (int)$row['created']),
+        'category' => empty($cat) ? '' : (string)$cat['slug'],
+    );
+
+    return Typecho_Router::url('post', $params, $options->index);
+}
+
+/**
+ * 相关文章：同分类的优先，不够再用最近发布的补齐，最多 $limit 条。
+ *
+ * 分类匹配和排序全放在 PHP 侧，SQL 只跑两条不带 join 的平表查询：
+ *   * 核心的数组绑定（where('mid IN ?', $mids)）各版本行为不一致，
+ *     noline_parent_authors() 里已经躲过同一个坑；
+ *   * 「同分类优先、组内按时间倒序」这种两档排序，写进 SQL 要么 union 要么
+ *     CASE WHEN，两边数据库还不是一个写法。
+ * 文章本体直接吃 noline_post_rows() 的缓存——随机去往那张卡已经把它查出来了。
+ *
+ * 固定链接沿用 noline_random_url() 的写法：挑一个分类 slug 交给
+ * Typecho_Router::url('post', …)，不手拼 URL。
+ *
+ * @return array 每项含 title / permalink / date / thumb（thumb 可能为空串）
+ */
+function noline_related_posts($archive, $limit = 3)
+{
+    $self = (int)$archive->cid;
+    $limit = max(1, (int)$limit);
+
+    $posts = array();
+    foreach (noline_post_rows() as $row) {
+        $posts[(int)$row['cid']] = $row;
+    }
+
+    if ($self <= 0 || count($posts) <= 1) {
+        return array();
+    }
+
+    $db = Typecho_Db::get();
+
+    /* mid → 分类 slug，和 cid → 它挂的 mid 列表。两张对照表都不大。 */
+    $catSlug = array();
+    foreach ($db->fetchAll($db->select('mid, slug')->from('table.metas')->where('type = ?', 'category')) as $row) {
+        $catSlug[(int)$row['mid']] = (string)$row['slug'];
+    }
+
+    $catOfPost = array();
+    foreach ($db->fetchAll($db->select('cid, mid')->from('table.relationships')) as $row) {
+        $catOfPost[(int)$row['cid']][] = (int)$row['mid'];
+    }
+
+    $mine = isset($catOfPost[$self]) ? $catOfPost[$self] : array();
+
+    $same = array();
+    $other = array();
+    foreach ($posts as $cid => $row) {
+        if ($cid === $self) {
+            continue;
+        }
+
+        /* 先落成临时变量再 foreach：三元直接写在 foreach 的数组位上，
+           读的人得先确认 as 不会被当成三元的一个分支，不值这个心眼。 */
+        $theirs = isset($catOfPost[$cid]) ? $catOfPost[$cid] : array();
+        $shared = array();
+        foreach ($theirs as $mid) {
+            if (in_array($mid, $mine, true)) {
+                $shared[] = $mid;
             }
         }
 
-        $comments = $db->fetchAll(
-            $db->select('coid')->from('table.comments')->where('status = ?', 'approved')
-        );
-        $categories = $db->fetchAll(
-            $db->select('mid')->from('table.metas')->where('type = ?', 'category')
-        );
+        if (empty($shared)) {
+            $other[] = $row;
+        } else {
+            /* 带上一个共有的分类，拼固定链接时用它，比随便取第一个更贴题 */
+            $row['category'] = isset($catSlug[$shared[0]]) ? $catSlug[$shared[0]] : '';
+            $same[] = $row;
+        }
+    }
 
-        $stats = array(
-            'posts'      => count($rows),
-            'comments'   => count($comments),
-            'categories' => count($categories),
-            'days'       => max(1, (int)floor((time() - $oldest) / 86400)),
+    $newestFirst = function (array $a, array $b) {
+        return (int)$a['created'] === (int)$b['created'] ? 0 : ((int)$a['created'] < (int)$b['created'] ? 1 : -1);
+    };
+    usort($same, $newestFirst);
+    usort($other, $newestFirst);
+
+    $picked = array_slice(array_merge($same, $other), 0, $limit);
+    if (empty($picked)) {
+        return array();
+    }
+
+    $thumbs = noline_thumbs();
+    $options = Typecho_Widget::widget('Widget_Options');
+    $related = array();
+
+    foreach ($picked as $row) {
+        $cid = (int)$row['cid'];
+
+        if (!isset($row['category'])) {
+            $mid = empty($catOfPost[$cid]) ? 0 : $catOfPost[$cid][0];
+            $row['category'] = isset($catSlug[$mid]) ? $catSlug[$mid] : '';
+        }
+
+        $related[] = array(
+            'title'     => (string)$row['title'],
+            'permalink' => Typecho_Router::url('post', array(
+                'cid'      => $cid,
+                'slug'     => (string)$row['slug'],
+                'created'  => (int)$row['created'],
+                'year'     => date('Y', (int)$row['created']),
+                'month'    => date('m', (int)$row['created']),
+                'day'      => date('d', (int)$row['created']),
+                'category' => $row['category'],
+            ), $options->index),
+            'date'      => date('Y-m-d', (int)$row['created']),
+            'thumb'     => isset($thumbs[$cid]) ? $thumbs[$cid] : '',
         );
     }
 
-    return $stats;
+    return $related;
+}
+
+/* ==========================================================================
+   健康记录（体重 / BMI）
+   --------------------------------------------------------------------------
+   数据、BMI 计算、增删改全在 NolineApi 插件里（记录文件 usr/uploads/noline_api/store.php），
+   主题只负责画：升级主题不会清历史，App 走接口写完这一页立刻能看到。
+   插件没装时 helper 返回 null，模板显示「需要先启用插件」，不白屏也不报错。
+   ========================================================================== */
+
+/**
+ * 插件类名或 null。
+ *
+ * class_exists() 会走 Typecho 的自动加载去 require usr/plugins/NolineApi/Plugin.php，
+ * 文件不在就直接 false，不用自己拼路径判断目录。
+ */
+function noline_health_plugin()
+{
+    return class_exists('\TypechoPlugin\NolineApi\Plugin')
+        ? '\TypechoPlugin\NolineApi\Plugin'
+        : null;
+}
+
+/**
+ * 概览：profile / latest / stats / series / goal / changes。插件不在返回 null。
+ */
+function noline_health_summary()
+{
+    $plugin = noline_health_plugin();
+
+    return $plugin === null ? null : $plugin::summary();
+}
+
+/**
+ * 健康页给不给当前访客看。插件里可以设成「仅自己可见」。
+ *
+ * 这层只管「页面上给不给人看」，不是数据安全。真想藏住数字：给这个页面单独设访问密码
+ * （Typecho 页面自带的密码保护，比模板判断更早、更硬），接口那头本来就要密钥。
+ */
+function noline_health_visible($archive)
+{
+    $plugin = noline_health_plugin();
+
+    if ($plugin === null) {
+        return false;
+    }
+
+    if ($plugin::setting('healthVisible', '1') === '1') {
+        return true;
+    }
+
+    return isset($archive->user) && $archive->user->hasLogin();
+}
+
+/**
+ * 折线纵轴的实际上下界，单独抽出来是为了让「画布顶底边」和「模板上的两个刻度数字」
+ * 严格对应：折线定位和标签必须算同一套范围，否则标签会指错位置。
+ * 体重几乎没变化时按 ±1kg 撑开，免得一条水平线贴着画布边，看着像坏了。
+ */
+function noline_health_axis($series)
+{
+    $weights = array();
+    foreach ((array)$series as $row) {
+        $weights[] = (float)$row['weight'];
+    }
+
+    if ($weights === array()) {
+        return array('min' => 0.0, 'max' => 0.0);
+    }
+
+    $min = (float)min($weights);
+    $max = (float)max($weights);
+
+    if ($max - $min < 2) {
+        $mid = ($max + $min) / 2;
+        return array('min' => round($mid - 1, 1), 'max' => round($mid + 1, 1));
+    }
+
+    return array('min' => round($min, 1), 'max' => round($max, 1));
+}
+
+/**
+ * 体重折线，纯 PHP 拼的 inline SVG，不引任何图表库。
+ * 颜色和描边都挂在 class 上，由 design.css 用令牌赋值，深色模式自动跟着换。
+ *
+ * x 按真实日期分布（有断档时不会伪装成连续的），y 把纵轴上下界正好铺到画布上下边缘；
+ * 点太多按序号等距抽样，但一定保留最后一点——那才是「现在」。
+ */
+function noline_health_trend($series)
+{
+    if (!is_array($series) || count($series) < 2) {
+        return '';
+    }
+
+    $points = array();
+    foreach ($series as $row) {
+        $time = strtotime((string)$row['date']);
+        if ($time === false) {
+            continue;
+        }
+        $points[] = array($time, (float)$row['weight']);
+    }
+
+    $total = count($points);
+    if ($total < 2) {
+        return '';
+    }
+
+    if ($total > 180) {
+        $step = (int)ceil($total / 180);
+        $picked = array();
+        for ($i = 0; $i < $total; $i += $step) {
+            $picked[] = $points[$i];
+        }
+        $tail = $points[$total - 1];
+        if ($picked[count($picked) - 1][0] !== $tail[0]) {
+            $picked[] = $tail;
+        }
+        $points = $picked;
+        $total = count($points);
+    }
+
+    $width = 600;
+    $height = 170;
+    $pad = 10;
+
+    $times = array_column($points, 0);
+    $t0 = (int)min($times);
+    $t1 = (int)max($times);
+    $axis = noline_health_axis($series);
+    $min = (float)$axis['min'];
+    $max = (float)$axis['max'];
+
+    $xy = array();
+    for ($i = 0; $i < $total; $i++) {
+        // 全挤在同一天（比如批量补录）时退回按序号铺开，免得所有点叠成一个
+        $ratio = $t1 > $t0
+            ? ($points[$i][0] - $t0) / ($t1 - $t0)
+            : $i / ($total - 1);
+        $xy[] = array(
+            round($pad + $ratio * ($width - 2 * $pad), 1),
+            round($height - $pad - (($points[$i][1] - $min) / ($max - $min)) * ($height - 2 * $pad), 1),
+        );
+    }
+
+    $line = '';
+    foreach ($xy as $i => $p) {
+        $line .= ($i === 0 ? 'M' : 'L') . $p[0] . ' ' . $p[1];
+    }
+    $area = $line . 'L' . $xy[$total - 1][0] . ' ' . $height . 'L' . $xy[0][0] . ' ' . $height . 'Z';
+
+    $grid = '';
+    for ($g = 1; $g <= 2; $g++) {
+        $y = round($pad + ($height - 2 * $pad) * $g / 3, 1);
+        $grid .= '<line class="health-grid" x1="' . $pad . '" y1="' . $y
+            . '" x2="' . ($width - $pad) . '" y2="' . $y . '"/>';
+    }
+
+    return '<svg class="health-svg" viewBox="0 0 ' . $width . ' ' . $height
+        . '" role="img" aria-label="' . _t('体重趋势') . '">'
+        . $grid
+        . '<path class="health-area" d="' . $area . '"/>'
+        . '<path class="health-line" pathLength="1" d="' . $line . '"/>'
+        . '<circle class="health-dot" cx="' . $xy[0][0] . '" cy="' . $xy[0][1] . '" r="3"/>'
+        . '<circle class="health-dot is-last" cx="' . $xy[$total - 1][0] . '" cy="' . $xy[$total - 1][1] . '" r="4.5"/>'
+        . '</svg>';
 }

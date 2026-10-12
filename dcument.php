@@ -53,11 +53,13 @@ $this->need('public/header.php');
         <div class="main-content">
             <article class="card article-card">
                 <h1 class="post-title page-title"><?php $this->title(); ?></h1>
+                <p class="page-subtitle"><?php noline_icon('box-archive'); ?> <?php _e('全部文章，按年铺开'); ?></p>
 
                 <div class="post-content"><?php $this->content(); ?></div>
 
                 <?php if (empty($groups)): ?>
                 <div class="empty-state">
+                    <div class="empty-state-icon"><?php noline_icon('box-archive'); ?></div>
                     <p class="empty-state-text"><?php _e('还没有文章。'); ?></p>
                 </div>
                 <?php else: ?>

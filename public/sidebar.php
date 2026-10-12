@@ -1,12 +1,13 @@
 <?php if (!defined('__TYPECHO_ROOT_DIR__')) exit; ?>
 <?php
 /**
- * 右栏。站点身份（头像/名字/座右铭）在顶栏品牌和首页 masthead 里，
- * 这里放组件卡：日历 / 那年今日 / 分类 / 标签 / 近期评论 / 站点信息。
+ * 右栏。站点身份（头像/名字/座右铭）在顶栏品牌和首页头图（.site-hero）里，
+ * 这里放组件卡：日历 / 那年今日 / 分类（后台开关，默认关）/ 标签 / 目录（仅文章页）/ 近期评论 / 站点信息。
  *
- * 药丸标题不塞图标：圆点由 .card-header::before 统一画，整排卡片才是同一种语言。
+ * 每张卡都挂 .card-widget：8px/12px 内缩 + 卡内 8px gap，标题是一枚强调色图标
+ * 领一行粗字。图标按「这张卡在讲什么」挑，不是装饰——六个一样的圆点读不出区别。
  *
- * 最后两张（近期评论 + 站点信息）包在 .sidebar-sticky 里，是右栏唯一跟着页面滚的
+ * 尾部三张（目录 + 近期评论 + 站点信息）包在 .sidebar-sticky 里，是右栏唯一跟着页面滚的
  * 部分——列表改成无限加载之后正文会一直往下长，整栏都固定住的话前面四张滚走以后
  * 右栏就空了，整栏都不固定的话滚过一屏之后右栏又是空的。
  */
@@ -22,8 +23,8 @@ $stats    = noline_site_stats();
 <aside class="sidebar">
 
     <!-- 当月日历 -->
-    <div class="card">
-        <div class="card-header"><?php echo noline_month_name($calendar['month']) . _t('月历'); ?></div>
+    <div class="card card-widget">
+        <div class="card-header"><?php noline_icon('calendar'); ?><?php echo noline_month_name($calendar['month']) . _t('月历'); ?></div>
         <div class="calendar-wrap">
             <div class="calendar-head">
                 <?php foreach (array(_t('日'), _t('一'), _t('二'), _t('三'), _t('四'), _t('五'), _t('六')) as $wd): ?>
@@ -56,8 +57,8 @@ $stats    = noline_site_stats();
 
     <!-- 那年今日。没有命中就不出卡——空框比没有框更糟 -->
     <?php if (!empty($history)): ?>
-    <div class="card">
-        <div class="card-header"><?php _e('那年今日'); ?></div>
+    <div class="card card-widget">
+        <div class="card-header"><?php noline_icon('history'); ?><?php _e('那年今日'); ?></div>
         <div class="history-list">
             <?php foreach ($history as $hit): ?>
             <div class="history-item">
@@ -72,13 +73,14 @@ $stats    = noline_site_stats();
     </div>
     <?php endif; ?>
 
-    <!-- 分类。数据取自 noline_categories()，不再自己遍历 widget：
-         顶栏的分类下拉已经遍历过一遍，而 Typecho 的 widget() 只按类名缓存实例、
-         Rows 又没有 rewind()，这里第二遍 while 会直接空转，卡片静默变空。 -->
+    <!-- 分类卡。默认不出：分类导航在信息流顶上那条吸顶药丸条里已经有一份了，
+         这里再铺一长列是重复；后台「右栏分类卡」那个开关勾上才出。
+         数据读 noline_categories() 而不是自己遍历 widget：整站只允许遍历一次
+         （public/header.php 那次），原因见那个文件顶部的注释。 -->
     <?php $cats = noline_categories(); ?>
-    <?php if (!empty($cats)): ?>
-    <div class="card">
-        <div class="card-header"><?php _e('分类'); ?></div>
+    <?php if (!empty($options->showSidebarCats) && !empty($cats)): ?>
+    <div class="card card-widget">
+        <div class="card-header"><?php noline_icon('folder'); ?><?php _e('分类'); ?></div>
         <div class="archive-list">
             <?php foreach ($cats as $cat): ?>
             <div class="archive-item">
@@ -95,8 +97,8 @@ $stats    = noline_site_stats();
     <?php endif; ?>
 
     <!-- 标签云 -->
-    <div class="card">
-        <div class="card-header"><?php _e('标签'); ?></div>
+    <div class="card card-widget">
+        <div class="card-header"><?php noline_icon('tag'); ?><?php _e('标签'); ?></div>
         <div class="tags-container">
             <?php $this->widget('Widget_Metas_Tag_Cloud', 'sort=count&desc=1&limit=20')->to($tags); ?>
             <?php if ($tags->have()): ?>
@@ -111,15 +113,28 @@ $stats    = noline_site_stats();
         </div>
     </div>
 
-    <!-- 跟着页面滚的尾部。两张卡必须是相邻的兄弟：同级 sticky 元素共用一个 top
+    <!-- 跟着页面滚的尾部。组里这几张卡必须是相邻的兄弟：同级 sticky 元素共用一个 top
          会精确重叠，而 .card 是不透明背景，后一张会整张盖住前一张。 -->
     <div class="sidebar-sticky">
+
+        <!-- 目录。只在单篇文章/单页出卡，且要等 main.js 从正文里数出至少两个标题
+             才揭开：标题的 id 和整棵树都是它现搭的（正文是后台写的，PHP 侧改不了
+             已经解析好的 content HTML），模板这里只留一个空的有序列表占位。
+             放在 sticky 组的第一张：读长文时这一栏跟着滚，目录就该在最上面。 -->
+        <?php if ($this->is('single')): ?>
+        <div class="card card-widget sidebar-toc" id="sidebar-toc" hidden>
+            <div class="card-header"><?php noline_icon('bars'); ?><?php _e('目录'); ?></div>
+            <nav class="toc-content" id="toc-content" aria-label="<?php _e('文章目录'); ?>">
+                <ol class="toc-list" id="toc-list"></ol>
+            </nav>
+        </div>
+        <?php endif; ?>
 
         <!-- 近期评论：头像之间一条竖向发丝线，正文坐进浅灰气泡 -->
         <?php $this->widget('Widget_Comments_Recent', 'pageSize=5')->to($recent); ?>
         <?php if ($recent->have()): ?>
-        <div class="card">
-            <div class="card-header"><?php _e('近期评论'); ?></div>
+        <div class="card card-widget">
+            <div class="card-header"><?php noline_icon('comments'); ?><?php _e('近期评论'); ?></div>
             <div class="rcomment-list">
                 <?php while ($recent->next()): ?>
                 <a class="rcomment-item" href="<?php $recent->permalink(); ?>#comment-<?php echo (int)$recent->coid; ?>">
@@ -138,13 +153,13 @@ $stats    = noline_site_stats();
         <?php endif; ?>
 
         <!-- 站点信息 -->
-        <div class="card">
-            <div class="card-header"><?php _e('站点信息'); ?></div>
+        <div class="card card-widget">
+            <div class="card-header"><?php noline_icon('chart-line'); ?><?php _e('站点信息'); ?></div>
             <div class="site-stats">
-                <span class="site-stat"><?php _e('文章'); ?><b><?php echo $stats['posts']; ?></b></span>
-                <span class="site-stat"><?php _e('评论'); ?><b><?php echo $stats['comments']; ?></b></span>
-                <span class="site-stat"><?php _e('分类'); ?><b><?php echo $stats['categories']; ?></b></span>
-                <span class="site-stat"><?php _e('运行'); ?><b><?php echo sprintf(_t('%d 天'), $stats['days']); ?></b></span>
+                <span class="site-stat"><?php _e('文章'); ?><b data-count="<?php echo $stats['posts']; ?>"><?php echo $stats['posts']; ?></b></span>
+                <span class="site-stat"><?php _e('评论'); ?><b data-count="<?php echo $stats['comments']; ?>"><?php echo $stats['comments']; ?></b></span>
+                <span class="site-stat"><?php _e('分类'); ?><b data-count="<?php echo $stats['categories']; ?>"><?php echo $stats['categories']; ?></b></span>
+                <span class="site-stat"><?php _e('运行'); ?><b data-count="<?php echo $stats['days']; ?>"><?php echo sprintf(_t('%d 天'), $stats['days']); ?></b></span>
             </div>
             <div class="site-footer-note">
                 <p>&copy; <?php echo date('Y'); ?> <?php $options->title(); ?></p>

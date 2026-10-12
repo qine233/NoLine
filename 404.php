@@ -16,6 +16,7 @@ $this->need('public/header.php');
         <div class="main-content">
             <div class="card article-card">
                 <div class="error-page">
+                    <div class="error-illustration"><?php noline_icon('compass'); ?></div>
                     <div class="error-code">404</div>
                     <p class="error-message"><?php _e('页面没找到'); ?></p>
                     <p class="error-hint"><?php _e('您访问的内容可能已被移动、重命名或删除。'); ?></p>
@@ -26,8 +27,8 @@ $this->need('public/header.php');
             </div>
 
             <!-- 给迷路的访客一个出口，比原来那三个 COUNT 统计数字有用 -->
-            <div class="card">
-                <div class="card-header"><?php _e('最新文章'); ?></div>
+            <div class="card card-widget">
+                <div class="card-header"><?php noline_icon('file-lines'); ?><?php _e('最新文章'); ?></div>
                 <div class="archive-list">
                     <?php $this->widget('Widget_Contents_Post_Recent', 'pageSize=6')->to($recent); ?>
                     <?php if ($recent->have()): ?>
