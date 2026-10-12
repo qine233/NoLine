@@ -1,0 +1,34 @@
+name: Release theme
+
+# 推一个版本号形态的 tag（1.18.0 / v1.18.0）就自动发 Release：
+# 主题在仓库根，附件名必须是 noline.zip，插件的一键升级只认这个形状。
+# 也可以用下面的手动触发重发同一个 tag（比如附件传坏了）。
+on:
+  push:
+    tags:
+      - "v[0-9]*"
+      - "[0-9]*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要发布的 tag（留空则用当前分支名，一般只在重发附件时用）"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 打主题包
+        run: python3 _dev/build.py
+
+      - name: 建 Release 并挂 noline.zip
+        run: python3 _dev/publish_release.py "$TAG"
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

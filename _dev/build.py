@@ -15,6 +15,8 @@ import sys
 import zipfile
 from pathlib import Path
 
+from minify import minimize
+
 HERE = Path(__file__).resolve().parent          # _dev/
 THEME = HERE.parent                              # 主题目录（仓库布局下就是仓库根）
 # 仓库布局下主题根带着 .git，dist 只能放主题里面（.gitignore 掉）；
@@ -34,7 +36,7 @@ LOOSE = ['screenshot.jpg']
 # 顶层出现任何不在白名单也不在这张表里的文件/目录，构建直接失败——
 # 防止哪天多了个临时目录就顺手被打包走。
 LOCAL_ONLY = ['_dev', '_preview', '_trash', 'dist', '.DS_Store', '.git',
-              '.gitignore', '.qoder', 'README.md', 'APP-API-SPEC.md', 'plugins']
+              '.github', '.gitignore', '.qoder', 'README.md', 'APP-API-SPEC.md', 'plugins']
 
 BIG_WARN = 300 * 1024
 VERSION_RE = re.compile(r"define\('NOLINE_VERSION',\s*'([^']+)'\)")
@@ -93,14 +95,17 @@ def check_top_level():
 
 def check_minified_fresh():
     """header.php 见 .min.css 存在就用它，所以过期产物会静默把新样式挡在门外。
-    发布前卡一道：源文件比 .min.css 新就不许打包。"""
+
+    按内容比，不按 mtime 比：git clone / Actions 的 checkout 里时间戳是随写入顺序产生的，
+    拿它当判据会在一个根本没改过样式的仓库上报「css 比 .min.css 新」。
+    """
     for name in ('design.css', 'article.css'):
         src = THEME / 'css' / name
         min_ = THEME / 'css' / (src.stem + '.min.css')
         if not min_.is_file():
             fail('css/%s 还没有压缩版，先跑 python3 _dev/minify.py' % name)
-        if src.stat().st_mtime > min_.stat().st_mtime:
-            fail('css/%s 比它的 .min.css 新——改过样式没重跑 minify.py，'
+        if minimize(src.read_text(encoding='utf-8')) != min_.read_text(encoding='utf-8'):
+            fail('css/%s 的 .min.css 和源文件对不上——改过样式没重跑 minify.py，'
                  '线上会拿到旧样式' % name)
 
 

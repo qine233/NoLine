@@ -129,11 +129,28 @@ DELETE /api/health/records?date=  删除某天记录
 | `tokens.py` / `remify.py` | 令牌是否成对、字号是否 rem 化 |
 | `minify.py` | CSS 压缩，并验证只删了注释和空白 |
 | `mkpreview.py` | 生成静态预览夹具（`_preview/`，不外发） |
-| `build.py` | 打发布包；顶层出现白名单之外的目录**直接构建失败**，`_dev/_preview/_trash/dist` 永远进不去 |
+| `publish_release.py` | 把 `dist/noline.zip` 挂成 Release 附件（复用/新建 Release、删同名旧附件、回读校验大小）。**tag 和包内 `NOLINE_VERSION` 不一致直接失败** |
+| `build.py` | 打发布包；顶层出现白名单之外的目录**直接构建失败**，`_dev/_preview/_trash/dist/.github` 永远进不去 |
 
-改过 `css/*.css` 记得重跑 `minify.py`，否则 `build.py` 会拒绝发布（它检查 `.min.css` 不比源文件旧）。
+改过 `css/*.css` 记得重跑 `minify.py`，否则 `build.py` 会拒绝发布（它按内容重压一遍源文件，
+和仓库里的 `.min.css` 对不上就失败——不看时间戳，`git clone` 出来的仓库时间戳是随机的）。
 版本号同时写在 `functions.php` 的 `NOLINE_VERSION`（资源缓存指纹读它）和 `index.php` 头部注释的
 `@version`（Typecho 主题列表读它），`build.py` 会核对两边一致，分家就不打包。
+
+### 发布一个新版本
+
+推 tag 就行，`.github/workflows/release.yml` 会在 Actions 里跑 `build.py` + `publish_release.py`，
+建好 Release 并挂上 `noline.zip`。不需要本地装 PHP，也不需要把令牌交给任何人。
+
+```bash
+python3 _dev/build.py            # 本地先过一遍门槛
+git tag -a 1.19.0 -m "1.19.0" && git push origin 1.19.0
+```
+
+tag 名用 `1.19.0` 或 `v1.19.0`（工作流只认这两种形状），且必须等于 `NOLINE_VERSION`。
+后台「主题管理 → 主题更新」读的是 `releases/latest` 那个附件，所以**没有 `noline.zip` 的 Release
+等于没发布**：页面会报「这个 Release 没有 noline.zip 附件」。
+也可以不推 tag，直接在 Actions 页手动运行工作流、手填 tag。
 
 ## 已知取舍
 
