@@ -3551,6 +3551,52 @@ a.meta-pill:hover,
 .post-content img,
 .status-content img { cursor: zoom-in; }
 
+/* ==========================================================================
+   失效图片：main.js 把挂了的那张换成内联 SVG 占位图，并挂上 .img-dead。
+   占位图自己是透明底的，底板和描边走令牌，明暗两套自动跟；
+   正文/动态里 cursor 要从上面那条 zoom-in 抢回来——点了是重试，不是放大。
+   ========================================================================== */
+
+img.img-dead {
+    background-color: var(--cover-fallback);
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+    cursor: pointer;
+    object-fit: contain;
+    transition: background-color .25s ease, box-shadow .25s ease;
+}
+.post-content img.img-dead,
+.status-content img.img-dead { cursor: pointer; }
+img.img-dead:hover {
+    background-color: var(--accent-bg);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* 封面格原本是 100% 铺满 + cover，占位图被裁掉一半就没人看得懂那句话了 */
+.post-cover img.img-dead {
+    object-fit: contain;
+    padding: 1.5rem;
+}
+
+/* 圆形头像不要那圈描边：剪影本身就是完整的形状 */
+.avatar.img-dead,
+.status-avatar.img-dead,
+.site-hero-avatar.img-dead,
+.rcomment-face.img-dead,
+.card-comments-face.img-dead,
+.link-avatar.img-dead,
+.post-copyright-avatar-back.img-dead,
+.post-copyright-avatar-front.img-dead { box-shadow: none; }
+
+/* 点下去重试的那一会儿：图正在路上，让它呼吸一下而不是杵在那儿装死 */
+@keyframes dead-retry {
+    from { opacity: .45; }
+    to { opacity: 1; }
+}
+img.img-dead-retry {
+    animation: dead-retry .9s ease-in-out infinite alternate;
+    cursor: progress;
+}
+
 /* 灯箱打开时锁住背景滚动（main.js 往 <html> 上挂） */
 html.lightbox-open { overflow: hidden; }
 

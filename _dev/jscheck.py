@@ -228,6 +228,8 @@ def markup_corpus():
         'reveal', 'is-visible',
         'feed-skeleton', 'sk-head', 'sk-avatar', 'sk-line', 'sk-line-sm', 'sk-line-70',
         'lightbox-open',
+        # 失效图：main.js 换 src 之后挂上的状态类，模板里没有
+        'img-dead', 'img-dead-retry',
         # 目录：列表项由 initToc() 从正文标题现搭，模板里只有空的那层 <ol>
         'toc-link', 'toc-item', 'toc-child',
         # 分类条「更多」面板：每一格由 initFeedCats() 从看得见的药丸现克隆，

@@ -1595,7 +1595,8 @@
             items = [];
             var nodes = document.querySelectorAll(SELECTOR);
             Array.prototype.forEach.call(nodes, function (el) {
-                if (el.getAttribute('src')) {
+                /* 换成占位图的不要进轮播：放大一张「资料失效」没有任何意义 */
+                if (el.getAttribute('src') && !el.classList.contains('img-dead')) {
                     items.push(el);
                 }
             });
@@ -1603,6 +1604,12 @@
 
         function render() {
             var el = items[index];
+
+            /* 上一张可能是重试中的图：换下一张之前把它的占位痕迹擦掉，
+               不然一张好图会一直顶着 .img-dead 的底板和描边 */
+            img.classList.remove('img-dead', 'img-dead-retry');
+            img.removeAttribute('data-dead');
+            img.removeAttribute('title');
             img.src = el.getAttribute('src');
             img.alt = el.getAttribute('alt') || '';
             caption.textContent = el.getAttribute('alt') || '';
@@ -1673,6 +1680,146 @@
             } else if (event.key === 'ArrowRight') {
                 step(1);
             }
+        });
+    }
+
+    /* ==========================================================================
+       失效图片。图挂了浏览器只留一个碎图标，读的人分不清「这张本来就没有」和
+       「链接烂了」，所以统一换成主题自带的占位图，把话说明白。
+
+       两条路都堵：img 的 error 不冒泡，只能在捕获阶段收，管脚本装上监听器之后挂的；
+       DOMContentLoaded 再扫一遍 complete && naturalWidth === 0，管在那之前就挂完的。
+       占位图是内联 SVG 的 data URI——不占网络请求，也不会自己再挂一次。
+
+       分三种形态：圆形头像换中性剪影（一行字塞进 40px 的圆里只会糊成一团），
+       顶栏 logo 换后台没配头像时用的那套首字母占位块，其余按量出来的宽度换整卡或纯标记。 */
+    function initDeadImages() {
+        var AVATAR = '.avatar, .status-avatar, .rcomment-face, .card-comments-face, '
+            + '.site-hero-avatar, .post-copyright-avatar-back, .post-copyright-avatar-front, .link-avatar';
+
+        var DEAD_TIP = '图片资料已失效';
+
+        function svg(markup) {
+            return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup);
+        }
+
+        var CARD = svg("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 300' width='480' height='300'>"
+            + "<rect x='7' y='7' width='466' height='286' rx='18' fill='none' stroke='#8b8579' stroke-opacity='.42' stroke-width='2' stroke-dasharray='11 9'/>"
+            + "<g fill='none' stroke='#8b8579' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'>"
+            + "<path d='M148 178l52-58 38 42 34-34 50 50z'/><circle cx='200' cy='92' r='18'/>"
+            + "</g>"
+            + "<path d='M246 42l-14 58 20 24-16 54 16 26' fill='none' stroke='#b5695a' stroke-opacity='.62' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/>"
+            + "<text x='240' y='242' text-anchor='middle' font-family='system-ui, PingFang SC, Microsoft YaHei, sans-serif' font-size='27' fill='#8b8579'>图片资料已失效</text>"
+            + "</svg>");
+
+        var MARK = svg("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96' width='96' height='96'>"
+            + "<rect x='5' y='5' width='86' height='86' rx='16' fill='none' stroke='#8b8579' stroke-opacity='.42' stroke-width='3' stroke-dasharray='9 7'/>"
+            + "<g fill='none' stroke='#8b8579' stroke-opacity='.5' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'>"
+            + "<path d='M26 66l16-19 11 13 10-10 15 16z'/><circle cx='38' cy='35' r='6'/>"
+            + "</g></svg>");
+
+        var FACE = svg("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96' width='96' height='96'>"
+            + "<circle cx='48' cy='35' r='16' fill='#8b8579' fill-opacity='.34'/>"
+            + "<path d='M16 88c0-19 14-31 32-31s32 12 32 31z' fill='#8b8579' fill-opacity='.34'/>"
+            + "</svg>");
+
+        function initialChar(text) {
+            text = (text || '').trim();
+            /* 站点名可能以 emoji 开头，按码点取才不会被切成半个代理对 */
+            return text ? String.fromCodePoint(text.codePointAt(0)) : '';
+        }
+
+        function mark(img) {
+            if (img.getAttribute('data-dead') === '1') {
+                return;
+            }
+
+            var src = img.getAttribute('src') || '';
+
+            /* 空 src 是灯箱那张还没装图的壳子，data: 是自家占位图，都不算挂了 */
+            if (src === '' || src.indexOf('data:') === 0) {
+                return;
+            }
+
+            /* 顶栏 logo 挂了不如直接换回首字母块：那儿本来就有这个设计 */
+            if (img.classList.contains('topbar-logo')) {
+                var brand = img.closest('.topbar-brand');
+                var nameEl = brand ? brand.querySelector('.topbar-name') : null;
+                var span = document.createElement('span');
+
+                span.className = 'topbar-logo topbar-logo-placeholder';
+                span.setAttribute('aria-hidden', 'true');
+                span.textContent = initialChar(nameEl ? nameEl.textContent : '');
+                img.parentNode.replaceChild(span, img);
+
+                return;
+            }
+
+            var face = img.matches(AVATAR);
+            var width = img.clientWidth || parseInt(img.getAttribute('width'), 10) || 0;
+
+            if (!img.getAttribute('data-dead-src')) {
+                img.setAttribute('data-dead-src', src);
+            }
+
+            img.setAttribute('data-dead', '1');
+            img.src = face ? FACE : (width && width < 120 ? MARK : CARD);
+            img.classList.add('img-dead');
+            img.setAttribute('title', DEAD_TIP);
+        }
+
+        /* 没被链接占用的失效图，点一下拿原地址再试一次；两次还不行就别再点了 */
+        function retry(img) {
+            var old = img.getAttribute('data-dead-src');
+            var tries = parseInt(img.getAttribute('data-dead-tries'), 10) || 0;
+
+            if (!old || tries >= 2) {
+                return;
+            }
+
+            img.setAttribute('data-dead-tries', String(tries + 1));
+            img.removeAttribute('data-dead');
+            img.classList.remove('img-dead');
+            img.classList.add('img-dead-retry');
+            /* 重试成功就把占位痕迹整个摘掉。绑在这一次请求上（{once:true}），
+               比在 DOMContentLoaded 里扫一遍稳——那会儿大半的图还没挂过。 */
+            img.addEventListener('load', function () {
+                img.classList.remove('img-dead-retry');
+                img.removeAttribute('data-dead-tries');
+                img.removeAttribute('data-dead-src');
+                img.removeAttribute('title');
+            }, { once: true });
+            img.src = old;
+        }
+
+        document.addEventListener('error', function (event) {
+            var el = event.target;
+
+            if (el && el.tagName === 'IMG') {
+                mark(el);
+            }
+        }, true);
+
+        document.addEventListener('click', function (event) {
+            var el = event.target;
+
+            if (!el || !el.matches || !el.matches('img.img-dead')) {
+                return;
+            }
+            /* 包在链接里的（封面、版权卡头像）让导航走完，别在这儿抢 */
+            if (el.closest('a[href]')) {
+                return;
+            }
+            event.preventDefault();
+            retry(el);
+        });
+
+        ready(function () {
+            Array.prototype.forEach.call(document.querySelectorAll('img'), function (img) {
+                if (img.complete && img.naturalWidth === 0) {
+                    mark(img);
+                }
+            });
         });
     }
 
@@ -1821,6 +1968,7 @@
 
     /* ========================================================================== */
 
+    initDeadImages();
     initDynamicAccent();
     initTransition();
     initThemeToggle();

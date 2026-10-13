@@ -26,6 +26,8 @@ RUNTIME = {
     'feed-skeleton', 'sk-head', 'sk-avatar', 'sk-line', 'sk-line-sm', 'sk-line-70',
     # 灯箱打开时往 <html> 上挂，锁背景滚动
     'lightbox-open',
+    # 失效图：main.js 把挂了的那张换成内联 SVG 占位图后挂的状态类
+    'img-dead', 'img-dead-retry',
     # 目录的三层结构由 main.js 从正文标题现搭，模板里只有那层空 <ol class="toc-list">
     # 目录的三层结构由 main.js 从正文标题现搭，分类条「更多」面板的每一格由它从
     # 现存的药丸克隆：两边模板里都只有空壳。

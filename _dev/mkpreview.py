@@ -735,6 +735,7 @@ POST_BODY = """
 
                     <h3>图片</h3>
                     <p><img src="__FIGURE__" alt="一张示意图" width="800" height="300"></p>
+                    <p><img src="这张图故意不存在.png" alt="一张已经失效的外链图" width="800" height="300"></p>
 
                     <hr>
 
