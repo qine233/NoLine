@@ -179,6 +179,16 @@ class Updater
             case 'refresh':
                 $check = self::check(true);
 
+                /* 强制拉取失败时 check() 会退回上一次的成功结果，那里的 ok 仍是 true。
+                   不先岔开这一条，就会拿旧版本号报一句「检测成功」，看着像按钮压根没生效 */
+                if ($check['failed'] !== '') {
+                    return array('error', Admin::esc(_t(
+                        '这一轮没拉到新的：%s。下面显示的仍是 %s 那次成功检测的结果。',
+                        $check['failed'],
+                        date('m-d H:i', (int)$check['checked'])
+                    )));
+                }
+
                 if (!$check['ok']) {
                     return array('error', Admin::esc(_t('检测失败：') . $check['error']));
                 }
@@ -400,9 +410,19 @@ class Updater
             return $out;
         }
 
+        if ($http['status'] === 401) {
+            $out['error'] = _t('GitHub 不认设置里那个 token（HTTP 401），它多半已被撤销或过期。'
+                . '把 token 清空保存一次就退回匿名访问。');
+
+            return $out;
+        }
+
         if ($http['status'] === 403 || $http['status'] === 429) {
-            $out['error'] = _t('被 GitHub 限流了（匿名访问每个 IP 每小时 60 次）。'
-                . '在插件设置里填一个只读 token，或者一小时后再来。');
+            $out['error'] = trim(Plugin::setting('ghToken', '')) === ''
+                ? _t('被 GitHub 限流了（匿名访问每个 IP 每小时 60 次）。'
+                    . '在插件设置里填一个只读 token，或者一小时后再来。')
+                : _t('GitHub 用 HTTP %d 挡了这个 token：权限不够、已被撤销，或者额度用完了。'
+                    . '先把 token 清空退回匿名访问试一次。', $http['status']);
 
             return $out;
         }

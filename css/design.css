@@ -1168,6 +1168,12 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
 }
 .feed-cat-more.is-open .noline-icon { color: var(--on-brand); }
 
+/* 触屏上一根手指就能把这一行划过去，右边这颗只是白占一颗药丸的宽度。
+   判据用 hover 而不是宽度：窄窗口的鼠标用户照样需要它，横屏的手机不该有它。 */
+@media (hover: none) {
+    .feed-cat-more { display: none; }
+}
+
 /* --- 溢出的分类面板 --- */
 
 /* 靠右对齐：触发它的那颗按钮就在右端，面板往左展开才不会指到别处去。
