@@ -1,7 +1,7 @@
 @charset "UTF-8";
 
 /**
- * NoLine 主题样式表 —— 结构、布局、组件。
+ * Noline 主题样式表 —— 结构、布局、组件。
  * 正文排版在 css/article.css，它在本文之后加载。
  *
  * 配色全部收敛成设计令牌：浅色写在 :root，深色写在 :root[data-theme="dark"]。

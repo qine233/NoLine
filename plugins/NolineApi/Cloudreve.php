@@ -41,7 +41,8 @@ class Cloudreve
     /** access token 到期前多久就重换，避免卡在请求中途过期 */
     private const EARLY = 120;
 
-    private const DEFAULT_MAX = 20;
+    /** 默认单文件上限（MB），设置里没填 crMaxSize 时用它 */
+    public const DEFAULT_MAX = 20;
 
     /** 插件设置里那个默认值要跟这里一致，所以露出去给 Plugin::config() 用 */
     public const DEFAULT_ALLOW = 'jpg,jpeg,png,gif,webp,bmp,svg,ico,pdf,zip,txt,mp4,webm';

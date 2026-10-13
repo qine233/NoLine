@@ -1,10 +1,10 @@
 <?php
 /**
- * NoLine —— 简洁的双栏 Typecho 主题
+ * Noline —— 简洁的双栏 Typecho 主题
  *
- * @package NoLine
+ * @package Noline
  * @author QINE
- * @version 1.19.0
+ * @version 1.20.0
  * @link https://www.idkzr.com/
  */
 

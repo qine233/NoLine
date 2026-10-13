@@ -14,24 +14,24 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
 }
 
 /**
- * NoLine 对外接口
+ * Noline 对外接口
  *
  * 把主题设置和个人健康数据（体重 / BMI）以 JSON 接口暴露出去，给 App 或脚本对接用；
  * 顺带在后台挂一个「主题管理」页，主题的全部配置项、GitHub 更新检测与一键升级都在那儿，
  * 还能把后台编辑器的附件面板接上 Cloudreve v4 当图床（传完往正文插永久直链）。
- * 鉴权走自设密钥：请求头 X-NoLine-Key，或查询参数 key。站点没上 HTTPS 时务必用只读模式。
+ * 鉴权走自设密钥：请求头 X-Noline-Key，或查询参数 key。站点没上 HTTPS 时务必用只读模式。
  *
  * 接口清单、鉴权方式、curl 示例都在「控制台 → 插件 → NolineApi → 设置」页面里。
  *
  * @package NolineApi
  * @author 州州
- * @version 1.2.0
+ * @version 1.3.0
  * @link https://ui.zhouzhou.work/
  */
 class Plugin implements PluginInterface
 {
     /** 改这里要同时改文件头注释里的 @version，后台插件列表读的是注释 */
-    private const VERSION = '1.2.0';
+    private const VERSION = '1.3.0';
 
     /** 数据目录放在 uploads 下，不在主题目录内，升级主题不会清空记录 */
     private const DATA_DIR = '/usr/uploads/noline_api';
@@ -58,9 +58,11 @@ class Plugin implements PluginInterface
         \Typecho\Plugin::factory('admin/write-page.php')->bottom = array(__CLASS__, 'onEditorBottom');
 
         return _t('接口已启用。先在插件设置里填密钥，再访问 <code>/api/ping</code> 自检；'
-            . '主题设置与一键更新在后台右上角的「主题管理」里（<strong>停用再启用一次插件</strong>'
-            . '那个链接才会出现）。图床同样在设置里填 Cloudreve 地址和 Refresh Token，'
-            . '填好后进写文章页的「附件」标签就能看到上传区。');
+            . '主题设置、更新记录与回滚在后台右上角的「主题管理」里（<strong>停用再启用一次插件</strong>'
+            . '那个链接才会出现）。<strong>主题自动更新默认开着</strong>：后台路过任意一个页面时如果发现 '
+            . 'Release 里有新版本，会当场把旧主题整份备份再换成新版本，不需要点任何东西，'
+            . '不想让它自己动手就在那个页面的设置里关掉。图床同样在设置里填 Cloudreve 地址和 '
+            . 'Refresh Token，填好后进写文章页的「附件」标签就能看到上传区。');
     }
 
     public static function deactivate()
@@ -90,7 +92,7 @@ class Plugin implements PluginInterface
             null,
             null,
             _t('接口密钥'),
-            _t('自己随机生成一串长一点的值贴在这里，原文存进数据库。请求时带 <code>X-NoLine-Key: 密钥</code>（或 <code>?key=密钥</code>）。'
+            _t('自己随机生成一串长一点的值贴在这里，原文存进数据库。请求时带 <code>X-Noline-Key: 密钥</code>（或 <code>?key=密钥</code>）。'
                 . '<strong>清空并保存会同时清掉密钥</strong>，届时接口全部 401。')
         );
         $form->addInput($apiKey);
@@ -171,6 +173,21 @@ class Plugin implements PluginInterface
         );
         $form->addInput($ghToken);
 
+        $autoUp = new Radio(
+            'autoUpgrade',
+            array('1' => _t('自动升级'), '0' => _t('只提示，我自己点')),
+            '1',
+            _t('主题自动更新'),
+            _t('开着的时候，后台任意一个页面路过都会查一次（结果缓存 6 小时），'
+                . '发现 Release 里有新版本就当场下载、解压、把旧主题整份挪进备份再让新版本顶上，不需要你点任何东西。'
+                . '<strong>站点会在那几十微秒里对撞上的请求返回一次错误</strong>；'
+                . '中途被打断会自己把备份搬回原位。旧版本全留在 <code>usr/uploads/noline_backup</code>，'
+                . '「主题管理」页随时能回滚。两轮之间至少隔 1 小时，失败也不会每个页面刷新一次去撞 GitHub 限额。'
+                . '只有管理员登录的后台请求会触发。<strong>注意它不判断 Release 本身是好是坏</strong>——'
+                . '传上去的包只要版本号和 tag 对得上就会直接顶上，发布前自己验一遍。')
+        );
+        $form->addInput($autoUp);
+
         $crEnabled = new Radio(
             'crEnabled',
             array('1' => _t('开启'), '0' => _t('关闭')),
@@ -207,7 +224,7 @@ class Plugin implements PluginInterface
             _t('Refresh Token（推荐）'),
             _t('v4 没有长期有效的个人 token：浏览器用的 access token 默认只活 1 小时，'
                 . 'refresh token 默认 180 天。登录 Cloudreve 后在浏览器控制台执行 '
-                . '<code>localStorage.getItem('refresh_token')</code> 把这一串贴进来，'
+                . '<code>localStorage.getItem("refresh_token")</code> 把这一串贴进来，'
                 . '插件会自己在快到期时换新的 access token。原文存库，只发给上面那个地址。')
         );
         $form->addInput($crRefresh);
@@ -273,10 +290,12 @@ class Plugin implements PluginInterface
 
     /**
      * 后台顶栏那一个链接。插件能挂的只有这一处，页面本体还是走前台路由渲染。
+     * 顺路当自动更新的触发点：这一段每个后台页面都会走，且只在登录态下渲染。
      */
     public static function onAdminMenu()
     {
         Admin::menuLink();
+        Updater::autoTick();
     }
 
     /**
@@ -435,7 +454,7 @@ class Plugin implements PluginInterface
         }
 
         if ($given === '') {
-            self::json(array('code' => 401, 'message' => _t('缺少密钥：请在请求头带 X-NoLine-Key')), 401);
+            self::json(array('code' => 401, 'message' => _t('缺少密钥：请在请求头带 X-Noline-Key')), 401);
         }
 
         // 后台存的就是原文，直接比。走 hash_equals 而不是 ==，不泄露长度信息。
@@ -477,7 +496,7 @@ class Plugin implements PluginInterface
         if ($allow === '*' || in_array($origin, (array)$list, true)) {
             header('Access-Control-Allow-Origin: ' . $origin);
             header('Vary: Origin');
-            header('Access-Control-Allow-Headers: X-NoLine-Key, Content-Type');
+            header('Access-Control-Allow-Headers: X-Noline-Key, Content-Type');
             header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
             header('Access-Control-Max-Age: 600');
         }
@@ -1208,7 +1227,7 @@ class Plugin implements PluginInterface
         echo '<div class="typecho-option" style="padding:.6rem 0">'
             . '<h3 style="margin:0 0 .4rem">' . _t('接口一览') . '</h3>'
             . '<p style="margin:0 0 .4rem;color:#666">'
-            . _t('鉴权：请求头 <code>X-NoLine-Key: 你的密钥</code>（或 <code>?key=</code>）。'
+            . _t('鉴权：请求头 <code>X-Noline-Key: 你的密钥</code>（或 <code>?key=</code>）。'
                 . '路径不通时用兜底写法 <code>' . htmlspecialchars($url) . '/index.php?noline_api=health&key=…</code>。')
             . '</p>'
             . '<table class="w-100" style="border-collapse:collapse;font-size:.92em">'
@@ -1219,9 +1238,9 @@ class Plugin implements PluginInterface
             . _t('<strong>注意</strong>：首页公告与底部版权原样入库、不清洗 HTML。拿到密钥就能往前台塞任意脚本，'
                 . '不需要写主题时把「接口写主题设置」改成禁止。')
             . '</p>'
-            . '<p style="margin:.6rem 0 0;color:#666"><code>curl -H "X-NoLine-Key: ***" '
+            . '<p style="margin:.6rem 0 0;color:#666"><code>curl -H "X-Noline-Key: ***" '
             . htmlspecialchars($url) . '/api/health</code></p>'
-            . '<p style="margin:.4rem 0 0;color:#666"><code>curl -X PUT -H "X-NoLine-Key: ***" '
+            . '<p style="margin:.4rem 0 0;color:#666"><code>curl -X PUT -H "X-Noline-Key: ***" '
             . '-H "Content-Type: application/json" -d \'{"accentColor":"#e0662e"}\' '
             . htmlspecialchars($url) . '/api/theme</code></p>'
             . '</div>';

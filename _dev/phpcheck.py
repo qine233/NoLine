@@ -181,6 +181,104 @@ def collect_private(code):
     return out
 
 
+def collect_private_members(code):
+    """{类名: {私有成员名}}——私有方法和私有常量都算。
+
+    跨类读私有成员在 PHP 里是当场致命错误（Cannot access private ...），
+    而插件这几个类互相引用很频繁，「方法存不存在」那关查不出来。
+    """
+    out = {}
+    current = None
+    depth = 0
+    pending = None
+
+    pattern = (r'\bclass\s+([A-Za-z_][A-Za-z0-9_]*)'
+               r'|\b(?:final\s+)?(?:private|protected)\s+(?:static\s+)?(?:function|const)\s+([A-Za-z_][A-Za-z0-9_]*)'
+               r'|\{|\}')
+
+    for m in re.finditer(pattern, code):
+        token = m.group(0)
+
+        if m.group(1):
+            pending = m.group(1)
+            continue
+
+        if m.group(2):
+            if current is not None:
+                out.setdefault(current, set()).add(m.group(2))
+            continue
+
+        if token == '{':
+            depth += 1
+            if depth == 1 and pending is not None:
+                current = pending
+                pending = None
+                out.setdefault(current, set())
+            continue
+
+        if token == '}':
+            depth -= 1
+            if depth == 0:
+                current = None
+
+    return out
+
+
+def tokenize_php(raw):
+    """粗粒度 PHP 词法：字符串 / 注释 / 代码三种段，带起始位置。"""
+    toks = []
+    i, n = 0, len(raw)
+
+    while i < n:
+        c = raw[i]
+
+        if raw.startswith('//', i) or raw.startswith('/*', i) or c == '#':
+            if raw.startswith('/*', i):
+                j = raw.find('*/', i)
+                j = n if j < 0 else j + 2
+            else:
+                j = raw.find('\n', i)
+                j = n if j < 0 else j
+            toks.append(('cmt', i, raw[i:j]))
+            i = j
+            continue
+
+        if c in '"\'':
+            j = i + 1
+            while j < n and raw[j] != c and raw[j] != '\n':
+                j += 2 if raw[j] == '\\' else 1
+            toks.append(('str', i, raw[i:j + 1]))
+            i = j + 1
+            continue
+
+        j = i + 1                    # 至少吃一个字符，不然卡在换行上永远不前进
+        while (j < n and raw[j] not in '"\'\n#'
+               and not raw.startswith('//', j) and not raw.startswith('/*', j)):
+            j += 1
+        toks.append(('code', i, raw[i:j]))
+        i = j
+
+    return toks
+
+
+def check_quote_nesting(name, raw):
+    """字符串里手滑套了同种引号 = 当场致命语法错误，而且括号还是配平的。
+
+    信号很具体：一个字符串段后面紧跟一段「只有一个裸标识符」的代码，再紧跟一个字符串。
+    合法的写法中间总有运算符或空白兜着（\'a\' . $b . \'c\'），不会命中这个形状。
+    """
+    toks = tokenize_php(raw)
+
+    for k in range(len(toks) - 2):
+        a, b, c = toks[k], toks[k + 1], toks[k + 2]
+
+        if a[0] == 'str' and b[0] == 'code' and c[0] == 'str' \
+                and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', b[2]):
+            fail('%s 第 %d 行：字符串里套了同种引号（…%s…），PHP 在前一个引号处就把字符串断掉了，'
+                 '后面整段按代码解析——这是致命语法错误，插件一加载就白屏。'
+                 '文案里的引号换成双引号或 &quot;' % (name, line_of(raw, a[1]), b[2]))
+
+
 def check_headers(name, raw):
     if not raw.startswith('<?php'):
         fail('%s：文件头第一个字节必须是 <?php（多了 BOM 或空行的话，插件列表解析不到注释）' % name)
@@ -339,6 +437,7 @@ for path in files:
     CODE[path] = strip_code(RAW[path])
     check_headers(path.name, RAW[path])
     check_balance(path.name, RAW[path], CODE[path])
+    check_quote_nesting(path.name, RAW[path])
     if problems:
         # 括号或引号错位时后面什么都不可信，先停下
         break
@@ -357,6 +456,14 @@ if not problems:
     for methods in METHODS.values():
         known |= methods
 
+    PRIVATE_MEMBERS = {}
+    CLASSES_OF = {}
+    for path in files:
+        for cls, members in collect_private_members(CODE[path]).items():
+            PRIVATE_MEMBERS.setdefault(cls, set()).update(members)
+            CLASSES_OF.setdefault(cls, set()).add(NAME[path])
+
+    aliases_of = {}
     for path in files:
         # use 引进来的别名：PHP 里它优先于「同命名空间的同名类」，撞名就是致命错误
         aliases = set()
@@ -368,6 +475,7 @@ if not problems:
                 fail('%s 第 %d 行：use %s 把别名 “%s” 引进来了，和本插件自己的 %s 类撞名——'
                      '之后的 %s::xxx() 全都解析到核心类，同命名空间下的同名类会被盖掉'
                      % (NAME[path], line_of(RAW[path], m.start()), m.group(1), alias, alias, alias))
+        aliases_of[path] = aliases
 
         for m in re.finditer(r'(\\?)\b(%s|self|static)::\$?([A-Za-z_][A-Za-z0-9_]*)\s*\('
                              % '|'.join(own), CODE[path]):
@@ -386,6 +494,17 @@ if not problems:
                 # self:: 落在哪个类只能靠大括号层数猜，这里只要求「某个类里有」
                 fail('%s 第 %d 行：%s::%s() 在插件的任何一个类里都没找到定义'
                      % (NAME[path], line_of(RAW[path], m.start()), cls, target))
+
+    for path in files:
+        for m in re.finditer(r'\b([A-Z][A-Za-z0-9_]*)::\$?([A-Za-z_][A-Za-z0-9_]*)\b', CODE[path]):
+            cls, member = m.group(1), m.group(2)
+
+            if cls not in own or cls in aliases_of[path] or CLASSES_OF.get(cls) == {NAME[path]}:
+                continue
+            if member in PRIVATE_MEMBERS.get(cls, set()):
+                fail('%s 第 %d 行：跨类读了 %s::%s，可它是私有成员 —— PHP 会当场致命错误'
+                     '（Cannot access private）。要么改成 public，要么别跨类用'
+                     % (NAME[path], line_of(RAW[path], m.start()), cls, member))
 
     used = set()
     for path in files:

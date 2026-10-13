@@ -241,7 +241,7 @@ class Admin
             . '</div>'
             . '<p class="nl-lead"><code>GET ' . self::esc($base . '/api/theme') . '</code> '
             . self::esc(_t('读全部配置；')) . '<code>PUT ' . self::esc($base . '/api/theme') . '</code> '
-            . self::esc(_t('写配置，body 只带要改的键。两边都要请求头 X-NoLine-Key。'))
+            . self::esc(_t('写配置，body 只带要改的键。两边都要请求头 X-Noline-Key。'))
             . '</p>'
             . '<p class="nl-note">'
             . self::esc(_t('开关在插件设置页里。拿到密钥就等于能改整站门面，接口文档里已经把这条写清。'))

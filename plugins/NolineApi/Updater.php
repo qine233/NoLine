@@ -4,6 +4,7 @@ namespace TypechoPlugin\NolineApi;
 
 use Typecho\Http\Client;
 use Widget\Options;
+use Widget\User;
 
 if (!defined('__TYPECHO_ROOT_DIR__')) {
     exit;
@@ -22,7 +23,11 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * 交换期间 usr/themes/noline 有几十微秒不存在，并发请求可能撞上一次 500；
  * 这是选定的代价，换来的是不用 FTP。中途被 PHP 超时或断电打断由 state.json 里的 pending 标记兜：
- * 下次进这一页先 repair()，发现主题目录不见了就自动把备份搬回去。
+ * autoTick() 和进「主题管理」页都会先 repair()，发现主题目录不见了就自动把备份搬回去。
+ *
+ * 自动升级默认开着：后台每个页面都会过一遍 autoTick()，检测到新版本就自己下载覆盖完，不等人点按钮。
+ * 它只认管理员的登录态、每 AUTO_WAIT 秒最多跑一轮（失败也一样，免得每个页面都重试打爆 GitHub 限额），
+ * 结论落进 state.json，人下次进这一页看到的是「已经升完了」而不是一个待办的按钮。
  */
 class Updater
 {
@@ -38,6 +43,9 @@ class Updater
     private const MAX_ZIP = 20971520;           // 20MB，主题包实际只有几百 KB
     private const MAX_UNCOMPRESSED = 62914560;  // 解压后 60MB 封顶，挡压缩炸弹
     private const MAX_ENTRIES = 4000;
+
+    /** 自动模式两轮之间的最短间隔。检测本身有 TTL 缓存，这个闸是给「失败也先歇一小时」用的 */
+    private const AUTO_WAIT = 3600;
 
     private const DEFAULT_REPO = 'qine233/noline';
 
@@ -58,10 +66,16 @@ class Updater
 
         $html = '<h3 class="nl-h3">' . Admin::esc(_t('主题更新')) . '</h3>';
 
+        $auto = Plugin::setting('autoUpgrade', '1') === '1';
+        $state = self::readState();
+        $last = isset($state['auto']) && is_array($state['auto']) ? $state['auto'] : array();
+
         $html .= '<div class="nl-chips">';
         foreach ($env as $item) {
             $html .= '<span class="nl-chip nl-chip-' . $item[0] . '">' . Admin::esc($item[1]) . '</span>';
         }
+        $html .= '<span class="nl-chip nl-chip-' . ($auto ? 'ok' : 'muted') . '">'
+            . Admin::esc($auto ? _t('自动升级开着') : _t('自动升级已关')) . '</span>';
         $html .= '</div>';
 
         $stateText = !$check['ok']
@@ -74,6 +88,14 @@ class Updater
             . '<div class="nl-ver-arrow">→</div>'
             . '<div class="nl-ver-latest"><b>' . Admin::esc($check['ok'] ? $check['tag'] : _t('未知')) . '</b>'
             . '<em>' . Admin::esc($stateText) . '</em></div></div>';
+
+        if (isset($last['at']) && !empty($last['html'])) {
+            $level = in_array(isset($last['level']) ? $last['level'] : '', array('success', 'error', 'warn'), true)
+                ? $last['level'] : 'warn';
+            $html .= '<div class="nl-msg nl-msg-' . $level . '">'
+                . Admin::esc(_t('%s 自动跑过一轮：', date('m-d H:i', (int)$last['at']))) . $last['html']
+                . '</div>';
+        }
 
         if ($check['cached']) {
             $html .= '<p class="nl-note">' . Admin::esc(_t(
@@ -180,6 +202,88 @@ class Updater
             default:
                 return array('error', Admin::esc(_t('不认识的更新操作。')));
         }
+    }
+
+    /* ======================================================================
+       自动升级
+       ====================================================================== */
+
+    /**
+     * 后台每一个页面都会过一下（Plugin::onAdminMenu → admin/menu.php:navBar）。
+     * 发现新版本就当场升完，不再攒着等人点按钮。
+     */
+    public static function autoTick()
+    {
+        if (Plugin::setting('autoUpgrade', '1') !== '1') {
+            return;
+        }
+
+        /* 顶栏对所有能进后台的人都渲染，编辑和 subscriber 也算；
+           搬主题目录这种事只跟着站长走 */
+        if (!User::alloc()->pass('administrator', true)) {
+            return;
+        }
+
+        $state = self::readState();
+        $last = isset($state['auto']) && is_array($state['auto']) ? $state['auto'] : array();
+
+        if (isset($last['at']) && (int)$last['at'] + self::AUTO_WAIT > time()) {
+            return;
+        }
+
+        /* 先把上次没走完的交换圆回来。主题目录已经不在原地时还去下载新包，
+           只会把「前台坏了」变成「前台坏了而且没人知道」 */
+        $fixed = self::repair();
+
+        if ($fixed !== '') {
+            self::note('warn', Admin::esc($fixed));
+
+            return;
+        }
+
+        $check = self::check(false);
+
+        if (empty($check['ok'])) {
+            /* 一次都没成功过、这回又连不上：打时间戳，别拿每个后台页面去撞限流 */
+            self::note('warn', Admin::esc($check['error']));
+
+            return;
+        }
+
+        if (empty($check['available'])) {
+            /* 已经是最新。结论在 TTL 缓存里，缓存到期前不会再碰网络，不用额外打标记 */
+            return;
+        }
+
+        /* 刚被人手动回滚掉的正是这一版，别当场又顶上去。等下一个比它新的 tag */
+        $fresh = self::readState();
+        $floor = self::normalize(isset($fresh['auto_floor']) ? (string)$fresh['auto_floor'] : '');
+
+        if ($floor !== '' && self::normalize($check['tag']) === $floor) {
+            return;
+        }
+
+        $block = self::blocking();
+
+        if ($block !== '') {
+            self::note('warn', Admin::esc($block));
+
+            return;
+        }
+
+        $result = self::upgrade(true);
+        self::note($result[0], $result[1]);
+    }
+
+    /**
+     * 自动这一轮的结论落盘，好让人下次进页面看见的是「已经升完了」而非一排待办按钮。
+     * 存进去的 HTML 已经转义过，页面上直接输出、不再二次转义。
+     */
+    private static function note(string $level, string $html)
+    {
+        $state = self::readState();
+        $state['auto'] = array('at' => time(), 'level' => $level, 'html' => $html);
+        self::saveState($state);
     }
 
     /* ======================================================================
@@ -447,7 +551,12 @@ class Updater
        升级
        ====================================================================== */
 
-    private static function upgrade(): array
+    /**
+     * 下载、验收、把旧主题整份挪去备份再让新版本顶上。
+     *
+     * @param bool $auto 只影响历史里那一条怎么标，动作本身两种触发完全一样
+     */
+    private static function upgrade(bool $auto = false): array
     {
         $state = self::readState();
 
@@ -636,9 +745,15 @@ class Updater
             return self::fail(_t('备份放不回主题目录：%s', self::phpError()));
         }
 
+        /* 手动回滚掉的那一版不能被自动更新当场顶回去：记下这个 tag，以后只有比它新的才自动上 */
+        $state = self::readState();
+        $seen = isset($state['check']) && is_array($state['check']) ? $state['check'] : array();
+        $state['auto_floor'] = self::normalize(isset($seen['tag']) ? (string)$seen['tag'] : '');
+        self::saveState($state);
+
         return array('success', Admin::esc(_t(
             '已回到 %1$s。被顶掉的那一版存成了新备份 %2$s。', $name, basename($aside)
-        )));
+        )) . '<br>' . Admin::esc(_t('自动升级不会再把它顶上来了，除非 Release 里出了更新的版本。')));
     }
 
     /* ======================================================================

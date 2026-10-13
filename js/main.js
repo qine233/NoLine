@@ -1,5 +1,5 @@
 /**
- * NoLine 主题的前端行为。
+ * Noline 主题的前端行为。
  *
  * 以 defer 加载，执行时机在文档解析完成之后、DOMContentLoaded 之前，
  * 所以这里注册的 DOMContentLoaded 监听一定会被触发（readyState 仍是 'loading'）。

@@ -97,7 +97,7 @@ HEAD = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>__TITLE__ — NoLine 夹具</title>
+    <title>__TITLE__ — Noline 夹具</title>
     <script>
     (function () {
         var el = document.documentElement;
@@ -132,7 +132,7 @@ __EXTRA_HEAD__
 
         <a class="topbar-brand" href="./index.html" title="回到首页">
             <img src="__AVATAR__" alt="" class="topbar-logo" width="32" height="32">
-            <span class="topbar-name">NoLine</span>
+            <span class="topbar-name">Noline</span>
         </a>
 
         <!-- 窄屏下这整块脱离文档流，变成挂在顶栏下沿的下拉面板（见 design.css 与 main.js） -->
@@ -256,7 +256,7 @@ SIDEBAR = """        <aside class="sidebar">
                     </div>
                     <div class="history-item">
                         <div class="history-year">2021<span class="history-ago">5 年前</span></div>
-                        <div class="history-title">写下 NoLine 主题的第一行 CSS</div>
+                        <div class="history-title">写下 Noline 主题的第一行 CSS</div>
                     </div>
                 </div>
             </div>
@@ -349,8 +349,8 @@ __TOC__
                         <span class="site-stat">运行<b data-count="2190">2190 天</b></span>
                     </div>
                     <div class="site-footer-note">
-                        <p>&copy; 2026 NoLine</p>
-                        <p>由 Typecho 驱动 · 主题 NoLine</p>
+                        <p>&copy; 2026 Noline</p>
+                        <p>由 Typecho 驱动 · 主题 Noline</p>
                         <p><a href="https://beian.miit.gov.cn/">京ICP备00000000号</a></p>
                     </div>
                 </div>
@@ -588,7 +588,7 @@ INDEX_BODY = """
     <div class="site-hero-cover" style="background-image:url('__COVER__')" aria-hidden="true"></div>
     <div class="site-hero-inner">
         <img src="__FACE_A__" alt="" class="site-hero-avatar" width="136" height="136">
-        <h1 class="site-hero-title">NoLine 演示站</h1>
+        <h1 class="site-hero-title">Noline 演示站</h1>
         <p class="site-hero-bio">众里寻他千百度，蓦然回首，那人却在灯火阑珊处。</p>
     </div>
     <div class="hero-lip" aria-hidden="true"></div>

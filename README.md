@@ -1,8 +1,8 @@
-# NoLine
+# Noline
 
-> 一个克制、无描边的 Typecho 主题，配一个可选的 REST 接口插件。当前版本 **1.19.0**。
+> 一个克制、无描边的 Typecho 主题，配一个可选的 REST 接口插件。当前版本 **1.20.0**。
 
-NoLine 主张「无描边卡片」与「设计令牌驱动」：层次靠留白、圆角和一套统一的颜色令牌划分，
+Noline 主张「无描边卡片」与「设计令牌驱动」：层次靠留白、圆角和一套统一的颜色令牌划分，
 不靠重描边和强阴影。所有颜色集中在 `:root`，浅色深色各一套，强调色在后台填一个十六进制就够，
 深色模式会按它自动算出更亮的变体，换肤不用翻文件。
 
@@ -83,7 +83,7 @@ NoLine 主张「无描边卡片」与「设计令牌驱动」：层次靠留白�
 
 1. 下载 Release 附件 `noline.zip`（或在仓库里执行 `python3 _dev/build.py`），解压到
    `usr/themes/noline`。
-2. 后台「控制台 → 主题」启用 NoLine，到「设置外观」里填这 14 项：
+2. 后台「控制台 → 主题」启用 Noline，到「设置外观」里填这 14 项：
    站点头像地址、博主名字、座右铭、首页头图、强调色、动态分类、导航图标、首页公告、
    右栏分类卡、GitHub 显示名、GitHub 链接、Bilibili 显示名、Bilibili 链接、站点底部版权。
 3. **`views/` 目录别删**：里面是历史浏览量的兜底文件。新计数写在
@@ -94,14 +94,19 @@ NoLine 主张「无描边卡片」与「设计令牌驱动」：层次靠留白�
 ## 可选：NolineApi 插件
 
 1. 把 `plugins/NolineApi` 整个目录拷到 `usr/plugins/`。
-2. 后台「插件」里启用，填接口密钥（明文存即可，接口靠请求头 `X-NoLine-Key` 校验）。
+2. 后台「插件」里启用，填接口密钥（明文存即可，接口靠请求头 `X-Noline-Key` 校验）。
 3. **启用后请「停用 → 再启用」一次**：后台顶栏的「主题管理」链接挂在 `admin/menu.php:navBar`
    钩子上，编辑器的图床面板挂在 `admin/write-post.php:bottom`、`write-page.php:bottom` 上，
    老版本激活时注册过的那几条不会因为升级而补上。
 4. 后台顶栏点「主题管理」，那一页有：14 项主题设置的可视化编辑、接口状态与自检、
-   GitHub 检测更新与一键升级（升级前自动备份旧主题、留回滚入口、`views/` 会保留）、
-   接入 Cloudreve 的图床上传。
-5. 图床：在插件设置里填 Cloudreve 地址和 **Refresh Token**（登录 Cloudreve 后在浏览器控制台
+   GitHub 更新与回滚、接入 Cloudreve 的图床上传。
+5. **主题自动更新默认开着**：后台路过任意一个页面时查一次（结论缓存 6 小时，两轮之间至少隔
+   1 小时），发现 Release 里有新版本就当场下载、验收、把旧主题整份挪进 `usr/uploads/noline_backup`
+   再让新版本顶上，不需要点任何东西；只有管理员登录的后台请求会触发。交换那几十微秒里撞上的
+   前台请求会吃到一次错误，中途被打断（超时/断电）会自己把备份搬回原位，历史版本全留在备份目录里
+   可回滚。不放心就在插件设置里改成「只提示，我自己点」。**它不判断 Release 本身是好是坏**，
+   发布前自己验一遍。
+6. 图床：在插件设置里填 Cloudreve 地址和 **Refresh Token**（登录 Cloudreve 后在浏览器控制台
    执行 `localStorage.getItem('refresh_token')` 取），启用后写文章/写页面的附件面板顶部会多一个
    「图床」框，选文件、粘贴截图或拖图片进去都能上传，传完自动把直链按当前编辑器形态
    （Markdown 或富文本）插进正文，附带「打开 / 复制」两个按钮。
@@ -122,7 +127,7 @@ POST   /api/health/records        写入单条或 {"records":[…]} 批量
 DELETE /api/health/records?date=  删除某天记录
 ```
 
-`POST /index.php?noline_api=upload` 是图床上传，走后台登录态 + 编辑器令牌，不吃 `X-NoLine-Key`，
+`POST /index.php?noline_api=upload` 是图床上传，走后台登录态 + 编辑器令牌，不吃 `X-Noline-Key`，
 只给浏览器用，所以不写进 `APP-API-SPEC.md`。
 
 数据落在 `usr/uploads/noline_api/store.php`，上限 3660 条。
@@ -135,7 +140,7 @@ DELETE /api/health/records?date=  删除某天记录
 
 | 脚本 | 拦的是什么 |
 |---|---|
-| `phpcheck.py` | 插件五个文件的括号配对、文件头守卫、`self::` 指向的方法是否存在、私有方法漏调用、`_t()` 占位符缺参、**主题字段表与 `functions.php` 的 14 项是否漂移** |
+| `phpcheck.py` | 插件五个文件的括号配对、文件头守卫、`self::` 指向的方法是否存在、私有方法漏调用、**跨类读 `private` 成员/常量**（PHP 里是 fatal 不是警告）、**字符串里套同种引号**（引号数量照样是偶数、括号照样配平，只有走词法才看得见）、`_t()` 占位符缺参、**主题字段表与 `functions.php` 的 14 项是否漂移** |
 | `structure.py` | 模板 PHP/HTML 平衡、文档外壳、页面骨架、图标引用、死函数、重复声明 |
 | `classcheck.py` | 模板在用的 class 有没有样式、样式表里有没有解释不了的死规则（双向） |
 | `jscheck.py` | `main.js` 括号平衡、未定义引用、JS 钩子与模板 id/class 一一对应、CSS 花括号 |
@@ -159,10 +164,10 @@ DELETE /api/health/records?date=  删除某天记录
 
 ```bash
 python3 _dev/build.py            # 本地先过一遍门槛
-git tag -a 1.19.0 -m "1.19.0" && git push origin 1.19.0
+git tag -a 1.20.0 -m "1.20.0" && git push origin 1.20.0
 ```
 
-tag 名用 `1.19.0` 或 `v1.19.0`（工作流只认这两种形状），且必须等于 `NOLINE_VERSION`。
+tag 名用 `1.20.0` 或 `v1.20.0`（工作流只认这两种形状），且必须等于 `NOLINE_VERSION`。
 后台「主题管理 → 主题更新」读的是 `releases/latest` 那个附件，所以**没有 `noline.zip` 的 Release
 等于没发布**：页面会报「这个 Release 没有 noline.zip 附件」。
 也可以不推 tag，直接在 Actions 页手动运行工作流、手填 tag。
@@ -172,6 +177,7 @@ tag 名用 `1.19.0` 或 `v1.19.0`（工作流只认这两种形状），且必�
 - `notice`（首页公告）和 `logoFooter`（底部版权）**原样存 HTML，不做标签清洗**，接口写入也一样。
   这是有意的：公告里要能放链接和样式。代价是拿到接口密钥的人能往前台注入任意脚本，
   所以 `PUT /api/theme` 有独立开关，`APP-API-SPEC.md` 里也把它标成高危能力。
+- 自动更新只认「Release 里的版本号比本机高」，不判断那个包本身是不是坏的；装上就生效，靠备份+回滚兜底。
 - 归档页一次列全部文章，查询数是 O(文章数)。
 - 图床只实现「走 Cloudreve 服务端」的上传策略。如果实例的存储策略配成浏览器直传第三方对象存储
   （`file/upload` 会返回非空 `upload_urls`），插件会明确拒绝并提示去后台把该策略改成云端/本地，

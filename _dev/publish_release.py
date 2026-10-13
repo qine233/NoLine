@@ -147,7 +147,7 @@ def main():
         print('Release %s 不存在，创建。' % tag)
         status, release = api('POST', '%s/repos/%s/releases' % (api_base, repo), token, {
             'tag_name': tag,
-            'name': 'NoLine %s' % tag,
+            'name': 'Noline %s' % tag,
             'body': release_body(api_base, repo, tag, token),
             'draft': False,
             'prerelease': False,

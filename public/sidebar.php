@@ -163,7 +163,7 @@ $stats    = noline_site_stats();
             </div>
             <div class="site-footer-note">
                 <p>&copy; <?php echo date('Y'); ?> <?php $options->title(); ?></p>
-                <p><?php _e('由 Typecho 驱动'); ?> · <?php _e('主题 NoLine'); ?></p>
+                <p><?php _e('由 Typecho 驱动'); ?> · <?php _e('主题 Noline'); ?></p>
                 <?php if ($customFooter !== ''): ?>
                 <p><?php echo $customFooter; ?></p>
                 <?php endif; ?>

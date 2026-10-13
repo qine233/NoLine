@@ -1,4 +1,4 @@
-# NoLine 健康数据接口 · App 对接开发文档
+# Noline 健康数据接口 · App 对接开发文档
 
 > 面向对象：负责实现移动端 / 桌面端 App 的开发（或 AI 助手）。
 > 后端**已经写完并在跑**，你的工作只有客户端。本文档是唯一的接口事实来源；
@@ -35,7 +35,7 @@ App 是这套数据的**录入口和移动看板**，需要覆盖：
 |---|---|
 | Base URL | 用户站点根地址，如 `https://blog.example.com` |
 | 路径前缀 | `/api/` |
-| 鉴权 | 请求头 `X-NoLine-Key: <密钥>`（除 `/api/ping` 外全部必需） |
+| 鉴权 | 请求头 `X-Noline-Key: <密钥>`（除 `/api/ping` 外全部必需） |
 | 请求体 | `application/json`（也接受表单编码，见 §5.5） |
 | 响应体 | `application/json; charset=utf-8`，`Cache-Control: no-store` |
 | 数字精度 | 体重 / 体脂 / BMI 一律保留 1 位小数 |
@@ -63,7 +63,7 @@ https://site/?noline_api=health      # 服务器抢了 /api，或连 index.php �
 需要用户在插件设置里填 `https://你的源` 或 `*`。
 
 预检：服务器对已放行的 Origin 回 `Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS`
-和 `Access-Control-Allow-Headers: X-NoLine-Key, Content-Type`，`OPTIONS` 返回 204。
+和 `Access-Control-Allow-Headers: X-Noline-Key, Content-Type`，`OPTIONS` 返回 204。
 
 ---
 
@@ -627,39 +627,39 @@ BASE='https://blog.example.com'
 curl -s "$BASE/api/ping"
 
 # 2 概览
-curl -s -H "X-NoLine-Key: ***" "$BASE/api/health"
+curl -s -H "X-Noline-Key: ***" "$BASE/api/health"
 
 # 3 明细：最近 90 天区间内的最后 100 条
-curl -s -H "X-NoLine-Key: ***" \
+curl -s -H "X-Noline-Key: ***" \
      "$BASE/api/health/records?limit=100&from=2026-07-14&to=2026-10-12"
 
 # 4 写一条
-curl -s -X POST -H "X-NoLine-Key: ***" -H 'Content-Type: application/json' \
+curl -s -X POST -H "X-Noline-Key: ***" -H 'Content-Type: application/json' \
      -d '{"date":"2026-10-12","weight":66.0,"fat":18.4,"note":"晨起空腹"}' \
      "$BASE/api/health/records"
 
 # 5 批量补录
-curl -s -X POST -H "X-NoLine-Key: ***" -H 'Content-Type: application/json' \
+curl -s -X POST -H "X-Noline-Key: ***" -H 'Content-Type: application/json' \
      -d '{"records":[{"date":"2026-10-01","weight":67.2},{"date":"2026-10-02","weight":67.0}]}' \
      "$BASE/api/health/records"
 
 # 6 删除某天
-curl -s -X DELETE -H "X-NoLine-Key: ***" \
+curl -s -X DELETE -H "X-Noline-Key: ***" \
      "$BASE/api/health/records?date=2026-10-12"
 
 # 7 兜底 URL 形态（伪静态不通时）
-curl -s -H "X-NoLine-Key: ***" "$BASE/index.php?noline_api=health"
+curl -s -H "X-Noline-Key: ***" "$BASE/index.php?noline_api=health"
 
 # 8 读主题全部配置
-curl -s -H "X-NoLine-Key: ***" "$BASE/api/theme"
+curl -s -H "X-Noline-Key: ***" "$BASE/api/theme"
 
 # 9 写主题配置：只带要改的键，其它保持原值
-curl -s -X PUT -H "X-NoLine-Key: ***" -H 'Content-Type: application/json' \
+curl -s -X PUT -H "X-Noline-Key: ***" -H 'Content-Type: application/json' \
      -d '{"accentColor":"#e0662e","logoName":"QINE","showSidebarCats":true}' \
      "$BASE/api/theme"
 
 # 10 兜底形态下的 PUT（路径名换成 query 参数，方法仍是 PUT）
-curl -s -X PUT -H "X-NoLine-Key: ***" -H 'Content-Type: application/json' \
+curl -s -X PUT -H "X-Noline-Key: ***" -H 'Content-Type: application/json' \
      -d '{"notice":""}' \
      "$BASE/index.php?noline_api=theme"
 ```

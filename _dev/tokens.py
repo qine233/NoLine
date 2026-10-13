@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Design-token audit for the NoLine theme.
+"""Design-token audit for the Noline theme.
 
 Checks, per the plan's verification section:
   1. no literal colour (hex or rgb/rgba with numeric channels) outside the :root blocks
