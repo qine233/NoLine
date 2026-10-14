@@ -36,7 +36,8 @@ LOOSE = ['screenshot.jpg']
 # 顶层出现任何不在白名单也不在这张表里的文件/目录，构建直接失败——
 # 防止哪天多了个临时目录就顺手被打包走。
 LOCAL_ONLY = ['_dev', '_preview', '_trash', 'dist', '.DS_Store', '.git',
-              '.github', '.gitignore', '.qoder', 'README.md', 'APP-API-SPEC.md', 'plugins']
+              '.github', '.gitignore', '.qoder', 'README.md', 'APP-API-SPEC.md',
+              'plugins', 'docs']
 
 BIG_WARN = 300 * 1024
 VERSION_RE = re.compile(r"define\('NOLINE_VERSION',\s*'([^']+)'\)")

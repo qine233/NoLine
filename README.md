@@ -16,8 +16,32 @@ Noline 主张「无描边卡片」与「设计令牌驱动」：层次靠留白�
 | `plugins/NolineApi/` | 可选插件：对外接口 + 后台「主题管理」页 + GitHub 一键更新 |
 | `APP-API-SPEC.md` | 给 App 开发者的接口规格书（端点、字段、状态码、客户端实现要求） |
 | `_dev/` | 静态检查脚本与打包脚本，**不进发布包** |
+| `docs/screenshots/` | 下面那几张图，由 `_dev/shots.py` 从模板渲出来，**不进发布包** |
 
 发布包是 Release 附件 `noline.zip`（由 `_dev/build.py` 生成），不是仓库 ZIP 下载。
+
+## 长什么样
+
+首页（浅色 / 深色）：
+
+| | |
+|---|---|
+| ![首页浅色](docs/screenshots/index-light.png) | ![首页深色](docs/screenshots/index-dark.png) |
+
+文章页：
+
+![文章页](docs/screenshots/post-light.png)
+
+健康记录页（体重/BMI 趋势，数据来自 NolineApi 插件）：
+
+![健康记录](docs/screenshots/health.png)
+
+移动端首页（390px，分类条靠手指横滑，所以没有桌面端那颗「更多」）：
+
+<img src="docs/screenshots/index-mobile.png" alt="移动端首页" width="320">
+
+> 这几张图不是线上站点的照片，是 `_dev/shots.py` 用无头 Chrome 渲 `_dev/mkpreview.py`
+> 生成的静态夹具得到的——数据是示例数据，模板一改重跑一遍图就跟着改，不会烂在仓库里。
 
 ## 环境
 
@@ -149,6 +173,7 @@ DELETE /api/health/records?date=  删除某天记录
 | `tokens.py` / `remify.py` | 令牌是否成对、字号是否 rem 化 |
 | `minify.py` | CSS 压缩，并验证只删了注释和空白 |
 | `mkpreview.py` | 生成静态预览夹具（`_preview/`，不外发） |
+| `shots.py` | 从夹具渲「长什么样」那几张图到 `docs/screenshots/`（要本机有 Chrome，`--only 名字片段` 单跑一张）。不是门槛，`build.py` 不查它 |
 | `publish_release.py` | 把 `dist/noline.zip` 挂成 Release 附件（复用/新建 Release、删同名旧附件、回读校验大小）。**tag 和包内 `NOLINE_VERSION` 不一致直接失败** |
 | `build.py` | 打发布包；顶层出现白名单之外的目录**直接构建失败**，`_dev/_preview/_trash/dist/.github` 永远进不去 |
 
