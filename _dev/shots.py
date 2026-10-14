@@ -40,6 +40,7 @@ SHOTS = [
     ('index.html', 'index-dark.png', 1440, 1040, 1, 'dark', False, False),
     ('post.html', 'post-light.png', 1440, 1040, 1, 'light', False, False),
     ('health.html', 'health.png', 1440, 900, 1, 'light', False, False),
+    ('bills.html', 'bills.png', 1440, 1180, 1, 'light', False, False),
     ('index.html', 'index-mobile.png', 390, 844, 2, 'light', True, True),
 ]
 

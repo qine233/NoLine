@@ -58,6 +58,12 @@ PHP_EMITTED = {
     'health-badge',
     'is-up', 'is-down', 'is-quiet',
     'is-thin', 'is-normal', 'is-over', 'is-obese',
+    # 记账页：柱子和占比条整块由 noline_bills_bars() / noline_bills_kinds() 拼字符串，
+    # 分类色条的 is-veg…is-rest 来自函数里那张映射表，class 属性里没有这些字面量。
+    # bill-bar 是那一串里唯一被拼接截断的（'class="bill-bar' 后面才接 is-empty）。
+    'bill-bar', 'is-empty',
+    'is-veg', 'is-fruit', 'is-meat', 'is-fish',
+    'is-egg', 'is-grain', 'is-seasoning', 'is-other', 'is-rest',
     # 信息流卡片的左右朝向位：index/archive.php 算成 $flip（' flip' 或 ''）再 echo，
     # class 属性里没有 'flip' 这个字面量
     'flip',

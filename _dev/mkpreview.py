@@ -20,6 +20,7 @@ HTML 手写出来，就能用真实浏览器验证：设计令牌、深色模式
    把失败路径当成正常路径验。在 noline/_preview/ 里起一个静态服务即可：
        python3 -m http.server 8000   →   http://localhost:8000/index.html
 """
+import calendar
 import re
 from datetime import date, timedelta
 from pathlib import Path
@@ -1161,6 +1162,357 @@ def health_page():
     return HEALTH_BODY.replace('__TILES__', tiles).replace('__CHART__', chart).replace('__LOG__', log)
 
 
+BILLS_TODAY = date(2026, 10, 14)
+
+# 分类代码 → 中文名，和 bills.php 模板里那张 $labels 同一份
+BILLS_KIND_LABELS = {
+    'veg': '蔬菜', 'fruit': '水果', 'meat': '肉禽', 'fish': '水产',
+    'egg': '蛋奶', 'grain': '米面粮油', 'seasoning': '调料', 'other': '其他',
+}
+
+# (品名, 分类代码, 参考价)。分类代码和插件 Bills::KINDS 一一对应，改了那边要改这里。
+BILLS_CATALOG = [
+    ('番茄', 'veg', 4.5), ('黄瓜', 'veg', 2.8), ('小白菜', 'veg', 2.0),
+    ('土豆', 'veg', 3.2), ('茄子', 'veg', 3.6), ('青椒', 'veg', 4.0),
+    ('萝卜', 'veg', 2.4), ('菠菜', 'veg', 5.0), ('南瓜', 'veg', 3.0),
+    ('苹果', 'fruit', 8.8), ('香蕉', 'fruit', 4.6), ('橘子', 'fruit', 6.2),
+    ('葡萄', 'fruit', 12.0), ('西瓜', 'fruit', 15.0), ('草莓', 'fruit', 22.0),
+    ('五花肉', 'meat', 16.8), ('鸡腿', 'meat', 11.5), ('牛腩', 'meat', 42.0),
+    ('排骨', 'meat', 28.5), ('鸡胸肉', 'meat', 9.9),
+    ('鲫鱼', 'fish', 12.5), ('基围虾', 'fish', 38.0), ('带鱼', 'fish', 21.0),
+    ('花蛤', 'fish', 8.0),
+    ('鸡蛋', 'egg', 6.8), ('牛奶', 'egg', 12.5), ('豆腐', 'egg', 3.5),
+    ('大米', 'grain', 32.0), ('挂面', 'grain', 6.5), ('面粉', 'grain', 15.0),
+    ('食用油', 'grain', 59.9),
+    ('生抽', 'seasoning', 9.9), ('食盐', 'seasoning', 2.5), ('生姜', 'seasoning', 3.8),
+    ('大蒜', 'seasoning', 4.2),
+    ('垃圾袋', 'other', 7.9), ('厨房用纸', 'other', 11.0),
+]
+BILLS_SHOPS = ['东门菜场', '盒马', '小区门口', '永辉', '']
+# 价格的浮动周期，写死而不用随机数：夹具要每次跑出来一模一样，
+# 否则重跑一次 mkpreview 就把 README 里的图换了一批数字。
+BILLS_JITTER = [1.0, 0.82, 1.25, 0.94, 1.1, 0.76]
+BILLS_NOTES = {
+    '排骨': '煲汤用，让摊主剁好了',
+    '基围虾': '周末才到货，比工作日便宜',
+    '食用油': '5L 桶装，一次买够两个月',
+}
+
+
+def bills_records():
+    """造五个月的买菜流水，形状和插件读出来的一样。
+
+    六月整月空着：验的就是柱状图上「这个月一条没记」那一根矮柱和它旁边的金额，
+    这种情况线上很常见（出差、家里囤货没吃完），不能只验 happy path。
+    """
+    rows = []
+    day = date(2026, 5, 6)
+    index = 0
+
+    while day <= BILLS_TODAY:
+        if day.month != 6 and index % 3 != 2:      # 不是天天买菜，三天里去两天
+            picks = 1 + index % 3
+            for offset in range(picks):
+                name, kind, price = BILLS_CATALOG[(index * 5 + offset * 3) % len(BILLS_CATALOG)]
+                amount = round(price * BILLS_JITTER[(index + offset) % len(BILLS_JITTER)], 1)
+                rows.append({
+                    'date': day.isoformat(),
+                    'title': name,
+                    'kind': kind,
+                    'amount': amount,
+                    'shop': BILLS_SHOPS[(index + offset) % len(BILLS_SHOPS)],
+                    'note': BILLS_NOTES.get(name, ''),
+                })
+        # index 跟着日子走，不是跟着「记了账的那些天」走：漏一天就得往后错一格，
+        # 写在 if 里会让跳过的那些天永远停在同一个格子上，流水卡死在月初。
+        index += 1
+        day += timedelta(days=1)
+
+    return rows
+
+
+def bills_money(value):
+    """同 noline_bills_money()：12.50 → 12.5、20.00 → 20。"""
+    text = '%.2f' % float(value)
+    return text.rstrip('0').rstrip('.')
+
+
+def bills_span():
+    """同 Bills::span()：周一为一周之始，月按自然月。"""
+    today = BILLS_TODAY
+    monday = today - timedelta(days=today.isoweekday() - 1)
+    first = today.replace(day=1)
+    prev_first = (first - timedelta(days=1)).replace(day=1)
+    prev_last = prev_first + timedelta(days=(calendar.monthrange(prev_first.year, prev_first.month)[1] - 1))
+
+    return {
+        'week_start': monday.isoformat(),
+        'week_end': (monday + timedelta(days=6)).isoformat(),
+        'prev_week_start': (monday - timedelta(days=7)).isoformat(),
+        'prev_week_end': (monday - timedelta(days=1)).isoformat(),
+        'month_start': first.isoformat(),
+        'month_end': date(first.year, first.month,
+                          calendar.monthrange(first.year, first.month)[1]).isoformat(),
+        'prev_month_start': prev_first.isoformat(),
+        'prev_month_end': prev_last.isoformat(),
+    }
+
+
+def bills_slice(rows, start, end):
+    return [r for r in rows if start <= r['date'] <= end]
+
+
+def bills_agg(rows, start, end):
+    """同 Bills::aggregate()。"""
+    picked = bills_slice(rows, start, end)
+    amount = round(sum(r['amount'] for r in picked), 2)
+    days = len({r['date'] for r in picked})
+    top = max(picked, key=lambda r: r['amount']) if picked else None
+
+    return {
+        'start': start, 'end': end, 'amount': amount, 'count': len(picked), 'days': days,
+        'avg_day': round(amount / days, 2) if days else 0.0,
+        'avg_bill': round(amount / len(picked), 2) if picked else 0.0,
+        'max': top,
+    }
+
+
+def bills_delta(current, previous):
+    """同 noline_bills_delta()：返回 (文本, 类名后缀)。"""
+    if not previous or not previous['count']:
+        return '—', 'is-quiet'
+
+    diff = round(current['amount'] - previous['amount'], 2)
+    if abs(diff) < 0.005:
+        return '持平', 'is-quiet'
+
+    return ('+' if diff > 0 else '−') + bills_money(abs(diff)), ('is-up' if diff > 0 else 'is-down')
+
+
+def bills_months(rows):
+    """同 Bills::months()：最近 6 个自然月，没记录的那个月也要出现。"""
+    keys = []
+    cursor = BILLS_TODAY.replace(day=1)
+    for _ in range(6):
+        cursor = (cursor - timedelta(days=1)).replace(day=1)
+        keys.append(cursor.isoformat()[:7])
+    keys.append(BILLS_TODAY.isoformat()[:7])
+    keys.sort()
+
+    out = []
+    for key in keys:
+        picked = [r for r in rows if r['date'][:7] == key]
+        out.append({
+            'month': key,
+            'amount': round(sum(r['amount'] for r in picked), 2),
+            'count': len(picked),
+        })
+    return out
+
+
+def bills_bars(months):
+    """同 noline_bills_bars()：柱高是相对最贵那个月的百分比。"""
+    top = max(m['amount'] for m in months)
+    if top <= 0:
+        return ''
+
+    bars = ''
+    for month in months:
+        amount = month['amount']
+        height = max(3, round(amount / top * 100, 1)) if amount > 0 else 0
+        bars += ('<div class="bill-bar%s">'
+                 '<span class="bill-bar-plot"><i class="bill-bar-fill" style="height:%s%%"></i></span>'
+                 '<span class="bill-bar-value">%s</span>'
+                 '<span class="bill-bar-label">%d<i>月</i></span>'
+                 '</div>') % (
+            '' if amount > 0 else ' is-empty', height, bills_money(amount), int(month['month'][5:]))
+
+    return '<div class="bill-bars" role="img" aria-label="近 7 个月支出">%s</div>' % bars
+
+
+def bills_kind_rows(rows):
+    """同 noline_bills_kinds()：不足 4% 的归进最后那条「其余」。"""
+    mods = {'veg': 'is-veg', 'fruit': 'is-fruit', 'meat': 'is-meat', 'fish': 'is-fish',
+            'egg': 'is-egg', 'grain': 'is-grain', 'seasoning': 'is-seasoning',
+            'other': 'is-other'}
+    buckets = {}
+    total = sum(r['amount'] for r in rows)
+
+    for row in rows:
+        kind = buckets.setdefault(row['kind'], {'amount': 0.0, 'count': 0})
+        kind['amount'] = round(kind['amount'] + row['amount'], 2)
+        kind['count'] += 1
+
+    ranked = sorted(buckets.items(), key=lambda kv: -kv[1]['amount'])
+    rest = {'amount': 0.0, 'share': 0.0, 'count': 0}
+    out = ''
+
+    for kind, bucket in ranked:
+        share = round(bucket['amount'] / total, 3) if total else 0.0
+        if share < 0.04:
+            rest['amount'] = round(rest['amount'] + bucket['amount'], 2)
+            rest['share'] += share
+            rest['count'] += bucket['count']
+            continue
+        out += bills_kind_row(BILLS_KIND_LABELS[kind], bucket['amount'], share, mods[kind])
+
+    if rest['count']:
+        out += bills_kind_row('其余', rest['amount'], round(rest['share'], 3), 'is-rest')
+
+    return '<div class="bill-kinds">%s</div>' % out
+
+
+def bills_kind_row(label, amount, share, mod):
+    width = round(max(0.0, min(1.0, share)) * 100, 1)
+
+    # 配色类挂在整行上，跟 noline_bills_kind_row() 一致：design.css 选的是
+    # .bill-kind.is-meat .bill-kind-fill，写错一层就是一片透明条。
+    return ('<div class="bill-kind %s"><span class="bill-kind-label">%s</span>'
+            '<span class="bill-kind-track"><i class="bill-kind-fill" style="width:%s%%"></i></span>'
+            '<span class="bill-kind-amount">%s<i>元</i></span>'
+            '<span class="bill-kind-share">%s%%</span></div>') % (mod, label, width,
+                                                                  bills_money(amount), width)
+
+
+BILLS_BODY = """
+<div class="container">
+    <div class="grid-layout">
+
+        <div class="main-content">
+            <article class="card article-card">
+                <h1 class="post-title page-title">买菜记账</h1>
+                <p class="page-subtitle">{{icon:wallet}} 买了什么、花了多少，按周和月汇总</p>
+
+                <div class="post-content">
+                    <p>这一页只负责画。流水记在 <code>NolineApi</code> 插件的文件里，
+                        写入走带密钥的接口，可见性和写入开关都在插件设置页。</p>
+                </div>
+
+__TILES__
+
+__CHART__
+
+__SLICE__
+
+__LOG__
+
+                <p class="bill-foot">流水由 NolineApi 插件保管，主题只做展示；端点、密钥和写入开关都在插件设置页。</p>
+            </article>
+        </div>
+
+__SIDEBAR__
+    </div>
+</div>
+"""
+
+
+def bills_page():
+    """记账页夹具：把 Bills::summary() + 那几个 noline_bills_*() 的算法在这儿重算一遍，
+    这样浏览器里看到的柱高、占比和涨跌配色和线上是同一套数。"""
+    rows = bills_records()
+    span = bills_span()
+    week = bills_agg(rows, span['week_start'], span['week_end'])
+    prev_week = bills_agg(rows, span['prev_week_start'], span['prev_week_end'])
+    month = bills_agg(rows, span['month_start'], span['month_end'])
+    prev_month = bills_agg(rows, span['prev_month_start'], span['prev_month_end'])
+    totals = bills_agg(rows, rows[0]['date'], rows[-1]['date'])
+
+    def tile(icon, label, value, note, cls='', hint=''):
+        return ('<div class="bill-tile">'
+                '<span class="bill-tile-label">{{icon:%s}} %s</span>'
+                '<span class="bill-tile-value">%s<i>元</i></span>'
+                '<span class="bill-tile-note%s">%s%s</span></div>') % (
+            icon, label, bills_money(value),
+            (' ' + cls) if cls else '',
+            note,
+            ('<i>· %s</i>' % hint) if hint else '')
+
+    week_text, week_cls = bills_delta(week, prev_week)
+    month_text, month_cls = bills_delta(month, prev_month)
+    # 今天在一周/一个月里的第几天：不写这个，「较上周 −55.8」会被读成省了钱
+    week_done = BILLS_TODAY.isoweekday()
+    month_done = BILLS_TODAY.day
+    month_len = calendar.monthrange(BILLS_TODAY.year, BILLS_TODAY.month)[1]
+
+    tiles = '\n                <div class="bill-stats">\n\n                    %s\n\n                    %s\n\n                    %s\n\n                    %s\n\n                </div>' % (
+        tile('calendar', '本周', week['amount'], '较上周 ' + week_text, week_cls,
+             '%d/%d 天' % (week_done, 7)),
+        tile('chart-line', '本月', month['amount'], '较上月 ' + month_text, month_cls,
+             '%d/%d 天' % (month_done, month_len)),
+        tile('clock', '本月日均', month['avg_day'],
+             '%d 天有开销 · 单笔均 %s 元' % (month['days'], bills_money(month['avg_bill']))),
+        tile('wallet', '累计', totals['amount'],
+             '%d 笔 · 从 %s 记到今天' % (totals['count'], rows[0]['date'])),
+    )
+
+    months = bills_months(rows)
+    chart = '''
+                <section class="bill-chart">
+                    <div class="bill-block-head">
+                        <span class="card-header">{{icon:bars}}月度支出</span>
+                        <span class="bill-block-range">最贵的一月 %s 元</span>
+                    </div>
+                    %s
+                </section>''' % (bills_money(max(m['amount'] for m in months)), bills_bars(months))
+
+    slice_html = '''
+                <section class="bill-slice">
+                    <div class="bill-block-head">
+                        <span class="card-header">{{icon:tag}}这个月的钱花在哪</span>
+                        <span class="bill-block-range">%s → %s</span>
+                    </div>
+                    %s
+                </section>
+                <p class="bill-top">{{icon:scale}}本月最贵的一笔：%s · %s 元（%s）</p>''' % (
+        span['month_start'], span['month_end'], bills_kind_rows(bills_slice(rows, span['month_start'], span['month_end'])),
+        month['max']['title'], bills_money(month['max']['amount']), month['max']['date'])
+
+    # 按天分组，新的在前，取最近 12 天
+    groups = []
+    for row in reversed(rows):
+        if not groups or groups[-1]['date'] != row['date']:
+            if len(groups) >= 12 and groups[-1]['date'] != row['date']:
+                break
+            groups.append({'date': row['date'], 'amount': 0.0, 'items': []})
+        groups[-1]['amount'] = round(groups[-1]['amount'] + row['amount'], 2)
+        groups[-1]['items'].append(row)
+
+    weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+    days = ''
+    for group in groups:
+        items = ''
+        for item in group['items']:
+            items += ('<div class="bill-item">'
+                      '<span class="bill-item-kind">%s</span>'
+                      '<span class="bill-item-title">%s</span>'
+                      '%s'
+                      '<span class="bill-item-amount">%s</span></div>%s') % (
+                BILLS_KIND_LABELS[item['kind']], item['title'],
+                ('<span class="bill-item-shop">%s</span>' % item['shop']) if item['shop'] else '',
+                bills_money(item['amount']),
+                ('<p class="bill-item-note">%s</p>' % item['note']) if item['note'] else '')
+
+        days += ('<div class="bill-day"><div class="bill-day-head">'
+                 '<span class="bill-day-date">%s</span>'
+                 '<i class="bill-day-week">%s</i>'
+                 '<span class="bill-day-total">%s<i>元</i></span></div>%s</div>') % (
+            group['date'][5:], weekdays[date.fromisoformat(group['date']).isoweekday() - 1],
+            bills_money(group['amount']), items)
+
+    log = '''
+                <section class="bill-log">
+                    <div class="bill-block-head">
+                        <span class="card-header">{{icon:receipt}}最近流水</span>
+                        <span class="bill-block-range">共 %d 笔</span>
+                    </div>
+                    %s
+                    <p class="bill-more">更早的流水走接口取：GET /api/bills/records?from=&amp;to=&amp;limit=1000</p>
+                </section>''' % (totals['count'], days)
+
+    return (BILLS_BODY.replace('__TILES__', tiles).replace('__CHART__', chart)
+            .replace('__SLICE__', slice_html).replace('__LOG__', log))
+
+
 def render(name, title, body, extra_head='', is_home=False):
     html = HEAD.replace('__TITLE__', title).replace('__EXTRA_HEAD__', extra_head)
     html += body + FOOT
@@ -1301,6 +1653,11 @@ def main():
     # 这样在浏览器里看到的坐标、圆点、涨跌配色和线上一致
     render('health.html', '健康记录',
            health_page().replace('__SIDEBAR__', SIDEBAR.rstrip('\n')).replace('__TOC__', TOC_CARD.rstrip('\n')))
+
+    # 记账页：周/月合计、柱高、占比条全部按插件里那套算法重算，
+    # 六月一根空柱是故意留的——那个月一条没记，图上不能凭空少一格
+    render('bills.html', '买菜记账',
+           bills_page().replace('__SIDEBAR__', SIDEBAR.rstrip('\n')).replace('__TOC__', TOC_CARD.rstrip('\n')))
 
     print('\n提醒：夹具在 noline/_preview/ 下，验证完必须删掉，不能随主题发布。')
 

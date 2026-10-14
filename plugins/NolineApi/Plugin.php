@@ -16,7 +16,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
 /**
  * Noline 对外接口
  *
- * 把主题设置和个人健康数据（体重 / BMI）以 JSON 接口暴露出去，给 App 或脚本对接用；
+ * 把主题设置、个人健康数据（体重 / BMI）和买菜流水以 JSON 接口暴露出去，给 App 或脚本对接用；
  * 顺带在后台挂一个「主题管理」页，主题的全部配置项、GitHub 更新检测与一键升级都在那儿，
  * 还能把后台编辑器的附件面板接上 Cloudreve v4 当图床（传完往正文插永久直链）。
  * 鉴权走自设密钥：请求头 X-Noline-Key，或查询参数 key。站点没上 HTTPS 时务必用只读模式。
@@ -25,13 +25,13 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package NolineApi
  * @author 州州
- * @version 1.3.1
+ * @version 1.4.0
  * @link https://ui.zhouzhou.work/
  */
 class Plugin implements PluginInterface
 {
     /** 改这里要同时改文件头注释里的 @version，后台插件列表读的是注释 */
-    private const VERSION = '1.3.1';
+    private const VERSION = '1.4.0';
 
     /** 数据目录放在 uploads 下，不在主题目录内，升级主题不会清空记录 */
     private const DATA_DIR = '/usr/uploads/noline_api';
@@ -101,8 +101,9 @@ class Plugin implements PluginInterface
             'writeEnabled',
             array('1' => _t('允许写入'), '0' => _t('只读')),
             '0',
-            _t('健康数据写入'),
-            _t('只读时 POST / DELETE 一律 403。App 端要能记体重才需要开启，且务必只在 HTTPS 下开。')
+            _t('数据写入（健康 / 记账）'),
+            _t('只读时两类数据的 POST / PUT / DELETE 一律 403（GET 照常）。'
+                . 'App 端要能记体重、记菜钱才需要开启，且务必只在 HTTPS 下开。')
         );
         $form->addInput($write);
 
@@ -140,6 +141,16 @@ class Plugin implements PluginInterface
                 . '选「仅自己可见」时，未登录的访客只看得到一句提示。')
         );
         $form->addInput($visible);
+
+        $billsVisible = new Radio(
+            'billsVisible',
+            array('1' => _t('所有人可见'), '0' => _t('仅自己可见')),
+            '1',
+            _t('记账页可见性'),
+            _t('只管主题里那个「买菜记账」页面，和健康页各管各的。'
+                . '选「仅自己可见」时，未登录的访客只看得到一句提示；接口本来就要密钥，不受这里影响。')
+        );
+        $form->addInput($billsVisible);
 
         $themeWrite = new Radio(
             'themeWrite',
@@ -395,6 +406,13 @@ class Plugin implements PluginInterface
                     self::dateParam('to')
                 );
                 self::json(array('code' => 0, 'data' => array('total' => count($records), 'records' => $records)));
+
+            case 'bills':
+            case 'bills/records':
+                if ($method === 'POST' || $method === 'PUT' || $method === 'DELETE') {
+                    self::requireWrite();
+                }
+                Bills::handle($route, $method);
 
             default:
                 self::json(array('code' => 404, 'message' => _t('接口不存在')), 404);
@@ -1211,6 +1229,9 @@ class Plugin implements PluginInterface
             array('POST', '/api/health/records', _t('写入，body 为 {"date":"2026-10-12","weight":68.4,"fat":18.2,"note":"…"}，也收 {"records":[…]} 批量')),
             array('DELETE', '/api/health/records?date=2026-10-12', _t('删除某天记录')),
         );
+
+        // 记账那几条的说明写在 Bills 里（端点归它管），这儿只负责拼进同一张表
+        $rows = array_merge($rows, Bills::docRows());
 
         $list = '';
         foreach ($rows as $row) {

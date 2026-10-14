@@ -4,7 +4,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
 /**
  * 主题版本号。同时用作静态资源的缓存指纹（?v=），改版本即可强制刷新客户端缓存。
  */
-define('NOLINE_VERSION', '1.20.1');
+define('NOLINE_VERSION', '1.21.0');
 
 /* ==========================================================================
    后台设置
@@ -1480,7 +1480,6 @@ function noline_health_plugin()
         ? '\TypechoPlugin\NolineApi\Plugin'
         : null;
 }
-
 /**
  * 概览：profile / latest / stats / series / goal / changes。插件不在返回 null。
  */
@@ -1624,4 +1623,187 @@ function noline_health_trend($series)
         . '<circle class="health-dot" cx="' . $xy[0][0] . '" cy="' . $xy[0][1] . '" r="3"/>'
         . '<circle class="health-dot is-last" cx="' . $xy[$total - 1][0] . '" cy="' . $xy[$total - 1][1] . '" r="4.5"/>'
         . '</svg>';
+}
+
+/* ==========================================================================
+   买菜记账
+   --------------------------------------------------------------------------
+   数据全在 NolineApi 插件的 Bills 里（usr/uploads/noline_api/bills.php），
+   这一页只负责画。金额一律「元」，接口给的是数字，格式化放在这儿。
+   ========================================================================== */
+
+/**
+ * 记账数据类；插件没装、或装的是还没有 Bills.php 的旧版时返回 null。
+ *
+ * 先认 Plugin 再认 Bills 不是多余：自动加载找不到 Bills.php 时 class_exists 只是 false，
+ * 但模板要是直接 Bills::summary() 就是 fatal。旧版插件配新版主题会走到这一条。
+ */
+function noline_bills_plugin()
+{
+    if (noline_health_plugin() === null) {
+        return null;
+    }
+
+    return class_exists('\TypechoPlugin\NolineApi\Bills')
+        ? '\TypechoPlugin\NolineApi\Bills'
+        : null;
+}
+
+/**
+ * 概览：totals / week / month / prev_month / months / kinds_month / by_date。
+ */
+function noline_bills_summary()
+{
+    $bills = noline_bills_plugin();
+
+    return $bills === null ? null : $bills::summary();
+}
+
+/**
+ * 记账页给不给当前访客看。和健康页各一个开关，只藏页面，不是数据安全。
+ */
+function noline_bills_visible($archive)
+{
+    $plugin = noline_health_plugin();
+
+    if ($plugin === null) {
+        return false;
+    }
+
+    if ($plugin::setting('billsVisible', '1') === '1') {
+        return true;
+    }
+
+    return isset($archive->user) && $archive->user->hasLogin();
+}
+
+/**
+ * 12.50 → 12.5、20.00 → 20。菜钱没有小数点后两位的意义，别占版面。
+ */
+function noline_bills_money($amount)
+{
+    $text = number_format((float)$amount, 2, '.', '');
+
+    return rtrim(rtrim($text, '0'), '.');
+}
+
+/**
+ * 区间对比 → 「+12.5 / -8 / 持平 / —」和配色类名。
+ * 上一期一条都没记时不给百分比，那不是一个能比的基数。
+ */
+function noline_bills_delta($current, $previous)
+{
+    if ($previous === null || (int)$previous['count'] === 0) {
+        return array('—', ' is-quiet');
+    }
+
+    $diff = round((float)$current['amount'] - (float)$previous['amount'], 2);
+
+    if (abs($diff) < 0.005) {
+        return array(_t('持平'), ' is-quiet');
+    }
+
+    return array(
+        ($diff > 0 ? '+' : '−') . noline_bills_money(abs($diff)),
+        $diff > 0 ? ' is-up' : ' is-down',
+    );
+}
+
+/**
+ * 近 7 个月（含本月）的柱状。纯 HTML + 内联高度百分比，不引图表库。
+ *
+ * 柱子高度是「相对最贵那个月」，不是相对均值——记账要看的就是哪个月冲出去了。
+ * 月份由插件补齐（没消费的那个月也占一根），所以这里不自己数月份。
+ */
+function noline_bills_bars($months)
+{
+    if (!is_array($months) || count($months) < 2) {
+        return '';
+    }
+
+    $max = 0.0;
+    foreach ($months as $month) {
+        $max = max($max, (float)$month['amount']);
+    }
+
+    if ($max <= 0) {
+        return '';
+    }
+
+    $bars = '';
+    foreach ($months as $month) {
+        $amount = (float)$month['amount'];
+        // 有消费就至少给 3px 的高度，只花了两块钱的月份不该在图上消失
+        $height = $amount > 0 ? max(3, round($amount / $max * 100, 1)) : 0;
+
+        $bars .= '<div class="bill-bar' . ($amount > 0 ? '' : ' is-empty') . '">'
+            . '<span class="bill-bar-plot"><i class="bill-bar-fill" style="height:' . $height . '%"></i></span>'
+            . '<span class="bill-bar-value">' . noline_bills_money($amount) . '</span>'
+            . '<span class="bill-bar-label">' . (int)substr((string)$month['month'], 5)
+            . '<i>' . _t('月') . '</i></span>'
+            . '</div>';
+    }
+
+    return '<div class="bill-bars" role="img" aria-label="' . _t('近 7 个月支出') . '">' . $bars . '</div>';
+}
+
+/**
+ * 本月分类占比条。share 是接口给的 0–1 小数，宽度直接拿百分比。
+ * 低于 4% 的不单独出条——名字会被挤成一团，归进最后那条「其余」。
+ *
+ * 色条类名在这儿对着代码写全（is-veg / is-rest…），不拼 'is-' . $kind：
+ * 拼出来的串 _dev/classcheck.py 只能扫到 'is-'，真正的类会被当成死样式报掉。
+ */
+function noline_bills_kinds($kinds, $labels)
+{
+    if (!is_array($kinds) || $kinds === array()) {
+        return '';
+    }
+
+    $mods = array(
+        'veg' => 'is-veg', 'fruit' => 'is-fruit', 'meat' => 'is-meat', 'fish' => 'is-fish',
+        'egg' => 'is-egg', 'grain' => 'is-grain', 'seasoning' => 'is-seasoning',
+        'other' => 'is-other',
+    );
+
+    $rows = '';
+    $rest = array('amount' => 0.0, 'share' => 0.0, 'count' => 0);
+
+    foreach ($kinds as $kind) {
+        if ((float)$kind['share'] < 0.04) {
+            $rest['amount'] += (float)$kind['amount'];
+            $rest['share'] += (float)$kind['share'];
+            $rest['count'] += (int)$kind['count'];
+            continue;
+        }
+
+        $rows .= noline_bills_kind_row(
+            isset($labels[$kind['kind']]) ? $labels[$kind['kind']] : (string)$kind['kind'],
+            $kind,
+            isset($mods[$kind['kind']]) ? $mods[$kind['kind']] : 'is-other'
+        );
+    }
+
+    if ($rest['count'] > 0) {
+        $rest['share'] = round($rest['share'], 3);
+        $rows .= noline_bills_kind_row(_t('其余'), $rest, 'is-rest');
+    }
+
+    return '<div class="bill-kinds">' . $rows . '</div>';
+}
+
+/**
+ * 一行占比条。
+ */
+function noline_bills_kind_row(string $label, array $kind, string $mod)
+{
+    $width = round(max(0.0, min(1.0, (float)$kind['share'])) * 100, 1);
+
+    return '<div class="bill-kind ' . $mod . '">'
+        . '<span class="bill-kind-label">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</span>'
+        . '<span class="bill-kind-track"><i class="bill-kind-fill" style="width:' . $width . '%"></i></span>'
+        . '<span class="bill-kind-amount">' . noline_bills_money($kind['amount'])
+        . '<i>' . _t('元') . '</i></span>'
+        . '<span class="bill-kind-share">' . $width . '%</span>'
+        . '</div>';
 }

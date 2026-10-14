@@ -122,6 +122,16 @@
     --health-over-bg:   rgba(168, 96, 15, .12);
     --health-obese:     #b3352f;
     --health-obese-bg:  rgba(179, 53, 47, .11);
+    /* 记账的八个分类色。一套八种，浅色压得住白底、深色要提亮，所以两边各写一份；
+       只有色相不同，明度都控制在同一档，避免「调料」那根紫色比别家更显眼。 */
+    --bill-veg:         #3f8a4f;
+    --bill-fruit:       #c4527a;
+    --bill-meat:        #a8543f;
+    --bill-fish:        #2f7f8c;
+    --bill-egg:         #c08a2e;
+    --bill-grain:       #8a6a45;
+    --bill-seasoning:   #7a5aa8;
+    --bill-other:       #6b7480;
     --scrim: rgba(15, 23, 42, .45);
     /* 灯箱：比 --scrim 更重的遮罩，配白字和半透明按钮底 */
     --lightbox-bg: rgba(8, 12, 18, .82);
@@ -283,6 +293,14 @@
     --health-over-bg:   rgba(226, 167, 95, .16);
     --health-obese:     #e0837a;
     --health-obese-bg:  rgba(224, 131, 122, .16);
+    --bill-veg:         #6ec389;
+    --bill-fruit:       #e79ab6;
+    --bill-meat:        #d99177;
+    --bill-fish:        #58bdd0;
+    --bill-egg:         #e6c274;
+    --bill-grain:       #c2a179;
+    --bill-seasoning:   #b197dd;
+    --bill-other:       #9aa4b0;
     --scrim: rgba(0, 0, 0, .62);
     --lightbox-bg: rgba(0, 0, 0, .90);
     --lightbox-fg: #e8eef6;
@@ -2522,6 +2540,322 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     /* 一行五列在窄屏放不下：备注整段换行，缩进到体重那一列的左边缘 */
     .health-row { flex-wrap: wrap; gap: .5rem; }
     .health-row-note { flex: 1 1 100%; margin-left: 3.875rem; white-space: normal; }
+}
+
+/* ==========================================================================
+   买菜记账页（bills.php）
+   数据由 NolineApi 插件的 Bills 给，这一节只管画：四块磁贴、六根月度柱、
+   本月分类占比条、按天分组的流水。柱高和条宽是模板算好的百分比，写在 style 里。
+   ========================================================================== */
+
+.bill-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: .75rem;
+    margin-top: 1.5rem;
+}
+.bill-tile {
+    display: flex;
+    flex-direction: column;
+    gap: .1875rem;
+    padding: .8125rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-soft);
+    transition: transform .25s var(--ease-spring), box-shadow .25s ease, background-color .25s ease;
+}
+.bill-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    background-color: var(--card-bg);
+}
+.bill-tile-label {
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+    font-size: .75rem;
+    font-weight: 600;
+    color: var(--text-light);
+}
+/* 金额比体重的数字再重一档：这一页用户扫的就是「多少钱」 */
+.bill-tile-value {
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1.25;
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+.bill-tile-value i {
+    margin-left: .1875rem;
+    font-size: .8125rem;
+    font-style: normal;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+.bill-tile-note { font-size: .75rem; color: var(--text-secondary); }
+/* 花超了不用红色警告——记账不是犯错。用暖的强调色，省下来才转绿。 */
+.bill-tile-note.is-up { color: var(--health-over); }
+.bill-tile-note.is-down { color: var(--health-normal); }
+.bill-tile-note.is-quiet { color: var(--text-light); }
+/* 「3/7 天」是口径说明，不是结论，所以它不跟着涨跌上色 */
+.bill-tile-note i {
+    font-style: normal;
+    margin-left: .3125rem;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+}
+
+.bill-chart,
+.bill-slice,
+.bill-log {
+    margin-top: 1.5rem;
+    padding: 1.125rem 1.125rem 1.25rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-zebra);
+}
+.bill-block-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-bottom: 1rem;
+}
+.bill-block-range {
+    font-size: .75rem;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 月度柱：六根等宽，柱高是「相对最贵那个月」的百分比，所以 .bill-bar-plot 得有定高，
+   百分比高度才有参照（父元素高度 auto 时子元素的 % 会退化成内容高度）。 */
+.bill-bars {
+    display: flex;
+    align-items: stretch;
+    gap: .5rem;
+}
+.bill-bar {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    gap: .3125rem;
+}
+.bill-bar-plot {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    width: 100%;
+    height: 8.75rem;
+}
+.bill-bar-fill {
+    width: 58%;
+    max-width: 2.5rem;
+    min-height: .1875rem;
+    border-radius: .3125rem .3125rem .125rem .125rem;
+    background-color: var(--accent);
+    transform-origin: bottom;
+    animation: bill-rise .55s var(--ease-ios) both;
+    transition: filter .2s ease;
+}
+.bill-bar:hover .bill-bar-fill { filter: brightness(1.12); }
+@keyframes bill-rise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+/* 那个月一条没记：留一根几乎看不见的矮柱占位，横轴不能因为少一个月就少一格 */
+.bill-bar.is-empty .bill-bar-fill { background-color: var(--border-color); }
+.bill-bar-value {
+    font-size: .6875rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+.bill-bar.is-empty .bill-bar-value { color: var(--text-light); font-weight: 500; }
+.bill-bar-label { font-size: .75rem; color: var(--text-light); }
+.bill-bar-label i { font-style: normal; margin-left: .0625rem; }
+
+/* 分类占比：名字 / 色条 / 金额 / 百分比四列，色条那一列吃掉剩余宽度 */
+.bill-kinds { display: flex; flex-direction: column; gap: .5rem; }
+.bill-kind {
+    display: flex;
+    align-items: center;
+    gap: .625rem;
+    font-size: .8125rem;
+}
+.bill-kind-label {
+    flex-shrink: 0;
+    width: 4.375rem;
+    color: var(--text-secondary);
+}
+.bill-kind-track {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    height: .5rem;
+    border-radius: var(--radius-full);
+    background-color: var(--surface-soft);
+    overflow: hidden;
+}
+.bill-kind-fill {
+    border-radius: var(--radius-full);
+    transition: width .5s var(--ease-ios);
+}
+.bill-kind-amount {
+    flex-shrink: 0;
+    min-width: 4.375rem;
+    text-align: right;
+    font-weight: 700;
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+.bill-kind-amount i {
+    margin-left: .125rem;
+    font-size: .6875rem;
+    font-style: normal;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+.bill-kind-share {
+    flex-shrink: 0;
+    width: 3.125rem;
+    text-align: right;
+    font-size: .75rem;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+}
+.bill-kind.is-veg .bill-kind-fill { background-color: var(--bill-veg); }
+.bill-kind.is-fruit .bill-kind-fill { background-color: var(--bill-fruit); }
+.bill-kind.is-meat .bill-kind-fill { background-color: var(--bill-meat); }
+.bill-kind.is-fish .bill-kind-fill { background-color: var(--bill-fish); }
+.bill-kind.is-egg .bill-kind-fill { background-color: var(--bill-egg); }
+.bill-kind.is-grain .bill-kind-fill { background-color: var(--bill-grain); }
+.bill-kind.is-seasoning .bill-kind-fill { background-color: var(--bill-seasoning); }
+.bill-kind.is-other .bill-kind-fill { background-color: var(--bill-other); }
+.bill-kind.is-rest .bill-kind-fill { background-color: var(--text-light); }
+
+.bill-top {
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+    margin: 1rem 0 0;
+    font-size: .8125rem;
+    color: var(--text-secondary);
+}
+
+/* 流水按天分组：一天一块，块头是日期 + 周几 + 当天合计 */
+.bill-day {
+    padding: .25rem 0 .5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+.bill-day:last-of-type { border-bottom: 0; }
+.bill-day-head {
+    display: flex;
+    align-items: baseline;
+    gap: .5rem;
+    margin-bottom: .125rem;
+}
+.bill-day-date {
+    font-size: .8125rem;
+    font-weight: 700;
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+.bill-day-week {
+    font-size: .6875rem;
+    font-style: normal;
+    color: var(--text-light);
+}
+.bill-day-total {
+    margin-left: auto;
+    font-size: .8125rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+.bill-day-total i {
+    margin-left: .125rem;
+    font-size: .6875rem;
+    font-style: normal;
+    font-weight: 500;
+    color: var(--text-light);
+}
+.bill-item {
+    display: flex;
+    align-items: center;
+    gap: .625rem;
+    padding: .375rem .25rem;
+    font-size: .8125rem;
+    border-radius: var(--radius-md);
+    transition: background-color .2s ease;
+}
+.bill-item:hover { background-color: var(--surface-soft); }
+.bill-item-kind {
+    flex-shrink: 0;
+    padding: .0625rem .4375rem;
+    border-radius: var(--radius-full);
+    background-color: var(--accent-bg);
+    font-size: .6875rem;
+    color: var(--accent);
+}
+.bill-item-title {
+    min-width: 0;
+    color: var(--text-strong);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.bill-item-shop {
+    /* 店名接口那边放到 40 字，窄屏不能让它把金额顶出卡片：可缩 + 省略号 */
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: .75rem;
+    color: var(--text-light);
+}
+.bill-item-amount {
+    margin-left: auto;
+    flex-shrink: 0;
+    font-weight: 700;
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+.bill-item-note {
+    margin: 0 0 .375rem;
+    padding-left: .25rem;
+    font-size: .75rem;
+    color: var(--text-secondary);
+}
+
+.bill-more {
+    margin: .875rem 0 0;
+    font-size: .75rem;
+    color: var(--text-light);
+}
+.bill-foot {
+    margin: 1.5rem 0 0;
+    padding-top: .875rem;
+    border-top: 1px solid var(--border-color);
+    font-size: .75rem;
+    color: var(--text-light);
+}
+
+@media (max-width: 640px) {
+    .bill-stats { grid-template-columns: repeat(2, 1fr); }
+    /* 跨半年的柱子在窄屏照样站得住，字号不动，只收柱间缝 */
+    .bill-bars { gap: .25rem; }
+    /* 标题和区间挤在一行会各自断成两行：让区间整段换到第二行 */
+    .bill-block-head { flex-wrap: wrap; }
+    .bill-block-range { flex: 1 1 100%; }
+    /* 百分比和色条说的是同一件事，窄屏省掉重复的那一列；地名留着，买菜的人认的就是它 */
+    .bill-kind { gap: .5rem; }
+    .bill-kind-share { display: none; }
+}
+
+/* 用户设了「减少动态效果」时，柱子直接落位，不做生长动画 */
+@media (prefers-reduced-motion: reduce) {
+    .bill-bar-fill { animation: none; }
+    .bill-kind-fill { transition: none; }
 }
 
 /* ==========================================================================
