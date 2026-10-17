@@ -187,9 +187,9 @@ $this->need('public/header.php');
                     </div>
 
                     <div class="health-plot">
-                        <span class="health-axis"><?php echo (float)$axis['max']; ?></span>
+                        <span class="health-axis"><?php echo number_format((float)$axis['max'], 1); ?></span>
                         <?php echo $trend; ?>
-                        <span class="health-axis"><?php echo (float)$axis['min']; ?></span>
+                        <span class="health-axis"><?php echo number_format((float)$axis['min'], 1); ?></span>
                     </div>
 
                     <div class="health-deltas">

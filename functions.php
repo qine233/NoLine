@@ -4,7 +4,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
 /**
  * 主题版本号。同时用作静态资源的缓存指纹（?v=），改版本即可强制刷新客户端缓存。
  */
-define('NOLINE_VERSION', '1.25.0');
+define('NOLINE_VERSION', '1.26.0');
 
 /* ==========================================================================
    后台设置
@@ -1535,7 +1535,14 @@ function noline_health_axis($series)
         return array('min' => round($mid - 1, 1), 'max' => round($mid + 1, 1));
     }
 
-    return array('min' => round($min, 1), 'max' => round($max, 1));
+    /* 上下各让 12% 的余量，再往外取到 0.5kg。取极值当上下界的话，最高最低那两点永远压在
+       画布边上：首末圆点被裁掉半截，线也读成「顶格」而不是「趋势」。 */
+    $room = ($max - $min) * 0.12;
+
+    return array(
+        'min' => floor(($min - $room) * 2) / 2,
+        'max' => ceil(($max + $room) * 2) / 2,
+    );
 }
 
 /**
@@ -1617,8 +1624,9 @@ function noline_health_trend($series)
 
     return '<svg class="health-svg" viewBox="0 0 ' . $width . ' ' . $height
         . '" role="img" aria-label="' . _t('体重趋势') . '">'
-        . $grid
         . '<path class="health-area" d="' . $area . '"/>'
+        // 网格线排在填充之后：SVG 按文档顺序叠色，不透明的填充会盖住先画的线
+        . $grid
         . '<path class="health-line" pathLength="1" d="' . $line . '"/>'
         . '<circle class="health-dot" cx="' . $xy[0][0] . '" cy="' . $xy[0][1] . '" r="3"/>'
         . '<circle class="health-dot is-last" cx="' . $xy[$total - 1][0] . '" cy="' . $xy[$total - 1][1] . '" r="4.5"/>'
@@ -1738,7 +1746,8 @@ function noline_bills_bars($months)
 
         $bars .= '<div class="bill-bar' . ($amount > 0 ? '' : ' is-empty') . '">'
             . '<span class="bill-bar-plot"><i class="bill-bar-fill" style="height:' . $height . '%"></i></span>'
-            . '<span class="bill-bar-value">' . noline_bills_money($amount) . '</span>'
+            // 空月份写「—」不写「0」：0 是一个金额，— 是「这一格没数据」
+            . '<span class="bill-bar-value">' . ($amount > 0 ? noline_bills_money($amount) : '—') . '</span>'
             . '<span class="bill-bar-label">' . (int)substr((string)$month['month'], 5)
             . '<i>' . _t('月') . '</i></span>'
             . '</div>';

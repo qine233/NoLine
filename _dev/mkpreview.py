@@ -21,6 +21,7 @@ HTML 手写出来，就能用真实浏览器验证：设计令牌、深色模式
        python3 -m http.server 8000   →   http://localhost:8000/index.html
 """
 import calendar
+import math
 import re
 from datetime import date, timedelta
 from pathlib import Path
@@ -960,12 +961,14 @@ def health_delta(value):
 
 
 def health_axis(weights):
-    """同 functions.php 的 noline_health_axis()：极值当上下界，几乎没变化时按 ±1kg 撑开。"""
+    """同 functions.php 的 noline_health_axis()：几乎没变化时按 ±1kg 撑开，
+    否则在极值外各让 12% 余量、再往外取到 0.5kg。"""
     lo, hi = min(weights), max(weights)
     if hi - lo < 2:
         mid = (hi + lo) / 2
         return round(mid - 1, 1), round(mid + 1, 1)
-    return round(lo, 1), round(hi, 1)
+    room = (hi - lo) * 0.12
+    return math.floor((lo - room) * 2) / 2, math.ceil((hi + room) * 2) / 2
 
 
 def health_trend_svg(series):
@@ -995,8 +998,8 @@ def health_trend_svg(series):
 
     return ('<svg class="health-svg" viewBox="0 0 %s %s" role="img" aria-label="体重趋势">'
             % (width, height)
-            + grid
             + '<path class="health-area" d="%s"/>' % area
+            + grid
             + '<path class="health-line" pathLength="1" d="%s"/>' % line
             + '<circle class="health-dot" cx="%s" cy="%s" r="3"/>' % xy[0]
             + '<circle class="health-dot is-last" cx="%s" cy="%s" r="4.5"/>' % xy[-1]
@@ -1108,7 +1111,7 @@ def health_page():
         delta = None if from_weight is None else round(latest['weight'] - from_weight, 1)
         text, cls = health_delta(delta)
         chips.append('<span class="health-delta%s"><b>%s</b><i>%d 天%s</i></span>'
-                     % (cls[1:], text, days,
+                     % (cls, text, days,
                         '' if from_date is None else ' · ' + from_date))
 
     chart = '''
@@ -1142,7 +1145,7 @@ def health_page():
             '<span class="health-row-delta%s">%s</span>'
             '<span class="health-row-bmi"><b class="health-badge is-%s">%s</b></span>'
             '%s</div>'
-            % (row['date'][5:], row['weight'], cls[1:], text,
+            % (row['date'][5:], row['weight'], cls, text,
                row['category'], row['bmi'],
                ('<span class="health-row-note">%s</span>' % row['note']) if row['note'] else ''))
 
@@ -1168,6 +1171,13 @@ BILLS_TODAY = date(2026, 10, 14)
 BILLS_KIND_LABELS = {
     'veg': '蔬菜', 'fruit': '水果', 'meat': '肉禽', 'fish': '水产',
     'egg': '蛋奶', 'grain': '米面粮油', 'seasoning': '调料', 'other': '其他',
+}
+
+# 同 bills.php 的 $row_class：流水行的分类配色跟着占比条走，类名写全不拼前缀
+BILLS_ROW_CLASS = {
+    'veg': 'bill-item is-veg', 'fruit': 'bill-item is-fruit', 'meat': 'bill-item is-meat',
+    'fish': 'bill-item is-fish', 'egg': 'bill-item is-egg', 'grain': 'bill-item is-grain',
+    'seasoning': 'bill-item is-seasoning', 'other': 'bill-item is-other',
 }
 
 # (品名, 分类代码, 参考价)。分类代码和插件 Bills::KINDS 一一对应，改了那边要改这里。
@@ -1325,7 +1335,8 @@ def bills_bars(months):
                  '<span class="bill-bar-value">%s</span>'
                  '<span class="bill-bar-label">%d<i>月</i></span>'
                  '</div>') % (
-            '' if amount > 0 else ' is-empty', height, bills_money(amount), int(month['month'][5:]))
+            '' if amount > 0 else ' is-empty', height,
+            bills_money(amount) if amount > 0 else '—', int(month['month'][5:]))
 
     return '<div class="bill-bars" role="img" aria-label="近 7 个月支出">%s</div>' % bars
 
@@ -1482,11 +1493,12 @@ def bills_page():
     for group in groups:
         items = ''
         for item in group['items']:
-            items += ('<div class="bill-item">'
+            items += ('<div class="%s">'
                       '<span class="bill-item-kind">%s</span>'
                       '<span class="bill-item-title">%s</span>'
                       '%s'
                       '<span class="bill-item-amount">%s</span></div>%s') % (
+                BILLS_ROW_CLASS[item['kind']],
                 BILLS_KIND_LABELS[item['kind']], item['title'],
                 ('<span class="bill-item-shop">%s</span>' % item['shop']) if item['shop'] else '',
                 bills_money(item['amount']),

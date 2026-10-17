@@ -67,6 +67,14 @@ $this->need('public/header.php');
                         'fish' => _t('水产'), 'egg' => _t('蛋奶'), 'grain' => _t('米面粮油'),
                         'seasoning' => _t('调料'), 'other' => _t('其他'),
                     );
+                    /** 分类 → 流水行整串类名。类名在这儿写全，不拼 'is-' . $kind：
+                     *  拼出来的串 _dev/classcheck.py 只能扫到 'is-'，真正的类会被当成死样式报掉。 */
+                    $row_class = array(
+                        'veg' => 'bill-item is-veg', 'fruit' => 'bill-item is-fruit',
+                        'meat' => 'bill-item is-meat', 'fish' => 'bill-item is-fish',
+                        'egg' => 'bill-item is-egg', 'grain' => 'bill-item is-grain',
+                        'seasoning' => 'bill-item is-seasoning', 'other' => 'bill-item is-other',
+                    );
                     $weekdays = array(_t('周一'), _t('周二'), _t('周三'), _t('周四'), _t('周五'), _t('周六'), _t('周日'));
 
                     /** 某天是周几；日期是真实的 YYYY-MM-DD，strtotime 不会失手 */
@@ -212,7 +220,7 @@ $this->need('public/header.php');
                         </div>
 
                         <?php foreach ($day['items'] as $item): ?>
-                        <div class="bill-item">
+                        <div class="<?php echo isset($row_class[$item['kind']]) ? $row_class[$item['kind']] : 'bill-item'; ?>">
                             <span class="bill-item-kind"><?php
                                 echo htmlspecialchars(isset($labels[$item['kind']]) ? $labels[$item['kind']] : $item['kind']);
                             ?></span>

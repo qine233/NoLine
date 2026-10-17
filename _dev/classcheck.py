@@ -76,6 +76,8 @@ NOT_A_CLASS = {
     # feed-cats.php 里 $c['slug'] 的数组键——$this->is('category', $slug) 比的是
     # archiveSlug，跟 class 无关
     'slug',
+    # bills.php 里 $row_class[$item['kind']] 的数组键，同上不是类名
+    'kind',
 }
 
 TEMPLATES = sorted(

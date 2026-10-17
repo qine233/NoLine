@@ -123,7 +123,9 @@
     --health-obese:     #b3352f;
     --health-obese-bg:  rgba(179, 53, 47, .11);
     /* 记账的八个分类色。一套八种，浅色压得住白底、深色要提亮，所以两边各写一份；
-       只有色相不同，明度都控制在同一档，避免「调料」那根紫色比别家更显眼。 */
+       只有色相不同，明度都控制在同一档，避免「调料」那根紫色比别家更显眼。
+       _bg 是同一支色掺一成透明度，给流水行的分类药丸用——占比条和流水说的是同一个分类，
+       颜色必须对得上，用户在两处扫一眼就能认出来。 */
     --bill-veg:         #3f8a4f;
     --bill-fruit:       #c4527a;
     --bill-meat:        #a8543f;
@@ -132,6 +134,14 @@
     --bill-grain:       #8a6a45;
     --bill-seasoning:   #7a5aa8;
     --bill-other:       #6b7480;
+    --bill-veg-bg:       rgba(63, 138, 79, .10);
+    --bill-fruit-bg:     rgba(196, 82, 122, .10);
+    --bill-meat-bg:      rgba(168, 84, 63, .10);
+    --bill-fish-bg:      rgba(47, 127, 140, .10);
+    --bill-egg-bg:       rgba(192, 138, 46, .12);
+    --bill-grain-bg:     rgba(138, 106, 69, .11);
+    --bill-seasoning-bg: rgba(122, 90, 168, .10);
+    --bill-other-bg:     rgba(107, 116, 128, .10);
     --scrim: rgba(15, 23, 42, .45);
     /* 灯箱：比 --scrim 更重的遮罩，配白字和半透明按钮底 */
     --lightbox-bg: rgba(8, 12, 18, .82);
@@ -301,6 +311,14 @@
     --bill-grain:       #c2a179;
     --bill-seasoning:   #b197dd;
     --bill-other:       #9aa4b0;
+    --bill-veg-bg:       rgba(110, 195, 137, .16);
+    --bill-fruit-bg:     rgba(231, 154, 182, .16);
+    --bill-meat-bg:      rgba(217, 145, 119, .16);
+    --bill-fish-bg:      rgba(88, 189, 208, .16);
+    --bill-egg-bg:       rgba(230, 194, 116, .16);
+    --bill-grain-bg:     rgba(194, 161, 121, .16);
+    --bill-seasoning-bg: rgba(177, 151, 221, .16);
+    --bill-other-bg:     rgba(154, 164, 176, .16);
     --scrim: rgba(0, 0, 0, .62);
     --lightbox-bg: rgba(0, 0, 0, .90);
     --lightbox-fg: #e8eef6;
@@ -2372,20 +2390,22 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     color: var(--text-light);
 }
 .health-tile-value {
-    font-size: 1.625rem;
+    font-size: 1.75rem;
     font-weight: 800;
-    line-height: 1.25;
+    line-height: 1.15;
+    letter-spacing: -.015em;
     color: var(--text-strong);
     font-variant-numeric: tabular-nums;
 }
 .health-tile-value i {
-    margin-left: .1875rem;
+    margin-left: .25rem;
     font-size: .8125rem;
     font-style: normal;
     font-weight: 600;
+    letter-spacing: 0;
     color: var(--text-secondary);
 }
-.health-tile-note { font-size: .75rem; color: var(--text-secondary); }
+.health-tile-note { font-size: .75rem; line-height: 1.5; color: var(--text-secondary); }
 
 /* 折线与记录表：卡片里再套一层极淡的底，和正文段落分开，但不再叠第二层阴影 */
 .health-chart,
@@ -2425,7 +2445,7 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
 .health-axis:last-child { bottom: 5.9%; transform: translateY(50%); }
 
 .health-svg { display: block; width: 100%; height: auto; overflow: visible; }
-.health-grid { stroke: var(--border-color); stroke-width: 1; }
+.health-grid { stroke: var(--border-color); stroke-width: 1; stroke-dasharray: 3 5; }
 .health-area { fill: var(--accent-bg); stroke: none; }
 .health-line {
     fill: none;
@@ -2447,23 +2467,25 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
 }
 
 /* 7 / 30 / 90 天涨跌 */
-.health-deltas { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+.health-deltas { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1.125rem; }
 .health-delta {
     display: inline-flex;
     align-items: baseline;
-    gap: .375rem;
+    gap: .4375rem;
     padding: .3125rem .6875rem;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-full);
     background-color: var(--card-bg);
     font-size: .75rem;
+    transition: border-color .2s ease, transform .2s var(--ease-spring);
 }
+.health-delta:hover { border-color: var(--accent-ring); transform: translateY(-1px); }
 .health-delta b {
     font-weight: 700;
     color: var(--text-strong);
     font-variant-numeric: tabular-nums;
 }
-.health-delta i { font-style: normal; color: var(--text-light); }
+.health-delta i { font-style: normal; color: var(--text-light); font-variant-numeric: tabular-nums; }
 .health-delta.is-up b { color: var(--health-over); }
 .health-delta.is-down b { color: var(--health-normal); }
 .health-delta.is-quiet b { color: var(--text-light); }
@@ -2486,8 +2508,11 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     display: flex;
     align-items: center;
     gap: .75rem;
-    padding: .5625rem .25rem;
+    /* 左右各让出 .5rem，负 margin 补回去：hover 的底色能圆角收尾，又不会缩进一格 */
+    margin: 0 -.5rem;
+    padding: .625rem .5rem;
     border-bottom: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
     font-size: .8125rem;
     transition: background-color .2s ease;
 }
@@ -2593,22 +2618,25 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     font-weight: 600;
     color: var(--text-light);
 }
-/* 金额比体重的数字再重一档：这一页用户扫的就是「多少钱」 */
+/* 和体重那一页同一档：两页都是「个人页」，磁贴的读数不该一个 1.625 一个 1.75，
+   金额靠 800 字重和「元」的小字就够显眼了。 */
 .bill-tile-value {
     font-size: 1.75rem;
     font-weight: 800;
-    line-height: 1.25;
+    line-height: 1.15;
+    letter-spacing: -.015em;
     color: var(--text-strong);
     font-variant-numeric: tabular-nums;
 }
 .bill-tile-value i {
-    margin-left: .1875rem;
+    margin-left: .25rem;
     font-size: .8125rem;
     font-style: normal;
     font-weight: 600;
+    letter-spacing: 0;
     color: var(--text-secondary);
 }
-.bill-tile-note { font-size: .75rem; color: var(--text-secondary); }
+.bill-tile-note { font-size: .75rem; line-height: 1.5; color: var(--text-secondary); }
 /* 花超了不用红色警告——记账不是犯错。用暖的强调色，省下来才转绿。 */
 .bill-tile-note.is-up { color: var(--health-over); }
 .bill-tile-note.is-down { color: var(--health-normal); }
@@ -2664,6 +2692,8 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     justify-content: center;
     width: 100%;
     height: 8.75rem;
+    /* 柱底一条基线：没有它，六根柱子像是浮在卡片里的色块，读不出「同一口径的高度」 */
+    border-bottom: 1px solid var(--border-color);
 }
 .bill-bar-fill {
     width: 58%;
@@ -2748,6 +2778,17 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
 .bill-kind.is-other .bill-kind-fill { background-color: var(--bill-other); }
 .bill-kind.is-rest .bill-kind-fill { background-color: var(--text-light); }
 
+/* 流水行的分类药丸跟着占比条同色：同一个「肉禽」在上下两块里是两种颜色，
+   读者就得来回对照图例。药丸只上文字色 + 一成底，不抢金额那一列的重。 */
+.bill-item.is-veg .bill-item-kind { color: var(--bill-veg); background-color: var(--bill-veg-bg); }
+.bill-item.is-fruit .bill-item-kind { color: var(--bill-fruit); background-color: var(--bill-fruit-bg); }
+.bill-item.is-meat .bill-item-kind { color: var(--bill-meat); background-color: var(--bill-meat-bg); }
+.bill-item.is-fish .bill-item-kind { color: var(--bill-fish); background-color: var(--bill-fish-bg); }
+.bill-item.is-egg .bill-item-kind { color: var(--bill-egg); background-color: var(--bill-egg-bg); }
+.bill-item.is-grain .bill-item-kind { color: var(--bill-grain); background-color: var(--bill-grain-bg); }
+.bill-item.is-seasoning .bill-item-kind { color: var(--bill-seasoning); background-color: var(--bill-seasoning-bg); }
+.bill-item.is-other .bill-item-kind { color: var(--bill-other); background-color: var(--bill-other-bg); }
+
 .bill-top {
     display: flex;
     align-items: center;
@@ -2798,7 +2839,8 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     display: flex;
     align-items: center;
     gap: .625rem;
-    padding: .375rem .25rem;
+    margin: 0 -.5rem;
+    padding: .4375rem .5rem;
     font-size: .8125rem;
     border-radius: var(--radius-md);
     transition: background-color .2s ease;
@@ -2838,7 +2880,8 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
 }
 .bill-item-note {
     margin: 0 0 .375rem;
-    padding-left: .25rem;
+    /* 和流水行的左边缘对齐：那一行现在也是 .5rem 的左内缩 */
+    padding-left: .5rem;
     font-size: .75rem;
     color: var(--text-secondary);
 }
