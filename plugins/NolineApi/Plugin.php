@@ -2,11 +2,13 @@
 
 namespace TypechoPlugin\NolineApi;
 
+use Typecho\Db;
 use Typecho\Plugin\PluginInterface;
 use Typecho\Widget\Helper\Form;
 use Typecho\Widget\Helper\Form\Element\Password;
 use Typecho\Widget\Helper\Form\Element\Radio;
 use Typecho\Widget\Helper\Form\Element\Text;
+use Typecho\Widget\Helper\Form\Element\Textarea;
 use Widget\Options;
 
 if (!defined('__TYPECHO_ROOT_DIR__')) {
@@ -25,13 +27,13 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package NolineApi
  * @author 州州
- * @version 1.4.0
+ * @version 1.7.0
  * @link https://ui.zhouzhou.work/
  */
 class Plugin implements PluginInterface
 {
     /** 改这里要同时改文件头注释里的 @version，后台插件列表读的是注释 */
-    private const VERSION = '1.4.0';
+    private const VERSION = '1.7.0';
 
     /** 数据目录放在 uploads 下，不在主题目录内，升级主题不会清空记录 */
     private const DATA_DIR = '/usr/uploads/noline_api';
@@ -46,23 +48,125 @@ class Plugin implements PluginInterface
     /** 文件里最多留多少条：按一天一条能存 10 年，再多才丢最旧的，趋势不会莫名断头 */
     private const KEEP = 3660;
 
-    public static function activate()
-    {
+    /** 核心把钩子记在 options.plugins 里时用的名字，就是插件目录名 */
+    private const HANDLE = 'NolineApi';
+
+    /**
+     * 这个插件往核心身上挂的所有钩子，一处声明。
+     * 每项 [句柄文件, 组件, 静态方法]，activate() 照它注册，换装后的自愈照它比对。
+     *
+     * 改这张表要守一条规矩：<strong>onRequest 和 onAdminMenu 这两个入口不能同时消失或改名</strong>。
+     * 在线更新只换文件，换不掉数据库里已经登记好的钩子——自愈全靠这两条里至少有一条还挂着，
+     * 下一次请求才进得来。真要挪走谁，先留一个版本做兼容，再在下一个版本删。
+     */
+    private const HOOKS = array(
         // begin 在 Router::dispatch() 之前触发，此时还没有任何输出，可以直接吐 JSON 并 exit
-        \Typecho\Plugin::factory('index.php')->begin = array(__CLASS__, 'onRequest');
+        array('index.php', 'begin', 'onRequest'),
         // 后台没有给插件留独立页面的挂载点，能塞东西的只有顶栏这一条，页面本身自己渲染
-        \Typecho\Plugin::factory('admin/menu.php')->navBar = array(__CLASS__, 'onAdminMenu');
+        array('admin/menu.php', 'navBar', 'onAdminMenu'),
         // 图床面板挂在写文章/写页面的 bottom。不占 richEditor：那个钩子一旦被插件占了，
         // 核心就跳过 editor-js.php，自带编辑器和它的插入行为一起没了
-        \Typecho\Plugin::factory('admin/write-post.php')->bottom = array(__CLASS__, 'onEditorBottom');
-        \Typecho\Plugin::factory('admin/write-page.php')->bottom = array(__CLASS__, 'onEditorBottom');
+        array('admin/write-post.php', 'bottom', 'onEditorBottom'),
+        array('admin/write-page.php', 'bottom', 'onEditorBottom'),
+    );
+
+    public static function activate()
+    {
+        self::registerHooks();
 
         return _t('接口已启用。先在插件设置里填密钥，再访问 <code>/api/ping</code> 自检；'
-            . '主题设置、更新记录与回滚在后台右上角的「主题管理」里（<strong>停用再启用一次插件</strong>'
-            . '那个链接才会出现）。<strong>主题自动更新默认开着</strong>：后台路过任意一个页面时如果发现 '
-            . 'Release 里有新版本，会当场把旧主题整份备份再换成新版本，不需要点任何东西，'
-            . '不想让它自己动手就在那个页面的设置里关掉。图床同样在设置里填 Cloudreve 地址和 '
+            . '主题设置、更新记录与回滚在后台右上角的「主题管理」里。'
+            . '<strong>主题自动更新默认开着</strong>：后台路过任意一个页面时如果发现 '
+            . 'Release 里有新版本，会当场把旧主题和旧插件各整份备份、再换成新版本，不需要点任何东西，'
+            . '不想让它自己动手就在那个页面的设置里关掉。连不上 GitHub 的站点可以在设置里填「主题更新镜像」，'
+            . '直连失败会自动退到镜像。图床同样在设置里填 Cloudreve 地址和 '
             . 'Refresh Token，填好后进写文章页的「附件」标签就能看到上传区。');
+    }
+
+    /** 照 HOOKS 把钩子挂上核心。激活和自愈重登记走的都是这一个入口 */
+    private static function registerHooks()
+    {
+        foreach (self::HOOKS as $hook) {
+            \Typecho\Plugin::factory($hook[0])->{$hook[1]} = array(__CLASS__, $hook[2]);
+        }
+    }
+
+    /**
+     * 换装之后的钩子自愈。
+     *
+     * 在线更新能把 usr/plugins/NolineApi 整个换掉，却换不掉数据库里登记好的钩子——
+     * 核心只在「停用再启用」那一刻把 activate() 注册的东西序列化进 options.plugins。
+     * 于是每次路过入口钩子都比对一次：登记的和当前代码要的不一样，就照 activate() 的路子
+     * 重新登记一遍写回去。人不用去插件页点任何东西，设置那行 <code>plugin:NolineApi</code> 也不碰。
+     *
+     * 常态是一次字符串比较就返回，不碰数据库；真要写而写失败也不吭声——钩子照旧能跑，
+     * 下一个请求还会再试，比一次失败的写库把整站拖崩划算得多。
+     */
+    public static function resyncHooks()
+    {
+        static $asked = false;
+
+        if ($asked) {
+            return;
+        }
+
+        $asked = true;
+
+        try {
+            $plugins = \Typecho\Plugin::export();
+            $mine = isset($plugins['activated'][self::HANDLE]['handles'])
+                && is_array($plugins['activated'][self::HANDLE]['handles'])
+                ? $plugins['activated'][self::HANDLE]['handles'] : null;
+
+            /* 插件不在启用列表里（被停用了，或者那条记录被人动过）：不该在这儿替人启用 */
+            if ($mine === null) {
+                return;
+            }
+
+            $expected = array();
+
+            foreach (self::HOOKS as $hook) {
+                $expected[$hook[0] . ':' . $hook[1]][] = array(__CLASS__, $hook[2]);
+            }
+
+            if (self::hookSignature($mine) === self::hookSignature($expected)) {
+                return;
+            }
+
+            /* 摘掉旧的、按当前代码重新挂上，用的都是核心自己的方法：
+               出来的顺序和权重，跟人去插件页「停用再启用」一次完全一样 */
+            \Typecho\Plugin::deactivate(self::HANDLE);
+            self::registerHooks();
+            \Typecho\Plugin::activate(self::HANDLE);
+
+            $db = Db::get();
+            $db->query($db->update('table.options')
+                ->rows(array('value' => serialize(\Typecho\Plugin::export())))
+                ->where('name = ?', 'plugins'));
+        } catch (\Throwable $e) {
+            // 见上文：静默，下个请求再来
+        }
+    }
+
+    /**
+     * 把「句柄:组件 → 回调列表」压成一个能直接比字符串的形状。
+     * 顺序也排进去：核心按权重排序存过，比对不该因为顺序不同就白写一次库。
+     */
+    private static function hookSignature(array $handles): string
+    {
+        $flat = array();
+
+        foreach ($handles as $component => $callbacks) {
+            foreach ((array)$callbacks as $callback) {
+                $flat[] = $component . '=' . (is_array($callback)
+                    ? implode('::', $callback)
+                    : (is_string($callback) ? $callback : gettype($callback)));
+            }
+        }
+
+        sort($flat);
+
+        return implode('|', $flat);
     }
 
     public static function deactivate()
@@ -190,14 +294,33 @@ class Plugin implements PluginInterface
             '1',
             _t('主题自动更新'),
             _t('开着的时候，后台任意一个页面路过都会查一次（结果缓存 6 小时），'
-                . '发现 Release 里有新版本就当场下载、解压、把旧主题整份挪进备份再让新版本顶上，不需要你点任何东西。'
+                . '发现 Release 里有新版本就当场下载、解压、把旧主题和旧插件各整份挪进备份再让新版本顶上，不需要你点任何东西。'
                 . '<strong>站点会在那几十微秒里对撞上的请求返回一次错误</strong>；'
                 . '中途被打断会自己把备份搬回原位。旧版本全留在 <code>usr/uploads/noline_backup</code>，'
-                . '「主题管理」页随时能回滚。两轮之间至少隔 1 小时，失败也不会每个页面刷新一次去撞 GitHub 限额。'
+                . '「主题管理」页随时能回滚。换完插件不用再去插件页停用再启用：'
+                . '它登记的钩子会在下一个页面自动对齐当前代码。'
+                . '两轮之间至少隔 1 小时，失败也不会每个页面刷新一次去撞 GitHub 限额。'
                 . '只有管理员登录的后台请求会触发。<strong>注意它不判断 Release 本身是好是坏</strong>——'
                 . '传上去的包只要版本号和 tag 对得上就会直接顶上，发布前自己验一遍。')
         );
         $form->addInput($autoUp);
+
+        $mirrors = new Textarea(
+            'updateMirrors',
+            null,
+            Updater::DEFAULT_MIRRORS,
+            _t('主题更新镜像（可选）'),
+            _t('一行一条，按顺序试。<strong>GitHub 直连优先</strong>，只有直连失败（连不上、超时、被限流、5xx）才退到镜像；'
+                . '镜像也一条条试，试不通的进 30 分钟冷却，不会拿每个后台页面去撞它。<br>'
+                . '三种写法：<strong>纯域名前缀</strong>（如 <code>https://gh-proxy.com/</code>，插件把整条 GitHub 地址拼在后面，'
+                . '检测和下载都能用）；<strong>含 <code>{api}</code></strong> 的当检测模板；'
+                . '<strong>含 <code>{tag}</code> 或 <code>{asset}</code></strong> 的只当下载地址（适合只镜像了包的自有 CDN）。<br>'
+                . '留空就是只用 GitHub 直连。<strong>镜像站不会收到你的 GitHub token</strong>（token 只发给 api.github.com），'
+                . '但镜像能决定它回给你什么字节，所以<em>只有从 api.github.com 直连拿到的 sha256 摘要才算可信</em>：'
+                . '检测只能走镜像时，自动覆盖会停下来等你在「主题管理」里手动确认，接口和页面本身不受影响。')
+        );
+        $mirrors->input->setAttribute('rows', '4');
+        $form->addInput($mirrors);
 
         $crEnabled = new Radio(
             'crEnabled',
@@ -305,6 +428,7 @@ class Plugin implements PluginInterface
      */
     public static function onAdminMenu()
     {
+        self::resyncHooks();
         Admin::menuLink();
         Updater::autoTick();
     }
@@ -323,6 +447,9 @@ class Plugin implements PluginInterface
      */
     public static function onRequest($unused = null)
     {
+        // 前台每一次请求都先确认钩子登记和当前代码对不对得上：在线更新换的是文件，换不掉数据库
+        self::resyncHooks();
+
         $route = self::route();
 
         if ($route === '') {

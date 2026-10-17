@@ -55,7 +55,7 @@ class Admin
         $token = Security::alloc()->getToken(null);
         $action = isset($_POST['action']) ? preg_replace('/[^a-z_]/', '', (string)$_POST['action']) : '';
 
-        // 上次升级要是停在「旧主题已挪走、新的还没顶上」，先把主题目录搬回来再谈别的
+        // 上次交换要是停在「旧的已挪走、新的还没顶上」，先把没换完的部分退回旧版本再谈别的
         $messages = array();
         $repaired = Updater::repairMessage();
 

@@ -11,7 +11,11 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
 }
 
 /**
- * 从 GitHub Release 更新主题：检测 → 下载 noline.zip → 解压验收 → 旧主题整份挪走当备份 → 新版本顶上。
+ * 从 GitHub Release 更新主题：检测 → 下载 noline.zip → 解压验收 → 旧主题和旧插件各整份挪走当备份 → 新版本顶上。
+ *
+ * 包里有两个根：noline/ 落到 usr/themes/noline，plugins/NolineApi/ 落到 usr/plugins/NolineApi。
+ * 两个目录是一对，一次交换要么都成要么都退回去；换完插件不改数据库里的钩子登记，
+ * 那部分由 Plugin::resyncHooks() 在下一次路过入口钩子时自己补齐。
  *
  * 三个硬门槛，缺任何一个都只给手动说明，不做半吊子的自动升级：
  *   连不上 GitHub（没 curl 又没 allow_url_fopen）
@@ -28,6 +32,11 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  * 自动升级默认开着：后台每个页面都会过一遍 autoTick()，检测到新版本就自己下载覆盖完，不等人点按钮。
  * 它只认管理员的登录态、每 AUTO_WAIT 秒最多跑一轮（失败也一样，免得每个页面都重试打爆 GitHub 限额），
  * 结论落进 state.json，人下次进这一页看到的是「已经升完了」而不是一个待办的按钮。
+ *
+ * 镜像是第二通道，不是替代：GitHub 直连先走，连不上 / 超时 / 被限流 / 5xx 才按设置里的顺序退到镜像，
+ * 一条镜像试不通就冷却 MIRROR_WAIT 秒。「检测能不能成」和「包能不能装」在这儿是两件事——
+ * 摘要只认 api.github.com 直连给的那份 sha256：镜像给什么字节我们信什么字节的话，它连摘要一起给就永远自洽，
+ * 所以只从镜像拿到结果时自动覆盖会停住，等人进这一页自己确认过再点。
  */
 class Updater
 {
@@ -36,6 +45,12 @@ class Updater
 
     private const WORK = '/usr/uploads/noline_update';
     private const BACKUP = '/usr/uploads/noline_backup';
+
+    /** 包里的第二个根：build.py 把插件按这个路径打进来，交换时和主题一起换 */
+    private const PACKAGE_PLUGIN = 'plugins/NolineApi';
+
+    /** 本机插件目录名，对着 usr/plugins/ */
+    private const LIVE_PLUGIN = 'NolineApi';
 
     /** 检测结果的缓存时长。GitHub 匿名限流是每 IP 每小时 60 次，别拿刷新去撞它 */
     private const TTL = 21600;
@@ -49,12 +64,49 @@ class Updater
 
     private const DEFAULT_REPO = 'qine233/noline';
 
+    /**
+     * 预置的公共镜像，一行一条，用户在后台可以随便改。
+     *
+     * 2026-10-15 实测：三个都能把 Release 附件原样代理出来（sha256 与 GitHub 给的一致）；
+     * 只有 gh-proxy.com 连 api.github.com 一起代理，另两个对 API 回 403——
+     * 所以它们只会参与下载那一步，检测还是得直连或者另找镜像。
+     */
+    public const DEFAULT_MIRRORS = "https://gh-proxy.com/\nhttps://ghfast.top/\nhttps://ghproxy.net/";
+
+    /** 试不通的镜像冷却这么久：一次更新要撞三条死镜像，比直连超时还慢，不能每个后台页面都来一遍 */
+    private const MIRROR_WAIT = 1800;
+
+    /** 设置里最多认这么多条，多出来的直接忽略 */
+    private const MAX_MIRRORS = 8;
+
+    /** 检测用的 GitHub 地址；镜像的前缀式形态就是把它或下载直链拼在后面 */
+    private const API_URL = 'https://api.github.com/repos/%s/releases/latest';
+
+    /** 附件直链一律自己按 repo + tag 拼，不拿镜像回的 JSON 里的 URL 去下载 */
+    private const DOWNLOAD_URL = 'https://github.com/%s/releases/download/%s/' . self::ASSET;
+
+    /**
+     * 只有直连说出口才算定论、不再换下一条的状态码。
+     * 404 是 GitHub 亲口说「这个仓库没有已发布的 Release」，换出口问不出别的答案；
+     * 镜像回 404 通常只是它没代理 API。
+     */
+    private const DIRECT_FINAL = array(404);
+
+    /** 这几个域名填进镜像设置里没有意义：直连本来就走它们，去重时直接丢掉 */
+    private const DIRECT_HOSTS = array(
+        'github.com',
+        'api.github.com',
+        'codeload.github.com',
+        'objects.githubusercontent.com',
+        'raw.githubusercontent.com',
+    );
+
     /* ======================================================================
        页面区块与动作
        ====================================================================== */
 
     /**
-     * 管理页里的「主题更新」这一段。
+     * 管理页里的「主题与插件更新」这一段。一次更新同时换 usr/themes/noline 和 usr/plugins/NolineApi。
      */
     public static function section(string $token, string $url): string
     {
@@ -64,7 +116,7 @@ class Updater
         $version = self::installedVersion();
         $canUpgrade = $check['ok'] && $check['available'] && $block === '';
 
-        $html = '<h3 class="nl-h3">' . Admin::esc(_t('主题更新')) . '</h3>';
+        $html = '<h3 class="nl-h3">' . Admin::esc(_t('主题与插件更新')) . '</h3>';
 
         $auto = Plugin::setting('autoUpgrade', '1') === '1';
         $state = self::readState();
@@ -76,7 +128,18 @@ class Updater
         }
         $html .= '<span class="nl-chip nl-chip-' . ($auto ? 'ok' : 'muted') . '">'
             . Admin::esc($auto ? _t('自动升级开着') : _t('自动升级已关')) . '</span>';
+
+        $html .= '<span class="nl-chip nl-chip-' . self::viaLevel($check) . '">'
+            . Admin::esc(self::viaText($check)) . '</span>';
+
+        $html .= '<span class="nl-chip nl-chip-' . ($check['sha_trusted'] ? 'ok' : 'muted') . '">'
+            . Admin::esc($check['sha_trusted']
+                ? _t('摘要可信（GitHub 直连给的）')
+                : ($check['sha'] === '' ? _t('GitHub 没给摘要') : _t('摘要只来自镜像'))) . '</span>';
+
         $html .= '</div>';
+
+        $html .= self::mirrorsHtml($check);
 
         $stateText = !$check['ok']
             ? _t('没拿到')
@@ -88,6 +151,14 @@ class Updater
             . '<div class="nl-ver-arrow">→</div>'
             . '<div class="nl-ver-latest"><b>' . Admin::esc($check['ok'] ? $check['tag'] : _t('未知')) . '</b>'
             . '<em>' . Admin::esc($stateText) . '</em></div></div>';
+
+        $pluginNow = self::installedPluginVersion();
+
+        $html .= '<p class="nl-note">' . Admin::esc($pluginNow === ''
+            ? _t('本机没装 NolineApi 插件，这一轮只换主题。')
+            : _t('插件 %s 跟着一起换：包里带着 plugins/NolineApi/，'
+                . '新插件的钩子登记会在下一个页面自己对齐，不用去插件页停用再启用。', $pluginNow))
+            . '</p>';
 
         if (isset($last['at']) && !empty($last['html'])) {
             $level = in_array(isset($last['level']) ? $last['level'] : '', array('success', 'error', 'warn'), true)
@@ -122,6 +193,13 @@ class Updater
                 . '</div>';
         }
 
+        /* 自动那一轮会被这个条件挡下来，手动按钮不会：得让人知道为什么要自己点一下 */
+        if ($check['ok'] && $check['available'] && !$check['sha_trusted']) {
+            $html .= '<div class="nl-msg nl-msg-warn">'
+                . Admin::esc(self::trustReason($check))
+                . '</div>';
+        }
+
         if ($block !== '') {
             $html .= '<div class="nl-msg nl-msg-warn">' . Admin::esc($block) . '</div>';
         }
@@ -133,7 +211,7 @@ class Updater
         }
 
         $ask = $canUpgrade
-            ? _t('确定升级主题吗？旧版本会先整份备份，站点会有极短的重启窗口。')
+            ? _t('确定升级吗？旧主题和旧插件会各自整份备份，站点会有极短的重启窗口。')
             : _t('重新访问 GitHub 检测一次？');
 
         $html .= '<form class="nl-inline" method="post" action="' . Admin::esc($url) . '"'
@@ -155,8 +233,11 @@ class Updater
 
         if ($check['asset'] !== '') {
             $html .= ' <a class="btn btn-s" href="' . Admin::esc($check['asset']) . '" rel="noopener">'
-                . Admin::esc(_t('只下 zip')) . '</a>'
-                . '<span class="nl-note">' . Admin::esc(_t('手动更新：解压后覆盖 usr/themes/noline，记得留 views/ 里本机独有的文件。'))
+                . Admin::esc(_t('只下 zip（GitHub 直链）')) . '</a>'
+                . '<span class="nl-note">' . Admin::esc(_t(
+                    '手动更新：解压后把 noline/ 覆盖到 usr/themes/noline，'
+                    . '包里的 plugins/NolineApi/ 覆盖到 usr/plugins/NolineApi，'
+                    . '记得留 views/ 里本机独有的文件。'))
                 . '</span>';
         }
 
@@ -281,6 +362,14 @@ class Updater
             return;
         }
 
+        /* 摘要来路不可信就不自动搬主题目录：静默换上一份「和镜像给的摘要一致」的包，
+           等于把站点交给那个镜像。人自己进这一页点确认是另一回事，autoTick 不代办。 */
+        if (empty($check['sha_trusted'])) {
+            self::note('warn', Admin::esc(self::trustReason($check)));
+
+            return;
+        }
+
         $result = self::upgrade(true);
         self::note($result[0], $result[1]);
     }
@@ -329,6 +418,9 @@ class Updater
         $fresh['failed'] = '';
 
         if ($fresh['ok']) {
+            /* 重读一遍再写：这一轮 fetch() 可能刚把某条镜像的冷却记进去，
+               拿开头的旧快照覆盖会把那条记录抹掉 */
+            $state = self::readState();
             $state['check'] = $fresh;
             unset($state['last_error']);
             self::saveState($state);
@@ -343,6 +435,7 @@ class Updater
             return self::withRelation($cached);
         }
 
+        $state = self::readState();
         $state['last_error'] = $fresh['error'];
         self::saveState($state);
 
@@ -358,8 +451,12 @@ class Updater
         $check = array_merge(array(
             'ok' => false, 'error' => '', 'tag' => '', 'body' => '', 'page' => '',
             'asset' => '', 'size' => 0, 'sha' => '', 'checked' => 0, 'cached' => false,
-            'failed' => '', 'repo' => '',
+            'failed' => '', 'repo' => '', 'api_via' => '', 'api_hops' => array(),
         ), $check);
+
+        /* 摘要只有在 GitHub 亲口给的时候才算可信：镜像要改包，连摘要也能一起编。
+           老缓存里没有 api_via 字段，一律按不可信处理——TTL 到期自然会被新结果顶掉。 */
+        $check['sha_trusted'] = $check['api_via'] === 'github' && $check['sha'] !== '';
 
         $mine = self::normalize(self::installedVersion());
         $theirs = self::normalize($check['tag']);
@@ -380,13 +477,17 @@ class Updater
     }
 
     /**
-     * 打一次 GitHub API。错误文案要能让人自己判断下一步：限流、没发过 release、还是根本连不上。
+     * 走一遍检测的候选链：GitHub 直连打头，后面接设置里没在冷却的镜像。
+     *
+     * 「试了一条不通就换下一条」和「上游压根没有 Release」必须分开：404 只有直连说的算数，
+     * 镜像回 404 更像是它没代理 GitHub 的 API 路径，接着往下试就是了。
+     * 反过来，token 出问题（401）时镜像反倒可能成功——token 压根不会发给镜像。
      */
     private static function fetch(string $repo): array
     {
         $out = array(
             'ok' => false, 'error' => '', 'tag' => '', 'body' => '', 'page' => '',
-            'asset' => '', 'size' => 0, 'sha' => '',
+            'asset' => '', 'size' => 0, 'sha' => '', 'api_via' => '', 'api_hops' => array(),
         );
 
         if (!preg_match('#^[A-Za-z0-9._-]{1,60}/[A-Za-z0-9._-]{1,100}$#', $repo)) {
@@ -395,55 +496,114 @@ class Updater
             return $out;
         }
 
-        $http = self::http('https://api.github.com/repos/' . $repo . '/releases/latest', 15, true);
+        $candidates = array(array('github', sprintf(self::API_URL, $repo), false));
 
-        if ($http['error'] !== '') {
-            $out['error'] = $http['error'];
+        foreach (self::mirrors() as $mirror) {
+            if ($mirror['cooling'] > 0) {
+                continue;
+            }
 
-            return $out;
+            $url = self::mirrorPlan($mirror['line'], $repo, '', 'check');
+
+            if ($url === '') {
+                continue;
+            }
+
+            $candidates[] = array($mirror['host'], $url, true);
         }
 
-        if ($http['status'] === 404) {
-            $out['error'] = _t('%s 没有可用的 Release。latest 只认「已发布、非草稿」里最新的那一个，'
-                . 'draft 状态的 release 看不见。', $repo);
+        $failures = array();
 
-            return $out;
+        foreach ($candidates as $candidate) {
+            $parsed = self::parseRelease(
+                self::http($candidate[1], 15, true),
+                $candidate[0],
+                $repo,
+                $candidate[2]
+            );
+
+            if ($parsed['final']) {
+                $out['error'] = $parsed['why'];
+
+                return $out;
+            }
+
+            if ($parsed['ok']) {
+                return array_merge($out, $parsed['data'], array(
+                    'ok' => true,
+                    'api_via' => $candidate[0],
+                    'api_hops' => $failures,
+                ));
+            }
+
+            self::hopFail($failures, $candidate[0], $parsed['why'], $candidate[2]);
+        }
+
+        $out['api_hops'] = $failures;
+        $out['error'] = self::hopError($failures);
+
+        return $out;
+    }
+
+    /**
+     * 一次检测应答的三种归类：可以用、换下一条、这条答案就是最终答案。
+     *
+     * 结构性的坏消息（Release 里压根没有 noline.zip、附件大得不像主题包）只有 GitHub
+     * 直连说的才当定论；镜像回的 JSON 随时可能是被改写或截断过的，换一条出口再问一次。
+     *
+     * @return array ['ok' => bool, 'final' => bool, 'why' => string, 'data' => array]
+     */
+    private static function parseRelease(array $http, string $label, string $repo, bool $isMirror): array
+    {
+        if ($http['error'] !== '') {
+            return self::miss($http['error'], false);
+        }
+
+        $direct = !$isMirror;
+
+        if (in_array($http['status'], self::DIRECT_FINAL, true)) {
+            return self::miss($direct
+                ? _t('%s 没有可用的 Release。latest 只认「已发布、非草稿」里最新的那一个，'
+                    . 'draft 状态的 release 看不见。', $repo)
+                : _t('HTTP 404，这条镜像多半没代理 GitHub 的 API。'), $direct);
         }
 
         if ($http['status'] === 401) {
-            $out['error'] = _t('GitHub 不认设置里那个 token（HTTP 401），它多半已被撤销或过期。'
-                . '把 token 清空保存一次就退回匿名访问。');
-
-            return $out;
+            return self::miss(_t('GitHub 不认设置里那个 token（HTTP 401），它多半已被撤销或过期。'
+                . '把 token 清空保存一次就退回匿名访问。'), false);
         }
 
         if ($http['status'] === 403 || $http['status'] === 429) {
-            $out['error'] = trim(Plugin::setting('ghToken', '')) === ''
-                ? _t('被 GitHub 限流了（匿名访问每个 IP 每小时 60 次）。'
-                    . '在插件设置里填一个只读 token，或者一小时后再来。')
+            return self::miss(trim(Plugin::setting('ghToken', '')) === ''
+                ? _t('被 GitHub 限流了（匿名访问每个 IP 每小时 60 次），或者这条镜像本身回 %d。'
+                    . '在插件设置里填一个只读 token，或者一小时后再来。', $http['status'])
                 : _t('GitHub 用 HTTP %d 挡了这个 token：权限不够、已被撤销，或者额度用完了。'
-                    . '先把 token 清空退回匿名访问试一次。', $http['status']);
-
-            return $out;
+                    . '先把 token 清空退回匿名访问试一次。', $http['status']), false);
         }
 
         if ($http['status'] !== 200) {
-            $out['error'] = _t('GitHub 返回了 HTTP %d。', $http['status']);
-
-            return $out;
+            return self::miss($isMirror
+                ? _t('镜像 %1$s 返回 HTTP %2$d（%3$s 没把它代理出来）。', $label, $http['status'], $repo)
+                : _t('GitHub 返回了 HTTP %d。', $http['status']), false);
         }
 
         $data = json_decode($http['body'], true);
 
         if (!is_array($data) || empty($data['tag_name'])) {
-            $out['error'] = _t('返回的内容不像预期的 release JSON，可能被代理或 CDN 改写了。');
-
-            return $out;
+            return self::miss($isMirror
+                ? _t('镜像 %s 回的内容不是预期的 release JSON，多半只代理了附件、没代理 API。', $label)
+                : _t('返回的内容不像预期的 release JSON，可能被代理或 CDN 改写了。'), false);
         }
 
-        $out['tag'] = trim((string)$data['tag_name']);
-        $out['body'] = isset($data['body']) && is_string($data['body']) ? $data['body'] : '';
-        $out['page'] = isset($data['html_url']) ? (string)$data['html_url'] : '';
+        $tag = trim((string)$data['tag_name']);
+        $payload = array(
+            'tag' => $tag,
+            'body' => isset($data['body']) && is_string($data['body']) ? $data['body'] : '',
+            'page' => isset($data['html_url']) ? (string)$data['html_url'] : '',
+            'asset' => '',
+            'size' => 0,
+            'sha' => '',
+        );
 
         $assets = isset($data['assets']) && is_array($data['assets']) ? $data['assets'] : array();
 
@@ -456,33 +616,32 @@ class Updater
                 continue;
             }
 
-            $out['asset'] = isset($asset['browser_download_url'])
-                ? (string)$asset['browser_download_url'] : '';
-            $out['size'] = isset($asset['size']) ? (int)$asset['size'] : 0;
+            $payload['size'] = isset($asset['size']) ? (int)$asset['size'] : 0;
             /* GitHub 给了摘要就校验，没给就跳过——不能因为它没提供 digest 就拒绝升级 */
-            $out['sha'] = isset($asset['digest']) && is_string($asset['digest'])
+            $payload['sha'] = isset($asset['digest']) && is_string($asset['digest'])
                 ? strtolower(trim($asset['digest'])) : '';
+            /* 直链一律自己按 repo + tag 拼，不用 JSON 里的 browser_download_url */
+            $payload['asset'] = self::assetUrl($repo, $tag);
 
             break;
         }
 
-        if ($out['asset'] === '') {
-            $out['error'] = _t('这个 Release 里没有叫 %s 的附件。发布时把 build.py 产出的 dist/noline.zip '
-                . '按原名上传成附件即可。', self::ASSET);
-
-            return $out;
+        if ($payload['asset'] === '') {
+            return self::miss(_t('这个 Release 里没有叫 %s 的附件。发布时把 build.py 产出的 dist/noline.zip '
+                . '按原名上传成附件即可。', self::ASSET), $direct);
         }
 
-        if ($out['size'] > self::MAX_ZIP) {
-            $out['error'] = _t('附件超过 %d MB，不像一个主题包，拒绝下载。',
-                (int)round(self::MAX_ZIP / 1048576));
-
-            return $out;
+        if ($payload['size'] > self::MAX_ZIP) {
+            return self::miss(_t('附件超过 %d MB，不像一个主题包，拒绝下载。',
+                (int)round(self::MAX_ZIP / 1048576)), $direct);
         }
 
-        $out['ok'] = true;
+        return array('ok' => true, 'final' => false, 'why' => '', 'data' => $payload);
+    }
 
-        return $out;
+    private static function miss(string $why, bool $final): array
+    {
+        return array('ok' => false, 'final' => $final, 'why' => $why, 'data' => array());
     }
 
     /**
@@ -503,7 +662,7 @@ class Updater
             $client->setAgent('NolineApi/updater');
             $client->setHeader('Accept', $json ? 'application/vnd.github+json' : 'application/zip');
 
-            $token = trim(Plugin::setting('ghToken', ''));
+            $token = self::tokenFor($url);
 
             if ($token !== '') {
                 $client->setHeader('Authorization', 'Bearer ' . $token);
@@ -539,7 +698,7 @@ class Updater
             'Accept: ' . ($json ? 'application/vnd.github+json' : 'application/zip'),
             'User-Agent: NolineApi/updater',
         );
-        $token = trim(Plugin::setting('ghToken', ''));
+        $token = self::tokenFor($url);
 
         if ($token !== '') {
             $headers[] = 'Authorization: Bearer ' . $token;
@@ -567,12 +726,26 @@ class Updater
         return array('status' => $status, 'body' => $body, 'error' => '');
     }
 
+    /**
+     * token 只发给 api.github.com。
+     *
+     * 发给镜像等于把凭据递给第三方，而它本来也不认这个 token；镜像那几条请求全部按匿名处理。
+     */
+    private static function tokenFor(string $url): string
+    {
+        if (strtolower((string)parse_url($url, PHP_URL_HOST)) !== 'api.github.com') {
+            return '';
+        }
+
+        return trim(Plugin::setting('ghToken', ''));
+    }
+
     /* ======================================================================
        升级
        ====================================================================== */
 
     /**
-     * 下载、验收、把旧主题整份挪去备份再让新版本顶上。
+     * 下载、验收、把旧主题和旧插件各整份挪去备份，再让新版本顶上。
      *
      * @param bool $auto 只影响历史里那一条怎么标，动作本身两种触发完全一样
      */
@@ -607,8 +780,11 @@ class Updater
             return self::fail(_t('临时目录或备份目录建不出来，检查 usr/uploads 是否可写。'));
         }
 
+        /* 附件地址按 repo + tag 现拼，所以这里要的仓库是检测当时那一份；
+           换过仓库的话缓存早就被 check() 作废了，不会走到这儿 */
+        $repo = $check['repo'] === '' ? self::repo() : $check['repo'];
+
         $stamp = date('Ymd-His');
-        $themeDir = self::themeDir();
         $from = self::installedVersion();
         $backup = $backupRoot . '/' . self::safe($from === '' ? 'unknown' : $from) . '-' . $stamp;
         $staging = $work . '/package-' . $stamp;
@@ -617,14 +793,17 @@ class Updater
         set_time_limit(0);
         ignore_user_abort(true);
 
-        $error = self::download($check['asset'], $zip, (int)$check['size'], (string)$check['sha']);
+        $fetched = self::download($repo, $check['tag'], $zip, (int)$check['size'], (string)$check['sha']);
 
-        if ($error !== '') {
-            return self::fail($error);
+        if (empty($fetched['ok'])) {
+            return self::fail($fetched['error']);
         }
 
+        $via = $fetched['via'] === 'github' ? _t('GitHub 直连') : $fetched['via'];
+
         $root = '';
-        $error = self::extract($zip, $staging, $root);
+        $packagePlugin = '';
+        $error = self::extract($zip, $staging, $root, $packagePlugin);
 
         if ($error !== '') {
             self::rrmdir($staging);
@@ -649,64 +828,56 @@ class Updater
             return self::fail(_t('包里的版本（%s）和本机一模一样。是 Release 重发过没换 tag 吗？已放弃。', $newVersion));
         }
 
-        $pending = array(
-            'theme'   => $themeDir,
-            'backup'  => $backup,
-            'staging' => $root,
-            'from'    => $from,
-            'to'      => $newVersion,
-            'stage'   => 'prepare',
-            'at'      => date('c'),
-        );
+        /* 包里带了插件才考虑换插件；本机没装、或者 usr/plugins 不让写，就只换主题，
+           不去替人决定「要不要突然多出一个插件目录」，也别把能成的主题升级一起拖死 */
+        $skipped = '';
 
-        $state['pending'] = $pending;
-        self::saveState($state);
+        if ($packagePlugin !== '') {
+            $livePlugin = self::pluginDir();
 
-        /* 旧主题整份挪走：一次 rename，不复制不删除，所以 views/ 下那些还没迁进
-           usr/uploads 的历史计数文件一定还在原地，回滚时也完整。 */
-        if (!@rename($themeDir, $backup)) {
-            $state = self::readState();
-            unset($state['pending']);
-            self::saveState($state);
-
-            return self::fail(_t('旧主题挪不动：%s（站点没受影响，主题还是原来那份。）', self::phpError()));
+            if (!is_dir($livePlugin) || is_link($livePlugin)) {
+                $skipped = _t('包里有插件，但本机没有可换的 NolineApi 目录，这一轮只换了主题。');
+                $packagePlugin = '';
+            } elseif (!is_writable(dirname($livePlugin))) {
+                $skipped = _t('包里有插件，但 usr/plugins 不可写，插件换不动，这一轮只换了主题。'
+                    . '插件还停在 %s，和主题的版本可能不匹配，去把目录权限修好再升级。',
+                    self::installedPluginVersion() === '' ? _t('未知版本') : self::installedPluginVersion());
+                $packagePlugin = '';
+            }
         }
 
-        $pending['stage'] = 'moved';
-        $state = self::readState();
-        $state['pending'] = $pending;
-        self::saveState($state);
+        $pluginFrom = $packagePlugin === '' ? '' : self::installedPluginVersion();
+        $pluginTo = $packagePlugin === '' ? '' : self::versionFromPlugin($packagePlugin . '/Plugin.php');
+        $swapped = self::swapAll(self::swapItems($root, $packagePlugin, $backup), array(
+            'backup'      => $backup,
+            'from'        => $from,
+            'to'          => $newVersion,
+            'plugin_from' => $pluginFrom,
+            'plugin_to'   => $pluginTo,
+        ));
 
-        if (!@rename($root, $themeDir)) {
-            $restored = @rename($backup, $themeDir);
-            $state = self::readState();
-            unset($state['pending']);
-            self::saveState($state);
-
-            return self::fail($restored
-                ? _t('新版本没能落到主题目录：%s。旧主题已原样放回，站点照常。', self::phpError())
-                : _t('新版本没能落到主题目录，旧主题也放不回去：%s。'
-                    . '请手动把 %s 挪回 usr/themes/noline。', self::phpError(), $backup));
+        if (empty($swapped['ok'])) {
+            /* 现场一点没动：挪走的、没挪走的、下载下来的都原样留着等下一次 repair() 收尾，
+               页面里的「清掉升级残留」是给人在确认过之后再按的 */
+            return self::fail($swapped['error']);
         }
 
-        $pending['stage'] = 'placed';
-        $state = self::readState();
-        $state['pending'] = $pending;
-        self::saveState($state);
+        $plan = $swapped['plan'];
 
         /* 权威计数在 usr/uploads/noline_views/ 里，交换碰不到；
            这一步只补主题目录 views/ 下「本机有、新版本没有」的旧版兜底文件。 */
-        $kept = self::mergeViews($backup . '/views', $themeDir . '/views');
+        $kept = self::mergeViews($backup . '/theme/views', $plan[0]['live'] . '/views');
 
+        self::clearPending();
         self::rrmdir($staging);
         @unlink($zip);
 
         $state = self::readState();
-        unset($state['pending']);
         $history = isset($state['upgrades']) && is_array($state['upgrades']) ? $state['upgrades'] : array();
         $history[] = array(
             'from' => $from, 'to' => $newVersion, 'at' => date('c'),
-            'backup' => $backup, 'kept_views' => $kept,
+            'backup' => $backup, 'kept_views' => $kept, 'via' => $fetched['via'],
+            'plugin_from' => $pluginFrom, 'plugin_to' => $pluginTo,
         );
         $state['upgrades'] = array_slice($history, -20);
         self::saveState($state);
@@ -715,16 +886,304 @@ class Updater
         $mismatch = $tagVersion !== '' && self::normalize($newVersion) !== $tagVersion;
 
         return array('success', Admin::esc(_t(
-            '已升级到 %1$s（原 %2$s）。旧主题完整留在 %3$s，随时能回滚。',
-            $newVersion, $from === '' ? _t('未知') : $from, $backup
-        )) . ($kept > 0 ? '<br>' . Admin::esc(_t('另外把本机独有的 %d 个 views/ 文件补进了新版本。', $kept)) : '')
+            '已升级到 %1$s（原 %2$s），包从 %3$s 下的。旧主题和旧插件各留了一份整副本在 %4$s，随时能回滚。',
+            $newVersion, $from === '' ? _t('未知') : $from, $via, $backup
+        ))
+            . ($pluginTo !== '' ? '<br>' . Admin::esc(_t(
+                '插件也一起换了：%s → %s。它登记的钩子会在下一个页面（前台后台都算）自己补齐，'
+                . '不用去插件页停用再启用。',
+                $pluginFrom === '' ? _t('未知版本') : $pluginFrom, $pluginTo)) : '')
+            . ($skipped !== '' ? '<br>' . Admin::esc($skipped) : '')
+            . ($kept > 0 ? '<br>' . Admin::esc(_t('另外把本机独有的 %d 个 views/ 文件补进了新版本。', $kept)) : '')
             . ($mismatch ? '<br>' . Admin::esc(_t(
                 '提醒：Release 的 tag 是 %s，包里的 @version 是 %s，两者对不上，回头确认一下发布。',
-                $check['tag'], $newVersion)) : ''));
+                $check['tag'], $newVersion)) : '')
+            . self::trustNote($check));
     }
 
     /**
-     * 回滚：把备份搬回主题目录，被顶掉的现行版本顺势存成一份新备份。
+     * 一次交换涉及的两个地方：主题，以及（包里带了插件时）插件。
+     * 备份目录里固定是 theme/ 和 plugin/ 两个子目录，repair 和回滚都按这个形状走。
+     *
+     * @return array 每项 ['label' => 文案, 'live' => 现网目录, 'backup' => 备份落点, 'staging' => 包里的新份]
+     */
+    private static function swapItems(string $root, string $pluginRoot, string $backup): array
+    {
+        $items = array(array(
+            'label' => _t('主题'),
+            'live' => self::themeDir(),
+            'backup' => $backup . '/theme',
+            'staging' => $root,
+        ));
+
+        if ($pluginRoot !== '') {
+            $items[] = array(
+                'label' => _t('插件'),
+                'live' => self::pluginDir(),
+                'backup' => $backup . '/plugin',
+                'staging' => $pluginRoot,
+            );
+        }
+
+        return $items;
+    }
+
+    /**
+     * 成对交换：每一项先把 live 整份挪到 backup 位置，再把各自的 staging 顶回 live。
+     *
+     * 升级和回滚只是这两组路径从哪儿来——顺序、pending 记录、失败回退全共用一套。
+     * 主题永远排第一，插件排第二，中途被打断时 repair() 也按这个顺序退回旧版本。
+     *
+     * @param array $plan 每项 ['label','live','backup','staging']
+     * @param array $base 先写进 pending 的说明性字段（备份目录、版本号之类）
+     * @return array ['ok' => bool, 'error' => string, 'plan' => array]
+     */
+    private static function swapAll(array $plan, array $base): array
+    {
+        $targets = array();
+        $absent = array();
+
+        foreach ($plan as $i => $item) {
+            if (!self::isSwappable($item) || is_link($item['live'])) {
+                continue;
+            }
+
+            $targets[] = $i;
+
+            /* 现网目录本来就不在（比如上一次交换没走完就被打断）：没东西要挪走，
+               但备份或解压出来的那一份照样能顶上去 */
+            if (!is_dir($item['live'])) {
+                $absent[] = $i;
+            }
+        }
+
+        if ($targets === array()) {
+            return array('ok' => false, 'plan' => $plan, 'error' => _t(
+                '要交换的目录一个都不在站点自己的目录下（主题或插件目录被移走或改成了软链接），没有动手。'));
+        }
+
+        $pending = $base + array(
+            'items'   => $plan,
+            'targets' => $targets,
+            'moved'   => array(),
+            'placed'  => array(),
+            'stage'   => 'prepare',
+            'at'      => date('c'),
+        );
+
+        self::mark($pending);
+
+        /* 每一项的落点必须还不存在：撞上上一次留下的同名目录，宁可不动也不要把两份副本混在一起 */
+        foreach ($targets as $i) {
+            $into = $plan[$i]['backup'];
+
+            if (is_dir($into) || (!is_dir(dirname($into)) && !@mkdir(dirname($into), 0755, true))) {
+                self::clearPending();
+
+                return array('ok' => false, 'plan' => $plan, 'error' => _t(
+                    '备份的落点 %s 用不了（已经存在，或者建不出来：%s），没有动手。', $into, self::phpError()));
+            }
+        }
+
+        /* 整份挪走：一项一次 rename，不复制不删除，所以 views/ 下那些还没迁进
+           usr/uploads 的历史计数文件一定还在原地，回退时也完整。 */
+        foreach ($targets as $i) {
+            if (in_array($i, $absent, true)) {
+                continue;
+            }
+
+            if (@rename($plan[$i]['live'], $plan[$i]['backup'])) {
+                $pending['moved'][] = $i;
+                self::mark($pending);
+
+                continue;
+            }
+
+            return self::swapFailed($pending, $i, _t('旧的%s挪不动', $plan[$i]['label']));
+        }
+
+        $pending['stage'] = 'moved';
+        self::mark($pending);
+
+        foreach ($targets as $i) {
+            if (@rename($plan[$i]['staging'], $plan[$i]['live'])) {
+                $pending['placed'][] = $i;
+                self::mark($pending);
+
+                continue;
+            }
+
+            return self::swapFailed($pending, $i, _t('新%s没能落到原位', $plan[$i]['label']));
+        }
+
+        $pending['stage'] = 'placed';
+        self::mark($pending);
+
+        return array('ok' => true, 'plan' => $plan, 'error' => '');
+    }
+
+    /**
+     * 交换某一步失败：能全自动退回就退回并清标记，退不干净就把 pending 留着——
+     * 留着才有下一次 repair() 重试的机会，清了就等于把半截现场丢给人自己收拾。
+     */
+    private static function swapFailed(array $pending, int $failedOn, string $what): array
+    {
+        $why = self::phpError();
+        $aside = '';
+        $undone = self::restorePending($pending, $aside);
+
+        if ($undone) {
+            self::clearPending();
+
+            return array('ok' => false, 'plan' => $pending['items'], 'error' => _t(
+                '%1$s：%2$s。前面已经搬过的都原样放回了，站点还是原来的样子。', $what, $why));
+        }
+
+        return array('ok' => false, 'plan' => $pending['items'], 'error' => _t(
+            '%1$s：%2$s。剩下的没能自动放回原位，现场整个留着了：一份在 %3$s，'
+            . '已经顶上原位的另一份暂存在 %4$s。再进一次这一页会自动重试，'
+            . '重试还不行就手动把它们各自摆回 usr/themes 与 usr/plugins 下。',
+            $what, $why, (string)$pending['backup'],
+            $aside === '' ? self::rootDir() . self::WORK : $aside));
+    }
+
+    /** 把 pending 落到 state.json，每次调用前都重读一遍，免得盖掉镜像冷却之类的别的记录 */
+    private static function mark(array $pending)
+    {
+        $state = self::readState();
+        $state['pending'] = $pending;
+        self::saveState($state);
+    }
+
+    private static function clearPending()
+    {
+        $state = self::readState();
+        unset($state['pending']);
+        self::saveState($state);
+    }
+
+    /**
+     * pending 里的一条记录能不能动手：三个路径必须都还在站点自己名下的目录里。
+     * state.json 被人手改过、或者目录搬过家，到这里就被挡下来。
+     */
+    private static function isSwappable(array $item): bool
+    {
+        if (!isset($item['live'], $item['backup'], $item['staging'])) {
+            return false;
+        }
+
+        foreach (array('live', 'backup', 'staging') as $key) {
+            if (!is_string($item[$key]) || $item[$key] === '') {
+                return false;
+            }
+        }
+
+        $root = self::rootDir();
+
+        /* 新版本的来源有两个：升级时是解压出来的临时目录，回滚时是备份目录里那份旧副本 */
+        return self::under($item['live'], array($root . '/usr/themes/', $root . __TYPECHO_PLUGIN_DIR__ . '/'))
+            && self::under($item['backup'], array($root . self::BACKUP . '/'))
+            && self::under($item['staging'], array($root . self::WORK . '/', $root . self::BACKUP . '/'));
+    }
+
+    /**
+     * 路径是不是严格落在某个前缀目录里。前缀都以 / 结尾，所以「正好等于前缀」不算。
+     */
+    private static function under(string $path, array $prefixes): bool
+    {
+        if (strpos($path, '..') !== false) {
+            return false;
+        }
+
+        foreach ($prefixes as $prefix) {
+            if (strpos($path, $prefix) === 0 && strlen($path) > strlen($prefix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 把 pending 里已经挪走的目录放回现网。中途被打断、以及某一步失败时都靠它收场。
+     *
+     * 已经落进去的新版不能就地盖掉——先把它挪去工作目录暂存，旧版才有位置回来。
+     *
+     * @param string|null $asideOut 新版暂存到了哪儿，供失败文案指给人看
+     * @return bool 是否一个都不缺（true 表示站点回到了交换前的样子）
+     */
+    private static function restorePending(array $pending, &$asideOut = null): bool
+    {
+        $items = isset($pending['items']) && is_array($pending['items']) ? $pending['items'] : array();
+        $moved = isset($pending['moved']) && is_array($pending['moved']) ? $pending['moved'] : array();
+        $placed = isset($pending['placed']) && is_array($pending['placed']) ? $pending['placed'] : array();
+        $clean = true;
+        $asideOut = '';
+        $aside = '';
+
+        if (!empty($placed)) {
+            $dir = self::workDir();
+
+            if ($dir !== null) {
+                $candidate = $dir . '/replaced-' . date('Ymd-His');
+
+                if (@mkdir($candidate, 0755, true) || is_dir($candidate)) {
+                    $aside = $candidate;
+                    $asideOut = $candidate;
+                }
+            }
+        }
+
+        foreach (array_reverse($moved) as $i) {
+            if (!isset($items[$i]) || !self::isSwappable($items[$i])) {
+                $clean = false;
+
+                continue;
+            }
+
+            /* 这一项已经换成新版了：新版先让位 */
+            if (in_array($i, $placed, true) && is_dir($items[$i]['live'])) {
+                $held = $aside === '' ? '' : $aside . '/' . basename($items[$i]['live']);
+
+                if ($held === '' || !@rename($items[$i]['live'], $held)) {
+                    $clean = false;
+
+                    continue;
+                }
+            }
+
+            if (!is_dir($items[$i]['live']) && !@rename($items[$i]['backup'], $items[$i]['live'])) {
+                $clean = false;
+            }
+        }
+
+        return $clean;
+    }
+
+    /**
+     * 摘要不是 GitHub 直连给的时候，升级完了要补一句「这回没验到 GitHub 那份摘要」。
+     * 手动升级允许在这种状态下发生（人自己看过 Release），但不能让它悄悄发生。
+     *
+     * @return string 已转义的 HTML 片段
+     */
+    private static function trustNote(array $check): string
+    {
+        if (!empty($check['sha_trusted'])) {
+            return '';
+        }
+
+        return '<br>' . Admin::esc($check['sha'] === ''
+            ? _t('提醒：这一轮没有可信的摘要可验，包只按字节数收了货，装完自己看一眼前台是否正常。')
+            : _t('提醒：这次的摘要来自 %s，不是 api.github.com 直接给的。'
+                . '校验只证明「字节和摘要一致」，而摘要和包是同一个出口一起回的。',
+                $check['api_via'] === '' ? _t('未知出口') : $check['api_via']));
+    }
+
+    /**
+     * 回滚：把备份里的主题（和插件）搬回原位，被顶掉的现行版本顺势存成一份新备份。
+     *
+     * 走的正是升级那套 swapAll：pending 记录、失败回退、中途打断后由 repair() 收尾都共用，
+     * 只是每一项的来处换成了备份目录。
      */
     private static function rollback(string $name): array
     {
@@ -746,24 +1205,44 @@ class Updater
             return self::fail(_t('备份目录不可写。'));
         }
 
+        /* 新备份是 theme/ + plugin/ 两个子目录；1.22 之前的老备份是平铺的整份主题 */
+        $themeSrc = '';
+
+        foreach (array($src . '/theme', $src) as $candidate) {
+            if (is_file($candidate . '/index.php')) {
+                $themeSrc = $candidate;
+
+                break;
+            }
+        }
+
+        if ($themeSrc === '') {
+            return self::fail(_t('这份备份里读不到主题的 index.php，不知道往哪儿放，回不去。'));
+        }
+
         set_time_limit(0);
         ignore_user_abort(true);
 
-        $themeDir = self::themeDir();
         $current = self::installedVersion();
         $aside = $backupRoot . '/' . self::safe($current === '' ? 'unknown' : $current) . '-' . date('Ymd-His');
 
-        if (is_dir($themeDir) && !@rename($themeDir, $aside)) {
-            return self::fail(_t('现在的主题挪不动：%s', self::phpError()));
+        if (!is_dir($aside) && !@mkdir($aside, 0755, true)) {
+            return self::fail(_t('给现在的版本腾备份的位子建不出来：%s', self::phpError()));
         }
 
-        if (!@rename($src, $themeDir)) {
-            if (is_dir($aside)) {
-                @rename($aside, $themeDir);
-            }
+        $pairs = self::rollbackPairs($src, $themeSrc, $aside);
+        $swapped = self::swapAll($pairs, array('backup' => $src, 'rollback' => $name));
 
-            return self::fail(_t('备份放不回主题目录：%s', self::phpError()));
+        if (empty($swapped['ok'])) {
+            /* 现场留着：挪出去的部分还在 aside 里，没挪的都在原位，pending 也已按策略决定去留 */
+            return self::fail($swapped['error']);
         }
+
+        self::clearPending();
+
+        /* 现行版本一个目录都没挪出来（比如主题本来就不在），别留一份空备份在列表里碍事 */
+        $stashed = self::treeSize($aside);
+        @rmdir($aside);
 
         /* 手动回滚掉的那一版不能被自动更新当场顶回去：记下这个 tag，以后只有比它新的才自动上 */
         $state = self::readState();
@@ -771,68 +1250,177 @@ class Updater
         $state['auto_floor'] = self::normalize(isset($seen['tag']) ? (string)$seen['tag'] : '');
         self::saveState($state);
 
+        $back = self::installedVersion();
+        /* 只有这份备份里确实带了插件副本，才说得上「插件也回去了」 */
+        $pluginBack = self::rollbackHasPlugin($pairs) ? self::installedPluginVersion() : '';
+
         return array('success', Admin::esc(_t(
-            '已回到 %1$s。被顶掉的那一版存成了新备份 %2$s。', $name, basename($aside)
-        )) . '<br>' . Admin::esc(_t('自动升级不会再把它顶上来了，除非 Release 里出了更新的版本。')));
+            '已回到 %1$s（用的是备份 %2$s）。%3$s',
+            $back === '' ? $name : $back, $name,
+            $stashed[0] > 0
+                ? _t('被顶掉的那一版整份存成了新备份 %s。', basename($aside))
+                : _t('刚才现网并没有可挪走的目录，所以这次没留下新备份。')
+        ))
+            . ($pluginBack !== '' ? '<br>' . Admin::esc(_t(
+                '插件也跟着回到了 %s，它登记的钩子会在下一个页面自己补齐。', $pluginBack)) : '')
+            . '<br>' . Admin::esc(_t('自动升级不会再把它顶上来了，除非 Release 里出了更新的版本。')));
+    }
+
+    /**
+     * 一份备份能往回放到哪些地方：theme/ 一定有，plugin/ 有就一起放回去。
+     *
+     * @return array 每项 ['label','slot','live','backup','staging']
+     */
+    private static function rollbackPairs(string $src, string $themeSrc, string $aside): array
+    {
+        $pairs = array(array(
+            'label'   => _t('主题'),
+            'slot'    => 'theme',
+            'live'    => self::themeDir(),
+            'backup'  => $aside . '/theme',
+            'staging' => $themeSrc,
+        ));
+
+        if (is_file($src . '/plugin/Plugin.php')) {
+            $pairs[] = array(
+                'label'   => _t('插件'),
+                'slot'    => 'plugin',
+                'live'    => self::pluginDir(),
+                'backup'  => $aside . '/plugin',
+                'staging' => $src . '/plugin',
+            );
+        }
+
+        return $pairs;
+    }
+
+    /** 这一份备份里带没带插件副本：没带的话不能说「插件也回去了」 */
+    private static function rollbackHasPlugin(array $pairs): bool
+    {
+        foreach ($pairs as $pair) {
+            if (isset($pair['slot']) && $pair['slot'] === 'plugin') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /* ======================================================================
        下载 / 解压 / 校验
        ====================================================================== */
 
-    private static function download(string $url, string $dest, int $expectedSize, string $expectedSha): string
+    /**
+     * 下载附件：GitHub 直链先试，不通再按设置里的顺序退镜像。
+     *
+     * 每一条候选都重新验字节数和摘要，验不过就删掉文件、把这条出口冷却起来再换下一条——
+     * 镜像回一半 HTML 错误页、回个截断的包，在这儿都会被挡下来。
+     * 地址一律自己按 repo + tag 拼，不用谁给的直链。
+     *
+     * @return array ['ok' => bool, 'via' => string, 'error' => string]
+     */
+    private static function download(string $repo, string $tag, string $dest, int $expectedSize, string $expectedSha): array
     {
-        $http = self::http($url, 120, false);
+        $candidates = array(array('github', self::assetUrl($repo, $tag), false));
 
-        if ($http['error'] !== '') {
-            return $http['error'];
+        foreach (self::mirrors() as $mirror) {
+            if ($mirror['cooling'] > 0) {
+                continue;
+            }
+
+            $url = self::mirrorPlan($mirror['line'], $repo, $tag, 'download');
+
+            if ($url === '') {
+                continue;
+            }
+
+            $candidates[] = array($mirror['host'], $url, true);
         }
 
-        if ($http['status'] !== 200) {
-            return _t('下载附件返回 HTTP %d。', $http['status']);
+        $failures = array();
+
+        foreach ($candidates as $candidate) {
+            $http = self::http($candidate[1], 120, false);
+
+            if ($http['error'] !== '') {
+                self::hopFail($failures, $candidate[0], $http['error'], $candidate[2]);
+
+                continue;
+            }
+
+            if ($http['status'] !== 200) {
+                self::hopFail($failures, $candidate[0], _t('下载附件返回 HTTP %d。', $http['status']), $candidate[2]);
+
+                continue;
+            }
+
+            if (@file_put_contents($dest, $http['body']) === false) {
+                return array('ok' => false, 'via' => $candidate[0],
+                    'error' => _t('写不进 %s。', $dest));
+            }
+
+            $error = self::verifyPackage($dest, $expectedSize, $expectedSha);
+
+            if ($error !== '') {
+                self::hopFail($failures, $candidate[0], $error, $candidate[2]);
+
+                continue;
+            }
+
+            return array('ok' => true, 'via' => $candidate[0], 'error' => '');
         }
 
-        if (@file_put_contents($dest, $http['body']) === false) {
-            return _t('写不进 %s。', $dest);
-        }
+        return array('ok' => false, 'via' => '', 'error' => self::hopError($failures));
+    }
 
+    /**
+     * 字节数和摘要两道验收。失败时文件已经被删掉，调用方只管换下一条出口。
+     *
+     * @return string 空串代表通过
+     */
+    private static function verifyPackage(string $dest, int $expectedSize, string $expectedSha): string
+    {
         $actual = (int)@filesize($dest);
 
         if ($expectedSize > 0 && $actual !== $expectedSize) {
             @unlink($dest);
 
-            return _t('下载不完整：GitHub 说 %1$d 字节，只拿到 %2$d 字节。', $expectedSize, $actual);
+            return _t('下载不完整：期望 %1$d 字节，只拿到 %2$d 字节。', $expectedSize, $actual);
         }
 
-        if ($expectedSha !== '') {
-            $position = strpos($expectedSha, ':');
-            $algorithm = $position === false ? '' : substr($expectedSha, 0, $position);
-            $wanted = $position === false ? $expectedSha : substr($expectedSha, $position + 1);
+        if ($expectedSha === '') {
+            return '';
+        }
 
-            if (!in_array($algorithm, array('sha256', 'sha1', 'md5'), true)) {
-                @unlink($dest);
+        $position = strpos($expectedSha, ':');
+        $algorithm = $position === false ? '' : substr($expectedSha, 0, $position);
+        $wanted = $position === false ? $expectedSha : substr($expectedSha, $position + 1);
 
-                return _t('GitHub 给的摘要格式不认识（%s），为稳妥起见没有继续。', $expectedSha);
-            }
+        if (!in_array($algorithm, array('sha256', 'sha1', 'md5'), true)) {
+            @unlink($dest);
 
-            $got = @hash_file($algorithm, $dest);
+            return _t('摘要格式不认识（%s），为稳妥起见没有继续。', $expectedSha);
+        }
 
-            if ($got === false || !hash_equals(strtolower($wanted), $got)) {
-                @unlink($dest);
+        $got = @hash_file($algorithm, $dest);
 
-                return _t('%s 摘要对不上：期望 %s，实际 %s。包在路上被改过，已删除。', $algorithm, $wanted, (string)$got);
-            }
+        if ($got === false || !hash_equals(strtolower($wanted), $got)) {
+            @unlink($dest);
+
+            return _t('%s 摘要对不上：期望 %s，实际 %s。包在路上被改过，已删除。', $algorithm, $wanted, (string)$got);
         }
 
         return '';
     }
 
     /**
-     * 解压并验收。$root 带出包真正的根目录——build.py 打的是 noline/…，顶层平铺的也认。
+     * 解压并验收。包里有两层根，$root / $pluginRoot 分别带出主题和插件那一份：
+     * build.py 打的是 noline/… + plugins/NolineApi/…，只有一层 noline/ 的老包也认
+     * （那时 $pluginRoot 是空串，这一轮只换主题）。
      *
      * @return string 空串代表通过
      */
-    private static function extract(string $zip, string $into, &$root): string
+    private static function extract(string $zip, string $into, &$root, &$pluginRoot): string
     {
         if (!class_exists('ZipArchive')) {
             return _t('PHP 没有 zip 扩展，解不开包。');
@@ -894,25 +1482,44 @@ class Updater
             return _t('解压过程出错，磁盘可能满了。');
         }
 
-        foreach (array($into . '/' . Theme::DIR, $into) as $candidate) {
-            if (!self::looksLikeTheme($candidate)) {
-                continue;
+        /* 解出来的东西里有软链就放弃：软链能把文件写到主题或插件目录外面去。
+           整个解压目录都扫，不只看主题那一半——包里现在还有 plugins/ */
+        foreach (self::walk($into) as $path) {
+            if (is_link($path)) {
+                return _t('包里有软链接（%s），不做交换。', $path);
             }
-
-            /* 解出来的东西里有软链就放弃：软链能把文件写到主题目录外面去 */
-            foreach (self::walk($candidate) as $path) {
-                if (is_link($path)) {
-                    return _t('包里有软链接（%s），不做交换。', $path);
-                }
-            }
-
-            $root = $candidate;
-
-            return '';
         }
 
-        return _t('包里找不到主题的 index.php / functions.php / public/header.php。'
-            . '顶层应该是一层 noline/ 目录，重新跑一次 _dev/build.py 再发布。');
+        $root = '';
+
+        foreach (array($into . '/' . Theme::DIR, $into) as $candidate) {
+            if (self::looksLikeTheme($candidate)) {
+                $root = $candidate;
+
+                break;
+            }
+        }
+
+        if ($root === '') {
+            return _t('包里找不到主题的 index.php / functions.php / public/header.php。'
+                . '顶层应该是一层 noline/ 目录，重新跑一次 _dev/build.py 再发布。');
+        }
+
+        /* 插件是包的第二个根。老包只有主题那一层，这种情况就只换主题 */
+        $plugin = $into . '/' . self::PACKAGE_PLUGIN;
+
+        if (is_dir($plugin) && !is_file($plugin . '/Plugin.php')) {
+            return _t('包里的 %s 没有 Plugin.php，这个包不完整，已放弃。', self::PACKAGE_PLUGIN);
+        }
+
+        if ($root === $into && is_dir($plugin)) {
+            return _t('这个包是平铺着打的（没有 noline/ 那一层），插件目录会和主题混在同一个根里，'
+                . '没法分开交换。重新跑一次 _dev/build.py。');
+        }
+
+        $pluginRoot = is_dir($plugin) ? $plugin : '';
+
+        return '';
     }
 
     private static function looksLikeTheme(string $dir): bool
@@ -958,7 +1565,10 @@ class Updater
        ====================================================================== */
 
     /**
-     * 上次升级停在半路就把主题目录恢复回来。进这一页第一件事就是它。
+     * 上次交换停在半路就按 pending 把现场收干净。进这一页第一件事就是它。
+     *
+     * 判断只看目录在不在，不猜进行到了第几步：要交换的每一项都换到位才算成，
+     * 差一个就整套退回旧版本——一半新一半旧最容易在运行时炸。
      */
     public static function repair(): string
     {
@@ -969,28 +1579,103 @@ class Updater
         }
 
         $pending = $state['pending'];
+
+        if (!isset($pending['items']) || !is_array($pending['items'])) {
+            return self::repairLegacy($pending);
+        }
+
+        $items = $pending['items'];
+        $targets = self::intList(isset($pending['targets']) ? $pending['targets'] : array());
+        $placed = self::intList(isset($pending['placed']) ? $pending['placed'] : array());
+        $moved = self::intList(isset($pending['moved']) ? $pending['moved'] : array());
+        $backup = isset($pending['backup']) ? (string)$pending['backup'] : '';
+
+        if ($moved === array()) {
+            /* 一个目录都还没挪过，站点就是原来的样子 */
+            self::clearPending();
+
+            return '';
+        }
+
+        $done = $targets !== array();
+
+        foreach ($targets as $i) {
+            if (!in_array($i, $placed, true) || !isset($items[$i]) || !is_dir($items[$i]['live'])) {
+                $done = false;
+
+                break;
+            }
+        }
+
+        if ($done) {
+            self::clearPending();
+            $state = self::readState();
+            $state['repairs'][] = array('at' => date('c'), 'completed' => $backup);
+            self::saveState($state);
+
+            return _t('上次升级只差最后一条记录没写下，主题和插件其实都已经换到位了。标记清掉了，'
+                . '旧版本整份留在 %s。', $backup);
+        }
+
+        $aside = '';
+        $undone = self::restorePending($pending, $aside);
+        $missing = array();
+
+        foreach ($moved as $i) {
+            if (isset($items[$i]) && self::isSwappable($items[$i]) && !is_dir($items[$i]['live'])) {
+                $missing[] = $items[$i]['label'];
+            }
+        }
+
+        if ($undone) {
+            self::clearPending();
+        }
+
+        $state = self::readState();
+        $state['repairs'][] = array(
+            'at' => date('c'), 'restored' => $backup, 'clean' => $undone, 'missing' => $missing,
+        );
+        $state['repairs'] = array_slice($state['repairs'], -20);
+        self::saveState($state);
+
+        if ($undone) {
+            return _t('检测到上次交换只完成了一部分，已全部退回旧版本（旧副本来自 %s），站点照旧。', $backup);
+        }
+
+        /* 退不干净就留着 pending：下次进这一页还会再试一遍，话也跟着一直挂在这儿 */
+        return _t('检测到上次交换只完成了一部分，%s 到现在还没回到原位，标记留着下次再试。'
+            . '待放的在 %s，已经顶上原位的新版本暂存在 %s，'
+            . '自动重试还不行就手动把它们摆回 usr/themes 与 usr/plugins 下。',
+            implode('、', $missing) === '' ? _t('有目录') : implode('、', $missing), $backup,
+            $aside === '' ? self::rootDir() . self::WORK : $aside);
+    }
+
+    /**
+     * 只带 theme 一项的老 pending（1.22 之前那套形状）单独收一次场。
+     */
+    private static function repairLegacy(array $pending): string
+    {
         $theme = isset($pending['theme']) ? (string)$pending['theme'] : '';
         $backup = isset($pending['backup']) ? (string)$pending['backup'] : '';
         $root = self::rootDir();
 
         /* 只认我们自己名下的路径，state.json 被手动改过也动不到别处 */
         if ($theme === '' || strpos($theme, $root . '/usr/themes/') !== 0) {
-            unset($state['pending']);
-            self::saveState($state);
+            self::clearPending();
 
             return '';
         }
 
         if (is_dir($theme)) {
-            unset($state['pending']);
-            self::saveState($state);
+            self::clearPending();
 
             return _t('上次升级在收尾阶段被打断，主题目录已经是新版本上的了，标记清掉了。'
                 . '再确认一次前台是否正常。');
         }
 
         if ($backup !== '' && is_dir($backup) && @rename($backup, $theme)) {
-            unset($state['pending']);
+            self::clearPending();
+            $state = self::readState();
             $state['repairs'][] = array('at' => date('c'), 'restored' => $backup);
             self::saveState($state);
 
@@ -998,6 +1683,22 @@ class Updater
         }
 
         return _t('主题目录不见了，备份也找不回来（%s）。只能手动重新上传主题。', $backup);
+    }
+
+    /**
+     * pending 里的下标列表都是 json 解码出来的，只收真正的整数下标。
+     */
+    private static function intList($values): array
+    {
+        $out = array();
+
+        foreach ((array)$values as $value) {
+            if (is_int($value)) {
+                $out[] = $value;
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -1019,11 +1720,27 @@ class Updater
         }
 
         $removed = 0;
+        $held = 0;
 
-        foreach ((array)glob($dir . '/package-*') as $path) {
-            if (is_dir($path)) {
-                $removed += self::rrmdir($path) ? 1 : 0;
+        /* 半截交换还挂着 pending 的时候，暂存的那份新版本可能还要用来放回去，先别碰 */
+        $state = self::readState();
+        $paused = !empty($state['pending']);
+
+        foreach (array_merge(
+            (array)glob($dir . '/package-*'),
+            (array)glob($dir . '/replaced-*')
+        ) as $path) {
+            if (!is_dir($path) || is_link($path)) {
+                continue;
             }
+
+            if ($paused && strpos(basename($path), 'replaced-') === 0) {
+                $held++;
+
+                continue;
+            }
+
+            $removed += self::rrmdir($path) ? 1 : 0;
         }
 
         foreach ((array)glob($dir . '/*.zip') as $path) {
@@ -1032,7 +1749,9 @@ class Updater
             }
         }
 
-        return array('success', Admin::esc(_t('清掉了 %d 项残留。', $removed)));
+        return array('success', Admin::esc(_t('清掉了 %d 项残留。', $removed))
+            . ($held > 0 ? '<br>' . Admin::esc(_t(
+                '另有 %d 份暂存的新版本没动：上一次交换还没收尾，它可能还要用来放回去。', $held)) : ''));
     }
 
     /* ======================================================================
@@ -1050,6 +1769,9 @@ class Updater
         $themeDir = self::themeDir();
 
         $chips[] = array('muted', _t('本机 %s', $version === '' ? _t('版本未知') : $version));
+        $chips[] = array('muted', self::pluginPresent()
+            ? _t('插件 %s', self::installedPluginVersion() === '' ? _t('版本未知') : self::installedPluginVersion())
+            : _t('本机没装 NolineApi 插件'));
         $chips[] = array('muted', _t('仓库 %s', self::repo()));
 
         $net = extension_loaded('curl') ? 'curl' : (ini_get('allow_url_fopen') ? 'allow_url_fopen' : '');
@@ -1072,6 +1794,14 @@ class Updater
         $chips[] = array(is_dir($parent) && is_writable($parent) ? 'ok' : 'bad',
             is_dir($parent) && is_writable($parent) ? _t('usr/themes 可写') : _t('usr/themes 不可写，换不了目录'));
 
+        $pluginParent = dirname(self::pluginDir());
+        $writable = is_dir($pluginParent) && is_writable($pluginParent);
+        $chips[] = array(!self::pluginPresent() ? 'muted' : ($writable ? 'ok' : 'warn'),
+            !self::pluginPresent()
+                ? _t('本机没有插件目录，升级只换主题')
+                : ($writable ? _t('usr/plugins 可写，插件能一起换')
+                    : _t('usr/plugins 不可写，这一轮只换主题，插件会留在原地')));
+
         $work = self::workDir();
         $chips[] = array($work === null ? 'bad' : 'ok',
             $work === null ? _t('usr/uploads 建不出临时目录') : _t('usr/uploads 可写'));
@@ -1086,6 +1816,21 @@ class Updater
         if ($doc !== '' && $code !== '' && $doc !== $code) {
             $chips[] = array('warn', _t('index.php 写 %s，functions.php 写 %s，两个版本号对不上', $doc, $code));
         }
+
+        $mirrors = self::mirrors();
+        $cooling = 0;
+
+        foreach ($mirrors as $mirror) {
+            if ($mirror['cooling'] > 0) {
+                $cooling++;
+            }
+        }
+
+        $chips[] = array($mirrors === array() ? 'muted' : ($cooling > 0 ? 'warn' : 'ok'),
+            $mirrors === array()
+                ? _t('没配镜像，只走 GitHub 直连')
+                : _t('镜像 %d 条%s', count($mirrors),
+                    $cooling > 0 ? _t('（%d 条在冷却）', $cooling) : ''));
 
         return $chips;
     }
@@ -1120,6 +1865,303 @@ class Updater
     }
 
     /* ======================================================================
+       镜像
+       ====================================================================== */
+
+    /**
+     * 设置里的镜像，外加各自的冷却状态。检测、下载、页面三处共用同一份解析。
+     *
+     * 直连永远排在候选链最前面，所以把 GitHub 自己的域名填进镜像里没有任何意义，
+     * 只会被当成重复项丢掉。
+     *
+     * @return array 每项 ['line' => 规整过的写法, 'host' => 域名, 'cooling' => 还要等多少秒]
+     */
+    private static function mirrors(): array
+    {
+        $raw = (string)Plugin::setting('updateMirrors', self::DEFAULT_MIRRORS);
+        $cooldown = self::cooldowns();
+        $out = array();
+        $seen = array();
+
+        foreach (preg_split('#[\r\n]+#', $raw) as $line) {
+            $line = trim($line);
+
+            if ($line === '' || $line[0] === '#' || $line[0] === ';') {
+                continue;
+            }
+
+            /* 一行一条；中间还有空白，多半是把说明文字和地址粘在了一起，
+               这种猜不出用户到底想试哪个域名，直接丢掉比拼出一个怪地址好 */
+            if (preg_match('#\s#', $line)) {
+                continue;
+            }
+
+            /* 只写域名的补上 https://，省得「gh-proxy.com」这种写法静默失效 */
+            if (!preg_match('#^[a-zA-Z][a-zA-Z0-9.+-]*://#', $line)) {
+                $line = 'https://' . ltrim($line, '/');
+            }
+
+            $host = strtolower((string)parse_url($line, PHP_URL_HOST));
+
+            if ($host === '' || in_array($host, self::DIRECT_HOSTS, true)) {
+                continue;
+            }
+
+            /* 前缀式写法末尾的斜杠统一去掉，拼地址时由 mirrorPlan() 补 */
+            if (strpos($line, '{') === false) {
+                $line = rtrim($line, '/');
+            }
+
+            if (isset($seen[$host])) {
+                continue;
+            }
+
+            $seen[$host] = true;
+            $out[] = array(
+                'line' => $line,
+                'host' => $host,
+                'cooling' => isset($cooldown[$host]) ? max(0, $cooldown[$host] - time()) : 0,
+            );
+
+            if (count($out) >= self::MAX_MIRRORS) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * 把一条镜像写法展开成某个用途的地址。
+     *
+     * 三种写法：含 `{api}` 的是检测模板；含 `{tag}` 或 `{asset}` 的是下载地址模板
+     * （只镜像了包、没镜像 API 的自有 CDN 用这种）；都不含的当纯前缀，
+     * 把整条 GitHub 地址拼在后面，检测和下载都能走。
+     *
+     * @param string $purpose check | download
+     *
+     * @return string 空串表示这条镜像干不了这活
+     */
+    private static function mirrorPlan(string $line, string $repo, string $tag, string $purpose): string
+    {
+        $isCheck = $purpose === 'check';
+
+        if (strpos($line, '{api}') !== false) {
+            return $isCheck ? str_replace('{api}', sprintf(self::API_URL, $repo), $line) : '';
+        }
+
+        if (strpos($line, '{tag}') !== false || strpos($line, '{asset}') !== false) {
+            if ($isCheck || $tag === '') {
+                return '';
+            }
+
+            return str_replace(
+                array('{tag}', '{asset}'),
+                array(rawurlencode($tag), self::ASSET),
+                $line
+            );
+        }
+
+        if ($isCheck) {
+            return $line . '/' . sprintf(self::API_URL, $repo);
+        }
+
+        return $tag === '' ? '' : $line . '/' . self::assetUrl($repo, $tag);
+    }
+
+    /**
+     * 附件直链一律自己按 repo + tag 拼。
+     *
+     * 镜像回的 JSON 里那个 browser_download_url 想指哪儿就指哪儿，
+     * 拿它去下载等于让镜像决定我们装的是谁的字节。
+     */
+    private static function assetUrl(string $repo, string $tag): string
+    {
+        return sprintf(self::DOWNLOAD_URL, $repo, rawurlencode($tag));
+    }
+
+    /**
+     * @return array 域名 => 冷却到什么时候（只回没过期的）
+     */
+    private static function cooldowns(): array
+    {
+        $state = self::readState();
+        $raw = isset($state['mirror_cooldown']) && is_array($state['mirror_cooldown'])
+            ? $state['mirror_cooldown'] : array();
+        $now = time();
+        $out = array();
+
+        foreach ($raw as $host => $until) {
+            $host = strtolower((string)$host);
+
+            if ($host !== '' && (int)$until > $now) {
+                $out[$host] = (int)$until;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * 把一条镜像关进冷却。每次动手前重读一遍 state.json 并顺手清掉过期的条目：
+     * 这一轮里 check() 和 upgrade() 也要各自落结论，谁也不该把谁的记录冲掉。
+     */
+    private static function mirrorCool(string $host)
+    {
+        $host = strtolower($host);
+
+        if ($host === '') {
+            return;
+        }
+
+        $state = self::readState();
+        $raw = isset($state['mirror_cooldown']) && is_array($state['mirror_cooldown'])
+            ? $state['mirror_cooldown'] : array();
+        $now = time();
+
+        foreach ($raw as $key => $until) {
+            if ((int)$until <= $now) {
+                unset($raw[$key]);
+            }
+        }
+
+        $raw[$host] = $now + self::MIRROR_WAIT;
+        $state['mirror_cooldown'] = $raw;
+        self::saveState($state);
+    }
+
+    /**
+     * 试过却没试通的镜像逐条记名，好把「直连挂了」和「三条镜像全挂了」分开说。
+     */
+    private static function hopFail(array &$failures, string $label, string $why, bool $isMirror)
+    {
+        $failures[$label] = $why;
+
+        if ($isMirror) {
+            self::mirrorCool($label);
+        }
+    }
+
+    /**
+     * 候选链全空时的文案。只试过直连就原话直说，试过镜像才把每条的失败原因摊开。
+     */
+    private static function hopError(array $failures): string
+    {
+        if (count($failures) === 1) {
+            return (string)reset($failures);
+        }
+
+        $listed = array();
+
+        foreach ($failures as $label => $why) {
+            $listed[] = $label . '：' . $why;
+        }
+
+        return _t('%d 条出口全都没走通（%s）。', count($listed), implode(' / ', $listed));
+    }
+
+    /**
+     * 「检测走的是哪条出口」在页面上怎么说。缓存里的老结果没有这个字段，说「未知」而不是猜。
+     */
+    private static function viaText(array $check): string
+    {
+        if (!$check['ok'] || $check['api_via'] === '') {
+            return _t('检测出口未知');
+        }
+
+        return $check['api_via'] === 'github'
+            ? _t('检测出口：GitHub 直连')
+            : _t('检测出口：镜像 %s', $check['api_via']);
+    }
+
+    private static function viaLevel(array $check): string
+    {
+        if (!$check['ok'] || $check['api_via'] === '') {
+            return 'muted';
+        }
+
+        return $check['api_via'] === 'github' ? 'ok' : 'warn';
+    }
+
+    /**
+     * 自动覆盖为什么这一轮没跑。摘要来路不对和压根没有摘要是两件事，分开说才有下一步可做。
+     */
+    private static function trustReason(array $check): string
+    {
+        $via = $check['api_via'] === '' ? _t('未知出口') : $check['api_via'];
+
+        return $check['sha'] === ''
+            ? _t('这次没拿到 GitHub 给的附件摘要（走的 %s），没有可信的验收依据，自动覆盖已跳过。'
+                . '看过 Release 说明、确认要升的话，点下面的按钮即可。', $via)
+            : _t('这次的摘要来自镜像 %s，不是 api.github.com 直接给的，自动覆盖已跳过。'
+                . '看过 Release 说明、确认要升的话，点下面的按钮即可。', $via);
+    }
+
+    /**
+     * 镜像这一段：每条能干什么、在不在冷却、上次为什么没通，顺手给出可直接点的下载入口。
+     *
+     * @return string 已转义的 HTML
+     */
+    private static function mirrorsHtml(array $check): string
+    {
+        $mirrors = self::mirrors();
+        $repo = $check['repo'] === '' ? self::repo() : $check['repo'];
+        $tag = $check['tag'];
+
+        if (empty($mirrors)) {
+            return '<p class="nl-note">' . Admin::esc(_t(
+                '没有可用的镜像，只用 GitHub 直连。连不上 GitHub 的站点在插件设置「主题更新镜像」里填几条，'
+                . '一行一条，按顺序退。')) . '</p>';
+        }
+
+        $rows = array();
+
+        foreach ($mirrors as $mirror) {
+            $canCheck = self::mirrorPlan($mirror['line'], $repo, '', 'check') !== '';
+            $link = self::mirrorPlan($mirror['line'], $repo, $tag, 'download');
+            $skills = array();
+
+            if ($canCheck) {
+                $skills[] = _t('检测');
+            }
+
+            if ($link !== '') {
+                $skills[] = _t('下载');
+            }
+
+            $rows[] = '<tr><td><b>' . Admin::esc($mirror['host']) . '</b>'
+                . '<em>' . Admin::esc($mirror['line']) . '</em></td>'
+                . '<td>' . Admin::esc($skills === array()
+                    ? _t('写法不认识，这一条等于没填')
+                    : _t('可用：%s', implode('、', $skills))) . '</td>'
+                . '<td>' . ($mirror['cooling'] > 0
+                    ? Admin::esc(_t('冷却 %d 分钟', (int)ceil($mirror['cooling'] / 60)))
+                    : Admin::esc(_t('可试'))) . '</td>'
+                . '<td class="nl-ops">' . ($link !== ''
+                    ? '<a class="btn btn-s" href="' . Admin::esc($link) . '" rel="noopener">'
+                        . Admin::esc(_t('从这里下')) . '</a>'
+                    : '') . '</td></tr>';
+        }
+
+        $html = '<details class="nl-log"><summary>'
+            . Admin::esc(_t('镜像（%d 条，GitHub 直连优先，不通才退到这里）', count($mirrors)))
+            . '</summary><table class="nl-list"><tbody>' . implode('', $rows) . '</tbody></table>';
+
+        if ($check['ok'] && !empty($check['api_hops'])) {
+            $listed = array();
+
+            foreach ($check['api_hops'] as $label => $why) {
+                $listed[] = $label . '：' . $why;
+            }
+
+            $html .= '<p class="nl-note">' . Admin::esc(_t(
+                '直连和这些镜像都没通才走了成功的出口：%s。', implode(' / ', $listed))) . '</p>';
+        }
+
+        return $html . '</details>';
+    }
+
+    /* ======================================================================
        路径与状态
        ====================================================================== */
 
@@ -1131,6 +2173,15 @@ class Updater
     private static function themeDir(): string
     {
         return rtrim(Options::alloc()->themeFile(Theme::DIR), '/');
+    }
+
+    /**
+     * 本机插件目录。核心也是这么拼的（Common.php 里 __TYPECHO_ROOT_DIR__ . __TYPECHO_PLUGIN_DIR__），
+     * 跟着它走，别自己写死 /usr/plugins。
+     */
+    private static function pluginDir(): string
+    {
+        return rtrim(self::rootDir() . __TYPECHO_PLUGIN_DIR__, '/');
     }
 
     private static function baseUploads(): string
@@ -1230,6 +2281,34 @@ class Updater
         return self::versionFromIndex(self::themeDir() . '/index.php');
     }
 
+    /**
+     * 本机插件版本。后台插件列表读的是 Plugin.php 头部注释，和主题一个口径。
+     */
+    private static function installedPluginVersion(): string
+    {
+        return self::versionFromPlugin(self::pluginDir() . '/Plugin.php');
+    }
+
+    /** 插件目录在不在、是不是个普通目录（软链接不敢动） */
+    private static function pluginPresent(): bool
+    {
+        return is_dir(self::pluginDir()) && !is_link(self::pluginDir());
+    }
+
+    private static function versionFromPlugin(string $file): string
+    {
+        $doc = self::versionFromIndex($file);
+
+        if ($doc !== '') {
+            return $doc;
+        }
+
+        /* 头注释漏了 @version 也别报「未知」：const VERSION 是同一个版本号的另一份抄本 */
+        $head = (string)@file_get_contents($file);
+
+        return preg_match("/const VERSION = '([^']+)'/", $head, $m) ? trim($m[1]) : '';
+    }
+
     private static function versionFromIndex(string $file): string
     {
         if (!is_file($file)) {
@@ -1248,7 +2327,9 @@ class Updater
             // 下面退回正则
         }
 
-        $head = (string)@file_get_contents($file, false, null, 0, 800);
+        /* 4000 字节而不是整个文件：插件的头注释有几百个汉字，窗口太窄会读不到 @version，
+           而这两个文件都是几 KB 量级，多读一点也不怕。 */
+        $head = (string)@file_get_contents($file, false, null, 0, 4000);
 
         return preg_match('/@version\s+([^\s*]+)/', $head, $m) ? trim($m[1]) : '';
     }
@@ -1334,7 +2415,7 @@ class Updater
 
         if (empty($names)) {
             return '<p class="nl-note">' . Admin::esc(_t(
-                '还没有备份。第一次升级之后，旧主题会整份留在 %s 下，随时回滚。', self::BACKUP)) . '</p>';
+                '还没有备份。第一次升级之后，旧主题和旧插件会各留一份整副本在 %s 下，随时回滚。', self::BACKUP)) . '</p>';
         }
 
         $html = '<h4 class="nl-h4">' . Admin::esc(_t('备份（%d 份）', count($names))) . '</h4>'
@@ -1342,9 +2423,11 @@ class Updater
 
         foreach ($names as $name) {
             $stat = self::treeSize($root . '/' . $name);
+            $withPlugin = is_file($root . '/' . $name . '/plugin/Plugin.php');
 
             $html .= '<tr><td><b>' . Admin::esc($name) . '</b>'
-                . '<em>' . Admin::esc(_t('%1$d 个文件 · %2$s', $stat[0], self::humanSize($stat[1]))) . '</em></td>'
+                . '<em>' . Admin::esc(_t('%1$d 个文件 · %2$s · %3$s', $stat[0], self::humanSize($stat[1]),
+                    $withPlugin ? _t('含插件副本') : _t('只有主题'))) . '</em></td>'
                 . '<td class="nl-ops">';
 
             foreach (array(
@@ -1353,7 +2436,8 @@ class Updater
             ) as $action => $label) {
                 $ask = $action === 'drop_backup'
                     ? _t('删掉这份备份就没了，views/ 里的旧计数也一起没了。确定？')
-                    : _t('把这一版搬回主题目录？现在的版本会被存成一份新备份。');
+                    : _t('把这一版搬回原位？现在的版本会被存成一份新备份。')
+                        . ($withPlugin ? _t('这一份里有插件副本，插件会一起回去。') : '');
 
                 $html .= '<form method="post" action="' . Admin::esc($url) . '"'
                     . ' data-ask="' . Admin::esc($ask) . '">'
@@ -1379,6 +2463,7 @@ class Updater
 
         $leftovers = array_merge(
             (array)glob($dir . '/package-*'),
+            (array)glob($dir . '/replaced-*'),
             (array)glob($dir . '/*.zip')
         );
 
