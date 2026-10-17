@@ -108,7 +108,12 @@ def shoot(src: Path, png: Path, width, height, scale, touch, crop):
     except subprocess.TimeoutExpired:
         pass
     finally:
-        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        # headless=new 截完常常自己就退了；这时进程组已经没了，
+        # 再 killpg 会抛 ProcessLookupError 把整批图打断——图其实已经写出来了。
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        except ProcessLookupError:
+            pass
 
     if not png.is_file():
         sys.exit('FAIL: Chrome 没吐出 %s（检查 %s 能不能跑）' % (png.name, CHROME))

@@ -1004,6 +1004,10 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
     display: flex;
     flex-wrap: wrap;
     align-content: flex-start;
+    /* 双列里同行两张卡内容量差得很远（一条两行的动态 vs 一张带封面的长摘要）。
+       flex 默认把两张都拉成等高，短的那张就成了下半截全白的空卡，看着像渲染坏了；
+       改成各自按内容收高，行高仍由最高的那张决定，洞留在卡外面而不是卡里面。 */
+    align-items: flex-start;
     gap: 1.25rem;
 }
 .main-content.feed > * { flex: 1 1 100%; min-width: 0; }
@@ -1013,7 +1017,7 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
 .main-content.feed > .feed-status { margin-bottom: 0; }
 
 .main-content.feed .post-card { padding: 0; }
-.post-card-body { padding: 1.375rem 1.5rem 1.5rem; min-width: 0; }
+.post-card-body { padding: 1.25rem 1.5rem 1.5rem; min-width: 0; }
 @media (max-width: 639px) { .post-card-body { padding: 1.125rem 1rem 1.25rem; } }
 
 /* 卡片封面：贴着卡顶铺满。没有 thumb 自定义字段时整块不渲染，卡片维持文字形态。 */
@@ -1055,17 +1059,28 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
 
 @media (min-width: 1300px) {
     .main-content.feed { gap: 1rem; }
-    /* 只有文章卡成双成对。公告、动态、药丸条、页码、状态区、归档抬头一律占满一行。
+    /* 两列时一张卡只剩半宽，12.5rem 的定高会把封面拉成 2.2:1 的宽银幕，
+       看着像裁错了。改成跟着列宽走的 16:9：两张并排的封面形状一致，
+       高度也只多出一点点，正文照样是三行。 */
+    .main-content.feed .post-card.has-cover .post-cover {
+        height: auto;
+        aspect-ratio: 16 / 9;
+    }
+    /* 文章卡和动态卡成双成对，公告、药丸条、页码、状态区、归档抬头占满一行。
        50% 再减掉半个 gap，两个正好塞进一行；grow 配 max-width 封顶，
-       落单的最后一张也不会自己撑满。 */
-    .main-content.feed > .post-card {
+       落单的最后一张也不会自己撑满。
+       动态卡以前也占满一行，结果是这样：穿插进来的动态把序列切成一段一段，
+       每段里只要落单过一张，它右半边就凭空空出一块——首页十张卡有八张是
+       「左边一张、右边一片空白」。让动态一起进双列，洞就只剩整列最后那一张。 */
+    .main-content.feed > .post-card,
+    .main-content.feed > .status-card {
         flex-basis: calc(50% - .5rem);
         max-width: calc(50% - .5rem);
     }
     .main-content.feed > .feed-cats,
     .main-content.feed > .archive-header,
-    .main-content.feed > .status-card,
-    .main-content.feed > .card:not(.post-card),
+    /* .status-card 自己也是 .card，不排掉会被这条以多一级的特异性抢回去 */
+    .main-content.feed > .card:not(.post-card):not(.status-card),
     .main-content.feed > .page-navigator,
     .main-content.feed > .feed-status {
         flex-basis: 100%;
@@ -1260,7 +1275,7 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
     .feed-cats-pop { width: min(18rem, 92vw); }
 }
 
-.post-header { display: flex; align-items: center; margin-bottom: .875rem; min-width: 0; }
+.post-header { display: flex; align-items: center; margin-bottom: .75rem; min-width: 0; }
 .avatar {
     width: 40px; height: 40px;
     border-radius: 50%;
@@ -1316,7 +1331,7 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
     line-height: 1.4;
     letter-spacing: -.01em;
     color: var(--text-strong);
-    margin-bottom: .625rem;
+    margin-bottom: .5rem;
     overflow-wrap: break-word;
 }
 /* 标题 hover 下划线从 0 扫到满宽：背景渐变 + background-size 过渡，比 border-bottom 平滑 */
@@ -1365,7 +1380,7 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
 .post-excerpt {
     color: var(--text-secondary);
     font-size: .9375rem;
-    line-height: 1.8;
+    line-height: 1.75;
     margin-bottom: 1rem;
     overflow-wrap: break-word;
     display: -webkit-box;
@@ -1389,6 +1404,8 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
     flex-wrap: wrap;
     gap: .625rem;
 }
+/* 竖向内距和右边的 .read-more 取同一个 .375rem：底栏那一排是两种药丸并排，
+   差 0.125rem 的高度在一行里就会看出一个没对齐。 */
 .stat-item {
     display: inline-flex;
     align-items: center;
@@ -1396,7 +1413,7 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
     font-size: .75rem;
     color: var(--text-light);
     background-color: var(--surface-soft);
-    padding: .25rem .625rem;
+    padding: .375rem .625rem;
     border-radius: var(--radius-md);
     transition: color .2s, background-color .2s;
 }
@@ -1422,16 +1439,15 @@ a.stat-item:hover { color: var(--accent); background-color: var(--accent-bg); }
 
 /* 整块是一个 <a>：链接默认的下划线和蓝色都得压掉，否则三行摘要会全是蓝字带线。
 
-   静息态不铺底色，只用一条发丝线跟上面的 .post-footer 分开——那里面的 .stat-item
-   已经是 --surface-soft 了，紧挨着再叠一块同色填充只会糊成一片。底色留给 hover，
+   不再自带一条发丝线：上面 .post-footer 那条刚画过，两张卡挨得近时会出现两条
+   只隔 1rem 的横线，像表格线。这里只留一点间距，底色留给 hover，
    正好兼作「这一整条都能点」的提示。 */
 .card-comments {
     display: flex;
     align-items: flex-start;
     gap: .625rem;
-    margin-top: 1rem;
-    padding: .875rem .5rem .5rem;
-    border-top: 1px solid var(--border-color);
+    margin-top: .25rem;
+    padding: .625rem .5rem .25rem;
     border-radius: var(--radius-md);
     color: inherit;
     text-decoration: none;
