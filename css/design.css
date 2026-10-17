@@ -75,8 +75,10 @@
     --surface-zebra: rgba(var(--ink-rgb), var(--ink-fill-1));
     --surface-soft:  #f7f7f9;   /* 次级面：胶囊、计数、占位 */
     --surface-code:  rgba(var(--ink-rgb), var(--ink-fill-3));
-    /* 「凹陷」浅色下是往蓝灰里沉、深色下是往黑里沉，方向相反，所以深色块要单独给一次 */
+    /* 「凹陷」浅色下是往黑里沉、深色下是往黑里沉，方向相反，所以深色块要单独给一次 */
     --surface-sunken: #f2f5f8;
+    /* 选区：跟着强调色走，浓度两档分开——深色底上同样的 alpha 几乎读不出来 */
+    --selection-bg: rgba(var(--accent-rgb), .18);
 
     /* 描边：卡片一律 1px 实线 --card-border，不用半透明墨——
        蓝调描边压在浅灰白底上才是这套观感的核心。 */
@@ -98,6 +100,9 @@
     /* 局部装饰 */
     --avatar-ring: rgb(var(--paper-rgb));
     --cover-fallback: #e8ecf7;
+    /* 首屏那层模糊封面的存在感。深色下底本身就近黑，同样的浓度透不出图，
+       所以两档分开给。 */
+    --cover-opacity: .55;
     /* 正文标题前那颗人字形标记。刻意不跟强调色走——强调色是蓝，蓝箭头压在蓝链接上
        整页就一个颜色；换一支暖金，标题才有「这一段从这儿开始」的锚点。 */
     --heading-marker: #f2ba4b;
@@ -275,6 +280,7 @@
     --card-border: #3d3d3f;
     /* 深色下的「凹陷」是往黑里沉，浅墨调透明度只会让它凸出来 */
     --surface-sunken: rgba(0, 0, 0, .28);
+    --selection-bg: rgba(var(--accent-rgb), .34);
 
     /* 深色玻璃：底色近黑，边光反而要更亮，才有那圈磨砂感 */
     --glass-bg:      rgba(23, 25, 29, .72);
@@ -284,13 +290,16 @@
         inset 2px 0 3px rgba(0, 0, 0, .16), inset -2px 0 3px rgba(0, 0, 0, .16);
 
     --cover-fallback: #2a2d36;
+    /* 深色底本身就近黑，封面透一成 .55 等于没透——提到 .72 才还剩点图的样子 */
+    --cover-opacity: .72;
     /* 深底上同样的金要更亮一档、饱和降一档，否则标题标记看着像脏了一块 */
     --heading-marker: #e8c476;
-    /* 深色下封面罩压得更重：亮色封面图配上浅色的罩，白字会糊掉 */
+    /* 封面上的字换成近白，配下面这层加重的罩；罩本身不能一路压到纯黑，
+       否则首屏只剩一条秃带，比浅色还没层次。 */
     --on-cover: #f2f5f9;
     --on-cover-rgb: 242, 245, 249;
-    --hero-veil-top: rgba(0, 0, 0, .34);
-    --hero-veil-bottom: rgba(10, 14, 20, .78);
+    --hero-veil-top: rgba(0, 0, 0, .24);
+    --hero-veil-bottom: rgba(10, 14, 20, .66);
     --warn-bg: #3a2f14;
     --warn-text: #e0b25c;
     --mark-bg: #575019;
@@ -387,6 +396,8 @@ body {
     background-image: var(--page-glow);
     background-repeat: no-repeat;
     color: var(--text-main);
+    /* 光标不能留 UA 的白：深色下输入框底近黑，白光标像粘了个点。 */
+    caret-color: var(--accent);
     line-height: 1.7;
     -webkit-font-smoothing: antialiased;
     /* 颜色过渡让手动切换主题时不至于硬跳；防闪烁脚本已经在首帧前定好了 data-theme，
@@ -400,6 +411,10 @@ a:hover { color: var(--accent); }
 img { max-width: 100%; height: auto; }
 
 button, input, textarea, select { font-family: inherit; font-size: inherit; }
+
+/* 选区。不写 color：让被选中的字保留自己原来的颜色，
+   标题（--text-strong）和次要文字（--text-secondary）选中后仍是两档深浅。 */
+::selection { background-color: var(--selection-bg); }
 
 /* 键盘落点。整个主题原先没有任何焦点样式，Tab 过去完全看不见。
    只管交互元素——输入框有自己的 focus 环，不要叠两层。 */
@@ -1433,7 +1448,7 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
     background-color: var(--surface-soft);
     padding: .375rem .625rem;
     border-radius: var(--radius-md);
-    transition: color .2s, background-color .2s;
+    transition: color .2s, background-color .2s, transform .2s var(--ease-spring);
 }
 a.stat-item:hover { color: var(--accent); background-color: var(--accent-bg); }
 .stat-item .noline-icon { font-size: .8125rem; }
@@ -2373,7 +2388,7 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     padding: .8125rem 1rem;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    background-color: var(--surface-soft);
+    background-color: var(--surface-sunken);
     transition: transform .25s var(--ease-spring), box-shadow .25s ease, background-color .25s ease;
 }
 .health-tile:hover {
@@ -2602,7 +2617,7 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     padding: .8125rem 1rem;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    background-color: var(--surface-soft);
+    background-color: var(--surface-sunken);
     transition: transform .25s var(--ease-spring), box-shadow .25s ease, background-color .25s ease;
 }
 .bill-tile:hover {
@@ -3101,7 +3116,7 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     border-radius: var(--radius-pill);
     font-weight: 500;
     opacity: .85;
-    transition: opacity .2s, background-color .2s, color .2s;
+    transition: opacity .2s, background-color .2s, color .2s, transform .2s var(--ease-spring);
 }
 .comment-reply a:hover { opacity: 1; background-color: var(--accent); color: var(--on-brand); }
 
@@ -3168,7 +3183,7 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
     background-position: center 30%;
     filter: blur(26px) saturate(1.15);
     transform: scale(1.12);
-    opacity: .55;
+    opacity: var(--cover-opacity);
 }
 .site-hero-cover::after,
 .post-hero-cover::after {
@@ -3916,7 +3931,7 @@ a.meta-pill:hover,
     background-color: var(--lightbox-btn);
     color: var(--lightbox-fg);
     cursor: pointer;
-    transition: background-color .2s;
+    transition: background-color .2s, opacity .15s;
 }
 .lightbox-btn:hover { background-color: var(--lightbox-btn-hover); }
 .lightbox-btn[hidden] { display: none; }
@@ -4009,13 +4024,28 @@ html.lightbox-open { overflow: hidden; }
 }
 
 /* 按压反馈：Material/iOS 的「按下去会瘪一点」。:active 放在后面，
-   和 :hover 同特异性时靠源码顺序盖过 hover 的位移。 */
+   和 :hover 同特异性时靠源码顺序盖过 hover 的位移。
+   名单覆盖全站所有「按下去会立刻有反应」的东西：药丸、按钮、页码、评论回复。
+   不含整行卡片（.related-item / .article-nav-cell 走变色，缩一行字会晃眼），
+   也不含灯箱按钮（prev/next 自己带着 translateY(-50%)，再叠 scale 会跑位）。 */
 .btn-primary:active,
+.submit-btn:active,
 .read-more:active,
 .feed-retry:active,
 .icon-btn:active,
 .nav-item:active,
-.tag:active { transform: scale(.95); }
+.tag:active,
+.feed-cat:active,
+.feed-cat-more:active,
+.btn-load-more:active,
+.page-navigator li a:active,
+.comment-reply a:active,
+a.stat-item:active { transform: scale(.95); }
+
+/* 灯箱开在整屏黑底上，缩不放看不出，改压不透明度；
+   回到顶部是 .is-visible 把 transform 清成 none 的，:active 排在它后面才盖得住。 */
+.lightbox-btn:active { opacity: .68; }
+.back-top:active { transform: scale(.9); }
 
 /* ==========================================================================
    页面转场
