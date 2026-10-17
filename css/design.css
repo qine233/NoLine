@@ -3065,6 +3065,10 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
 .comment-children { margin-top: 1.25rem; margin-left: 1.25rem; padding-left: 1.25rem; border-left: 1px solid var(--border-color); }
 @media (min-width: 640px) { .comment-children { margin-left: 3.5rem; } }
 @media (max-width: 640px) { .comment-children { padding-left: .75rem; margin-left: .5rem; } }
+/* 第二层往下不再按「头像宽 + 名字」整段缩进：每层 3.5rem 再叠 1.25rem 的引导线，
+   到第三层正文只剩一半宽度，一条评论被切成十几行。首层对齐正文，往后再收回来。 */
+.comment-children .comment-children { margin-left: 1.25rem; }
+@media (min-width: 640px) { .comment-children .comment-children { margin-left: 1.5rem; } }
 
 .comment-closed {
     padding: 1.25rem 1.5rem;
