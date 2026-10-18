@@ -4,7 +4,7 @@
  *
  * @package Noline
  * @author QINE
- * @version 1.27.0
+ * @version 1.28.0
  * @link https://www.idkzr.com/
  */
 

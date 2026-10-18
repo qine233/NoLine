@@ -27,13 +27,13 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package NolineApi
  * @author 州州
- * @version 1.7.4
+ * @version 1.7.5
  * @link https://ui.zhouzhou.work/
  */
 class Plugin implements PluginInterface
 {
     /** 改这里要同时改文件头注释里的 @version，后台插件列表读的是注释 */
-    private const VERSION = '1.7.4';
+    private const VERSION = '1.7.5';
 
     /** 数据目录放在 uploads 下，不在主题目录内，升级主题不会清空记录 */
     private const DATA_DIR = '/usr/uploads/noline_api';

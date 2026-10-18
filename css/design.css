@@ -1124,9 +1124,11 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
 /* ==========================================================================
    吸顶分类药丸条（public/feed-cats.php）
    --------------------------------------------------------------------------
-   条本身透明——heo 的这条带就没有底，药丸自己是不透明的卡片色，压在滑过的
-   正文上读得清，缝隙里露出页面底色反而是想要的效果。给它铺底会成一条横贯
-   正文列的色带，把 --page-glow 那层环境光切断。
+   整条是一颗玻璃胶囊，和顶栏同一套配方（--glass-bg + backdrop-filter +
+   --glass-inset）。原先是彻底透明的：抄 heo 那条带就没有底，药丸自己不透，
+   缝隙里露出页面底色。但它毕竟是 sticky——滚起来之后正文从条底下穿过去，
+   没有底就变成「文字和文字叠在一起」，那一瞬间是读的。铺一层磨砂之后
+   穿过去的字被糊掉，药丸还是主角。
    横向溢出滚动而不是换行：一行是这套观感的前提，换行之后吸顶高度会吃掉半屏。
    溢出交给右端那颗「更多」兜底：滚动条已经藏了，鼠标用户既看不见进度也不知道
    右边还有东西，Tab 逐个跳过去才算是一条可用的退路。
@@ -1134,7 +1136,8 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
 
 /* sticky 的这层不滚动，只负责钉住、当弹层的定位参照，并把行和按钮排在一条线上。
    position: sticky 本身就是「已定位」元素，绝对定位的弹层会以她为包含块，
-   不需要再补一句 position: relative。 */
+   不需要再补一句 position: relative。
+   左右各让出 .5rem：药丸贴着胶囊内壁磨会显得挤，这一圈就是玻璃的高光位。 */
 .feed-cats {
     position: sticky;
     top: calc(var(--topbar-h) + .5rem);
@@ -1142,7 +1145,13 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
     display: flex;
     align-items: center;
     gap: .375rem;
-    padding: .125rem 0;
+    padding: .375rem .5rem;
+    border: var(--style-border);
+    border-radius: var(--radius-pill);
+    background-color: var(--glass-bg);
+    -webkit-backdrop-filter: saturate(180%) blur(var(--glass-blur));
+    backdrop-filter: saturate(180%) blur(var(--glass-blur));
+    box-shadow: var(--shadow-glass), var(--glass-inset);
 }
 
 /* 真正横向溢出的这一行。min-width: 0 是必需的：flex 项默认按内容撑开，
@@ -1256,10 +1265,15 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
     grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
     gap: .125rem;
     padding: .375rem;
-    background-color: var(--card-bg);
+    /* 面板是悬在正文上的，和顶栏同一套：不透明的卡底会把身后那行字直接切掉，
+       磨砂是让它读起来像「浮」着而不是「贴」着。deep 那一档浓度是为了
+       二三十个分类排成网格时，穿过去的正文不会和行文字打架。 */
+    background-color: var(--glass-bg-deep);
+    -webkit-backdrop-filter: saturate(180%) blur(var(--glass-blur));
+    backdrop-filter: saturate(180%) blur(var(--glass-blur));
     border: var(--style-border);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-lg), var(--glass-inset);
 }
 .feed-cats-pop[hidden] { display: none; }
 /* 从 display:none 翻回 grid 时动画会重新起播，正好是「掀开」该有的那一下。
@@ -3862,11 +3876,13 @@ a.meta-pill:hover,
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--border-soft);
+    border: var(--style-border);
     border-radius: 50%;
-    background-color: var(--card-bg);
+    background-color: var(--glass-bg-deep);
+    -webkit-backdrop-filter: saturate(180%) blur(var(--glass-blur));
+    backdrop-filter: saturate(180%) blur(var(--glass-blur));
     color: var(--text-secondary);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-md), var(--glass-inset);
     cursor: pointer;
     opacity: 0;
     transform: translateY(.5rem);
@@ -3929,6 +3945,10 @@ a.meta-pill:hover,
     border: none;
     border-radius: 50%;
     background-color: var(--lightbox-btn);
+    /* 压在图上的三颗：不糊一下就是一块贴在画面里的实心圆，糊了才是浮在上面。 */
+    -webkit-backdrop-filter: saturate(180%) blur(var(--glass-blur));
+    backdrop-filter: saturate(180%) blur(var(--glass-blur));
+    box-shadow: var(--glass-inset);
     color: var(--lightbox-fg);
     cursor: pointer;
     transition: background-color .2s, opacity .15s;
