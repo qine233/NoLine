@@ -863,6 +863,24 @@ class Updater
         }
 
         $plan = $swapped['plan'];
+        $placed = isset($swapped['placed']) && is_array($swapped['placed']) ? $swapped['placed'] : array();
+
+        /* 插件到底换没换，看它在不在已落位的那几项里——「包里带了插件」只是打算。
+           早先这里拿 $pluginTo 非空当依据，路径判断一失手就成了口头换完。 */
+        $pluginSwapped = false;
+
+        foreach ($plan as $i => $item) {
+            if (isset($item['slot']) && $item['slot'] === 'plugin' && in_array($i, $placed, true)) {
+                $pluginSwapped = true;
+            }
+        }
+
+        if ($packagePlugin !== '' && !$pluginSwapped) {
+            $skipped = _t('包里有插件，但插件目录没能一起换（%s 用不了或不让动），'
+                . '这一轮只换了主题，插件还停在 %s。',
+                self::pluginDir(),
+                $pluginFrom === '' ? _t('未知版本') : $pluginFrom);
+        }
 
         /* 权威计数在 usr/uploads/noline_views/ 里，交换碰不到；
            这一步只补主题目录 views/ 下「本机有、新版本没有」的旧版兜底文件。 */
@@ -877,7 +895,7 @@ class Updater
         $history[] = array(
             'from' => $from, 'to' => $newVersion, 'at' => date('c'),
             'backup' => $backup, 'kept_views' => $kept, 'via' => $fetched['via'],
-            'plugin_from' => $pluginFrom, 'plugin_to' => $pluginTo,
+            'plugin_from' => $pluginSwapped ? $pluginFrom : '', 'plugin_to' => $pluginSwapped ? $pluginTo : '',
         );
         $state['upgrades'] = array_slice($history, -20);
         self::saveState($state);
@@ -889,7 +907,7 @@ class Updater
             '已升级到 %1$s（原 %2$s），包从 %3$s 下的。旧主题和旧插件各留了一份整副本在 %4$s，随时能回滚。',
             $newVersion, $from === '' ? _t('未知') : $from, $via, $backup
         ))
-            . ($pluginTo !== '' ? '<br>' . Admin::esc(_t(
+            . ($pluginSwapped ? '<br>' . Admin::esc(_t(
                 '插件也一起换了：%s → %s。它登记的钩子会在下一个页面（前台后台都算）自己补齐，'
                 . '不用去插件页停用再启用。',
                 $pluginFrom === '' ? _t('未知版本') : $pluginFrom, $pluginTo)) : '')
@@ -905,11 +923,12 @@ class Updater
      * 一次交换涉及的两个地方：主题，以及（包里带了插件时）插件。
      * 备份目录里固定是 theme/ 和 plugin/ 两个子目录，repair 和回滚都按这个形状走。
      *
-     * @return array 每项 ['label' => 文案, 'live' => 现网目录, 'backup' => 备份落点, 'staging' => 包里的新份]
+     * @return array 每项 ['slot' => theme|plugin, 'label' => 文案, 'live' => 现网目录, 'backup' => 备份落点, 'staging' => 包里的新份]
      */
     private static function swapItems(string $root, string $pluginRoot, string $backup): array
     {
         $items = array(array(
+            'slot' => 'theme',
             'label' => _t('主题'),
             'live' => self::themeDir(),
             'backup' => $backup . '/theme',
@@ -918,6 +937,7 @@ class Updater
 
         if ($pluginRoot !== '') {
             $items[] = array(
+                'slot' => 'plugin',
                 'label' => _t('插件'),
                 'live' => self::pluginDir(),
                 'backup' => $backup . '/plugin',
@@ -934,9 +954,9 @@ class Updater
      * 升级和回滚只是这两组路径从哪儿来——顺序、pending 记录、失败回退全共用一套。
      * 主题永远排第一，插件排第二，中途被打断时 repair() 也按这个顺序退回旧版本。
      *
-     * @param array $plan 每项 ['label','live','backup','staging']
+     * @param array $plan 每项 ['slot','label','live','backup','staging']
      * @param array $base 先写进 pending 的说明性字段（备份目录、版本号之类）
-     * @return array ['ok' => bool, 'error' => string, 'plan' => array]
+     * @return array ['ok' => bool, 'error' => string, 'plan' => array, 'placed' => array]
      */
     private static function swapAll(array $plan, array $base): array
     {
@@ -1019,7 +1039,9 @@ class Updater
         $pending['stage'] = 'placed';
         self::mark($pending);
 
-        return array('ok' => true, 'plan' => $plan, 'error' => '');
+        /* placed 是「真的挪到位了」的那几项，和 plan 里的下标对得上。
+           调用方要拿它去说结果，不能拿「包里有没有」——那是打算，不是事实。 */
+        return array('ok' => true, 'plan' => $plan, 'placed' => $pending['placed'], 'error' => '');
     }
 
     /**
@@ -2176,12 +2198,13 @@ class Updater
     }
 
     /**
-     * 本机插件目录。核心也是这么拼的（Common.php 里 __TYPECHO_ROOT_DIR__ . __TYPECHO_PLUGIN_DIR__），
-     * 跟着它走，别自己写死 /usr/plugins。
+     * 本机 NolineApi 插件自己的目录，不是 usr/plugins 那层容器。
+     * 前缀跟着核心走（Common.php 里 __TYPECHO_ROOT_DIR__ . __TYPECHO_PLUGIN_DIR__），
+     * 最后这一层目录名对着包里的 plugins/NolineApi，两边必须同名，所以共用 LIVE_PLUGIN。
      */
     private static function pluginDir(): string
     {
-        return rtrim(self::rootDir() . __TYPECHO_PLUGIN_DIR__, '/');
+        return rtrim(self::rootDir() . __TYPECHO_PLUGIN_DIR__ . '/' . self::LIVE_PLUGIN, '/');
     }
 
     private static function baseUploads(): string
