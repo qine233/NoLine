@@ -27,13 +27,13 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package NolineApi
  * @author 州州
- * @version 1.7.8
+ * @version 1.7.9
  * @link https://ui.zhouzhou.work/
  */
 class Plugin implements PluginInterface
 {
     /** 改这里要同时改文件头注释里的 @version，后台插件列表读的是注释 */
-    private const VERSION = '1.7.8';
+    private const VERSION = '1.7.9';
 
     /** 数据目录放在 uploads 下，不在主题目录内，升级主题不会清空记录 */
     private const DATA_DIR = '/usr/uploads/noline_api';
@@ -178,7 +178,7 @@ class Plugin implements PluginInterface
      *
      * 注意：这里注册的字段名必须和存进 options 的键一一对应——
      * Widget\Plugins\Config::config() 会对着已存的每个键调 $form->getInput($key)->value()，
-     * 存了没注册的键会让设置页直接白屏。删字段时记得顺手删掉那条 options。
+     * 存了没注册的键会让设置页直接 500。所以删字段要在底下 pruneStaleOptions() 收尾。
      */
     public static function config(Form $form)
     {
@@ -402,7 +402,55 @@ class Plugin implements PluginInterface
         );
         $form->addInput($crPaste);
 
+        self::pruneStaleOptions($form);
         self::renderDocs();
+    }
+
+    /**
+     * 洗掉库里那些已经没有对应输入项的旧键。
+     *
+     * 核心渲染这张表单的顺序是：先调我们的 config() 注册输入项，再拿库里存的每个键去调
+     * $form->getInput($key)->value($val)。getInput() 对没注册的键直接返回 null，
+     * 于是删掉一个设置项就让老用户的插件设置页 500。保存那条路也救不了：
+     * Widget\Plugins\Edit 存的是 array_merge(库里的旧值, 表单新值)，旧键会一直留着。
+     *
+     * 所以删字段得自己收尾。先改 Options 里那份被 memo 住的对象（同一个请求里核心接着用的
+     * 就是它，改完这一句本页就能正常渲染），再把新数组序列化回 options 行，一次写死。
+     */
+    private static function pruneStaleOptions(Form $form)
+    {
+        try {
+            $options = Options::alloc()->plugin(self::HANDLE);
+        } catch (\Throwable $e) {
+            // 没配过（刚激活、库里还没这行）就是没得清
+            return;
+        }
+
+        $registered = $form->getInputs();
+        $stale = array();
+
+        foreach (array_keys($options->toArray()) as $key) {
+            if (!isset($registered[$key])) {
+                $stale[] = $key;
+            }
+        }
+
+        if ($stale === array()) {
+            return;
+        }
+
+        foreach ($stale as $key) {
+            unset($options[$key]);
+        }
+
+        try {
+            $db = Db::get();
+            $db->query($db->update('table.options')
+                ->rows(array('value' => serialize($options->toArray())))
+                ->where('name = ?', 'plugin:' . self::HANDLE));
+        } catch (\Throwable $e) {
+            // 写库失败也不要紧，内存里那份已经干净，本次渲染照样过
+        }
     }
 
     /**
