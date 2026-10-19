@@ -19,16 +19,25 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  * beforeUpload/upload 通知和附件行照样跑，等于在核心的数据结构里伪造一个本地不存在的路径。
  *
  * Cloudreve 侧只走 v4 REST（routers/router.go）：
- *   PUT  /api/v4/file/upload              建会话，拿 session_id / chunk_size / upload_urls
- *   POST /api/v4/file/upload/{sid}/{i}    原始字节，一段一个 index；最后一段传完核心自己收尾
- *   PUT  /api/v4/file/source              拿永久直链（/f/{id}/{name}，匿名可访问）
- * 三段都不需要 POST /api/v4/file/create——那个接口造的是空文件，上传路径用不上。
+ *   POST   /api/v4/session/token          邮箱 + 密码登录，data 是 {user, token}
+ *   POST   /api/v4/session/token/refresh  续一个新的 access，data 直接就是 token 本身
+ *   DELETE /api/v4/session/token          作废这一串会话
+ *   PUT    /api/v4/file/upload            建会话，拿 session_id / chunk_size / upload_urls
+ *   POST   /api/v4/file/upload/{sid}/{i}  原始字节，一段一个 index；最后一段传完核心自己收尾
+ *   PUT    /api/v4/file/source            拿永久直链（/f/{id}/{name}，匿名可访问）
+ * 三段上传都不需要 POST /api/v4/file/create——那个接口造的是空文件，上传路径用不上。
  *
- * 令牌：v4 没有长期个人 token 这种接口。浏览器 localStorage 里的 access token 默认只活
- * 1 小时（access_token_ttl=3600），refresh token 默认 180 天，所以主用 refresh token，
- * 插件自己按需换 access 并缓存。非 OAuth 签发的令牌没有 scope 声明，
- * CheckScope 对空 scope 直接放行（pkg/auth/jwt.go:322），刷新接口能用。
- * 令牌只待在服务端：浏览器请求打到本插件，由这里带上 Authorization 转发给 Cloudreve。
+ * 登录：设置里只填邮箱和密码。需要凭据时先看缓存的 access（v4 默认只活 1 小时），
+ * 快到期就用登录时一起拿到的 refresh token 续，续不动再重新登一次。留这层缓存是因为
+ * 一次上传本身要打好几个请求，每个都先登一遍既慢又会在 Cloudreve 那边堆一堆会话。
+ * 而 refresh 也随时可能废掉——在 Cloudreve 改过密码或者退出过登录，StateHash 一变
+ * refresh 就拒（pkg/auth/jwt.go:150），能救回来的只有账号密码，所以这个入口不能省。
+ *
+ * 两道绕不过去的坎，命中就直接说清楚该去哪儿改：实例开了登录验证码
+ * （middleware.CaptchaRequired 在业务逻辑之前把请求挡下，回 40026）、账号开了两步验证
+ * （登录回 203 + 一个会话 id，动态码只在用户手上）。
+ *
+ * 邮箱、密码和令牌都只待在服务端：浏览器请求打到本插件，由这里带上 Authorization 转发给 Cloudreve。
  */
 class Cloudreve
 {
@@ -85,7 +94,7 @@ class Cloudreve
         }
 
         if (!self::ready()) {
-            self::reply(array('code' => 503, 'message' => _t('图床没有开启或者地址 / 令牌没填全。')));
+            self::reply(array('code' => 503, 'message' => _t('图床没有开启，或者实例地址 / 邮箱密码没填全。')));
         }
 
         if (!self::canUpload()) {
@@ -188,6 +197,18 @@ class Cloudreve
         $uri = self::uri($name);
         $session = self::createSession($uri, $size, $mime, $token['token']);
 
+        // 401 = 缓存的会话被 Cloudreve 判死了（在网盘那边改过密码、退出过登录都会这样）。
+        // 留账号密码的意义就在这里：这时候能自己爬起来，不用人回插件设置里补东西
+        if (!$session['ok'] && $session['code'] === 401) {
+            $token = self::accessToken(true);
+
+            if ($token['error'] !== '') {
+                return self::bad($token['error']);
+            }
+
+            $session = self::createSession($uri, $size, $mime, $token['token']);
+        }
+
         if (!$session['ok']) {
             // 目录不存在是最常见的第一次失败，建一次重试；建目录失败本身不用往外说
             if (!self::createFolder(self::parentUri($uri), $token['token'])) {
@@ -236,7 +257,7 @@ class Cloudreve
     /**
      * PUT /api/v4/file/upload：size 必须和真实字节数一致，核心拿 Content-Length 逐块核对。
      *
-     * @return array [ok, data, message]
+     * @return array [ok, code, data, message] code 是 Cloudreve 的业务码，调用点靠它认 401
      */
     private static function createSession(string $uri, int $size, string $mime, string $token): array
     {
@@ -251,11 +272,11 @@ class Cloudreve
         )), 30);
 
         if (!$response['ok']) {
-            return array('ok' => false, 'data' => array(), 'message' => $response['message']);
+            return array('ok' => false, 'code' => $response['code'], 'data' => array(),
+                'message' => $response['message']);
         }
 
-        return array(
-            'ok' => true,
+        return array('ok' => true, 'code' => 0,
             'data' => is_array($response['data']) ? $response['data'] : array(),
             'message' => '',
         );
@@ -377,87 +398,196 @@ class Cloudreve
     }
 
     /* ======================================================================
-       令牌
+       登录与令牌
        ====================================================================== */
 
     /**
-     * 拿到一个可用的 access token：命中缓存直接用，否则用 refresh token 换一个新的。
+     * 拿到一个可用的 access token：缓存没到期直接用，到期前拿 refresh token 续一个，
+     * 续不动就用邮箱密码重新登一次。
      *
+     * @param bool $force 跳过缓存和 refresh，直接重新登录；接口回了 401 才走这条路
      * @return array [token, error]
      */
-    private static function accessToken(): array
+    private static function accessToken(bool $force = false): array
     {
+        $current = self::fingerprint();
         $state = self::state();
-        $expires = isset($state['expires']) ? (int)$state['expires'] : 0;
-        $cached = isset($state['access']) ? trim((string)$state['access']) : '';
 
-        if ($cached !== '' && $expires - time() > self::EARLY) {
-            return array('token' => $cached, 'error' => '');
+        // 换了实例地址、换了账号、改了密码：手里的会话是上一份凭据登出来的，不能接着用
+        if ($force || (string)$state['account'] !== $current) {
+            return self::login($current);
         }
 
-        $refresh = trim(self::setting('crRefresh', ''));
+        $access = trim((string)$state['access']);
+        $expires = (int)$state['expires'];
 
-        if ($refresh !== '') {
-            $fresh = self::refreshToken($refresh);
-
-            if ($fresh['error'] === '') {
-                return $fresh;
-            }
-
-            // 刷新失败时如果手里还有一个旧的，用它试一次：反正过期了会明确报 401
-            if ($cached !== '') {
-                return array('token' => $cached, 'error' => '');
-            }
-
-            return array('token' => '', 'error' => $fresh['error']);
+        if ($access !== '' && $expires - time() > self::EARLY) {
+            return array('token' => $access, 'error' => '');
         }
 
-        $direct = trim(self::setting('crAccess', ''));
+        $renewed = self::renewToken(trim((string)$state['refresh']));
 
-        if ($direct !== '') {
-            return array('token' => $direct, 'error' => '');
+        if ($renewed['error'] === '') {
+            return $renewed;
         }
 
-        return array('token' => '', 'error' => _t('没配令牌：Refresh Token 和 Access Token 至少填一个。'));
+        $fresh = self::login($current);
+
+        if ($fresh['error'] === '') {
+            return $fresh;
+        }
+
+        // 两条路的失败原因都可能有用：refresh 为什么废了、登录又被什么挡住了
+        return array('token' => '', 'error' => $renewed['error'] . ' ' . $fresh['error']);
     }
 
     /**
-     * POST /api/v4/session/token 用 refresh_token 换 access_token。
+     * POST /api/v4/session/token：邮箱 + 密码登录，会话成对拿回来。
      *
+     * @param string $account 这份会话属于哪份凭据，见 fingerprint()
      * @return array [token, error]
      */
-    private static function refreshToken(string $refresh): array
+    private static function login(string $account): array
     {
-        $response = self::request('POST', self::api('session/token/refresh'), array(
+        $email = trim(self::setting('crEmail', ''));
+        $password = (string)self::setting('crPassword', '');
+
+        if ($email === '' || $password === '') {
+            return array('token' => '', 'error' => _t('没配登录信息：Cloudreve 的邮箱和密码都要填。'));
+        }
+
+        $body = json_encode(array('email' => $email, 'password' => $password), JSON_UNESCAPED_UNICODE);
+
+        if ($body === false) {
+            return array('token' => '', 'error' => _t('邮箱或密码里有非 UTF-8 字节，登录请求发不出去。'));
+        }
+
+        $response = self::request('POST', self::api('session/token'), array(
             'Content-Type: application/json',
-        ), json_encode(array('refresh_token' => $refresh)), 20);
+        ), $body, 20);
 
         if (!$response['ok']) {
-            return array('token' => '', 'error' => _t('换令牌失败：%s', $response['message']));
+            return array('token' => '', 'error' => self::blocked($response['code'])
+                . _t('登录失败：%s', $response['message']));
         }
 
-        $token = (is_array($response['data']) && isset($response['data']['token'])
-            && is_array($response['data']['token'])) ? $response['data']['token'] : array();
-        $access = isset($token['access_token']) ? trim((string)$token['access_token']) : '';
+        $token = self::tokenOf($response['data']);
 
-        if ($access === '') {
-            return array('token' => '', 'error' => _t('换令牌接口没返回 access_token。'));
+        if ($token['access'] === '') {
+            return array('token' => '', 'error' => _t('登录接口没返回 access_token，不像 Cloudreve v4。'));
         }
 
-        $expires = self::expiresAt(isset($token['access_expires']) ? (string)$token['access_expires'] : '');
+        self::keep($account, $token);
 
-        $state = self::state();
-        $state['access'] = $access;
-        $state['expires'] = $expires;
-        $state['checked'] = time();
-        $state['error'] = '';
-        self::saveState($state);
-
-        return array('token' => $access, 'error' => '');
+        return array('token' => $token['access'], 'error' => '');
     }
 
     /**
-     * access_expires 是 RFC3339；解析不动就按 1 小时算，反正换失败了也只是多发一次。
+     * POST /api/v4/session/token/refresh：登录时拿到的 refresh token 还没到期，
+     * 就只用它换一个新的 access，省掉一次密码上线。
+     *
+     * @return array [token, error]
+     */
+    private static function renewToken(string $refresh): array
+    {
+        if ($refresh === '') {
+            return array('token' => '', 'error' => _t('本地还没有会话。'));
+        }
+
+        $response = self::request('POST', self::api('session/token/refresh'), array(
+            'Content-Type: application/json',
+        ), json_encode(array('refresh_token' => $refresh)), 20, true);
+
+        if (!$response['ok']) {
+            return array('token' => '', 'error' => _t('续会话失败：%s', $response['message']));
+        }
+
+        $token = self::tokenOf($response['data']);
+
+        if ($token['access'] === '') {
+            return array('token' => '', 'error' => _t('续会话接口没返回 access_token。'));
+        }
+
+        // v4 不轮换 refresh token（Issue 复用同一个 RootTokenID），它回什么就存什么
+        $token['refresh'] = $token['refresh'] === '' ? $refresh : $token['refresh'];
+        self::keep('', $token);
+
+        return array('token' => $token['access'], 'error' => '');
+    }
+
+    /**
+     * 把会话写进状态文件。$account 留空表示「凭据没变，只换了令牌」。
+     */
+    private static function keep(string $account, array $token): void
+    {
+        $state = self::state();
+        $state['access'] = $token['access'];
+        $state['refresh'] = $token['refresh'];
+        $state['expires'] = $token['expires'];
+        $state['checked'] = time();
+        $state['error'] = '';
+
+        if ($account !== '') {
+            $state['account'] = $account;
+        }
+
+        self::saveState($state);
+    }
+
+    /**
+     * 两种响应的令牌字段位置不一样：登录的 data 外面还包了一层 {user, token}，
+     * 续会话的 data 本身就是 token。这里一次抹平，别在调用点各写一份。
+     *
+     * @param mixed $data
+     * @return array [access, refresh, expires]
+     */
+    private static function tokenOf($data): array
+    {
+        if (!is_array($data)) {
+            return array('access' => '', 'refresh' => '', 'expires' => 0);
+        }
+
+        $token = (isset($data['token']) && is_array($data['token'])) ? $data['token'] : $data;
+
+        return array(
+            'access' => isset($token['access_token']) ? trim((string)$token['access_token']) : '',
+            'refresh' => isset($token['refresh_token']) ? trim((string)$token['refresh_token']) : '',
+            'expires' => self::expiresAt(
+                isset($token['access_expires']) ? (string)$token['access_expires'] : ''),
+        );
+    }
+
+    /**
+     * 「这份会话是哪份凭据登出来的」。存哈希不存原文：状态文件在 usr/uploads 底下，
+     * 多留一份能反推出密码的东西没有意义，比对这个哈希又只需要相等与否。
+     */
+    private static function fingerprint(): string
+    {
+        return hash('sha256', self::baseUrl() . '|' . trim(self::setting('crEmail', ''))
+            . '|' . self::setting('crPassword', ''));
+    }
+
+    /**
+     * 这两道坎插件自己过不去，光看错误码没人知道该动哪里，所以把话说完。
+     */
+    private static function blocked(int $code): string
+    {
+        if ($code === 40026 || $code === 40027) {
+            return _t('这个 Cloudreve 开了登录验证码：请求在进业务逻辑之前就被挡下了，'
+                . '插件既拿不到也解不开那张图。请在 Cloudreve 后台关掉登录验证码，'
+                . '图床才能用账号密码登录。');
+        }
+
+        if ($code === 203) {
+            return _t('这个账号开了两步验证：登录只回一个会话 id，动态码只在你手上，插件填不了。'
+                . '关掉两步验证，或者给图床单独建一个不开两步验证的账号。');
+        }
+
+        return '';
+    }
+
+    /**
+     * access_expires 是 RFC3339；解析不动就按 1 小时算，反正误判最多是提前一点重新登录。
      */
     private static function expiresAt(string $text): int
     {
@@ -481,8 +611,8 @@ class Cloudreve
     {
         $state = self::state();
         $host = trim(self::setting('crHost', ''));
-        $refresh = trim(self::setting('crRefresh', ''));
-        $access = trim(self::setting('crAccess', ''));
+        $email = trim(self::setting('crEmail', ''));
+        $password = (string)self::setting('crPassword', '');
 
         $html = '<h3 class="nl-h3">' . Admin::esc(_t('Cloudreve 图床')) . '</h3>'
             . '<p class="nl-lead">' . Admin::esc(_t(
@@ -505,18 +635,22 @@ class Cloudreve
             $chips[] = array('ok', _t('实例 %s', $base));
         }
 
-        if ($refresh !== '') {
-            $chips[] = array('ok', _t('Refresh Token 已配'));
-        } elseif ($access !== '') {
-            $chips[] = array('warn', _t('只有 Access Token，默认 1 小时就过期'));
+        if ($email === '' || $password === '') {
+            $chips[] = array('bad', _t('没填 Cloudreve 的邮箱或密码'));
         } else {
-            $chips[] = array('bad', _t('没配令牌'));
+            $chips[] = array('ok', _t('账号 %s', $email));
         }
 
         $expires = isset($state['expires']) ? (int)$state['expires'] : 0;
 
-        if ($expires > time()) {
-            $chips[] = array('muted', _t('当前 access token 还能用到 %s', date('H:i:s', $expires)));
+        if ((string)$state['account'] === '') {
+            $chips[] = array('muted', _t('还没登录过，第一次传图会自动登'));
+        } elseif ((string)$state['account'] !== self::fingerprint()) {
+            $chips[] = array('warn', _t('地址 / 邮箱 / 密码改过了，下次传图重新登录'));
+        } elseif ($expires > time()) {
+            $chips[] = array('muted', _t('已登录，会话能用到 %s', date('H:i:s', $expires)));
+        } else {
+            $chips[] = array('muted', _t('会话到期了，下次传图自动续'));
         }
 
         $html .= '<div class="nl-chips">';
@@ -537,10 +671,11 @@ class Cloudreve
             . '<form method="post" action="' . Admin::esc($url) . '">'
             . '<input type="hidden" name="action" value="cr_forget">'
             . '<input type="hidden" name="_" value="' . Admin::esc($token) . '">'
-            . '<button class="btn btn-s" type="submit">' . Admin::esc(_t('清掉缓存的令牌')) . '</button>'
+            . '<button class="btn btn-s" type="submit">' . Admin::esc(_t('清掉登录缓存')) . '</button>'
             . '</form>'
             . '<span class="nl-note">' . Admin::esc(_t(
-                '测试连接只做三件事：换令牌、列一下目标目录、确认能取直链。不会真的传文件。'))
+                '测试连接只做三件事：用邮箱密码登一次、列一下目标目录、确认能取直链，不会真的传文件。'
+                . '「清掉登录缓存」会顺手把这一串会话在 Cloudreve 那边作废掉，下次传图重新登录。'))
             . '</span></div>';
 
         $html .= '<table class="nl-list"><tbody>';
@@ -587,11 +722,23 @@ class Cloudreve
     {
         if ($action === 'cr_forget') {
             $state = self::state();
+            $refresh = trim((string)$state['refresh']);
+
+            // 本地清掉不够：那一串 refresh token 在 Cloudreve 那边还能用到 180 天。
+            // 作废失败不拦着本地清理——多半是它本来就已经死了
+            if ($refresh !== '') {
+                self::request('DELETE', self::api('session/token'), array(
+                    'Content-Type: application/json',
+                ), json_encode(array('refresh_token' => $refresh)), 20, true);
+            }
+
             $state['access'] = '';
+            $state['refresh'] = '';
             $state['expires'] = 0;
+            $state['account'] = '';
             self::saveState($state);
 
-            return array('success', _t('缓存的 access token 已清掉，下次会重新换。'));
+            return array('success', _t('登录缓存已清掉，Cloudreve 那边那串会话也一并作废了，下次传图会重新登录。'));
         }
 
         if ($action !== 'cr_probe') {
@@ -607,9 +754,7 @@ class Cloudreve
 
         $expires = (int)self::state()['expires'];
 
-        $lines[] = $expires > time()
-            ? _t('令牌到手，有效到 %s。', date('m-d H:i:s', $expires))
-            : _t('令牌到手（这是手填的 Access Token，插件不知道它几点过期）。');
+        $lines[] = _t('已登录，会话有效到 %s。', date('m-d H:i:s', $expires));
 
         $dir = self::uri('');
         $listed = self::request('GET', self::api('file?uri=' . rawurlencode($dir) . '&page=1'),
@@ -804,13 +949,13 @@ class Cloudreve
        设置与环境
        ====================================================================== */
 
-    /** 开了、地址齐、令牌至少有一个，才往编辑器里塞东西 */
+    /** 开了、地址齐、邮箱密码齐，才往编辑器里塞东西 */
     private static function ready(): bool
     {
         return self::config('crEnabled', '1') === '1'
             && self::baseUrl() !== ''
-            && (trim(self::setting('crRefresh', '')) !== ''
-                || trim(self::setting('crAccess', '')) !== '');
+            && trim(self::setting('crEmail', '')) !== ''
+            && self::setting('crPassword', '') !== '';
     }
 
     private static function canUpload(): bool
@@ -836,7 +981,7 @@ class Cloudreve
 
     /**
      * Cloudreve 根地址：补上 https、只认 scheme://host[/子目录]，
-     * 不接受带 userinfo 或查询串的写法，免得把 Bearer 令牌转发到别人指的地方。
+     * 不接受带 userinfo 或查询串的写法，免得把密码和 Bearer 令牌转发到别人指的地方。
      */
     private static function baseUrl(): string
     {
@@ -1237,7 +1382,8 @@ class Cloudreve
         $raw = isset($decoded['msg']) ? trim((string)$decoded['msg']) : '';
 
         $names = array(
-            401 => _t('未登录：令牌过期或者不对'),
+            203 => _t('需要两步验证'),
+            401 => _t('未登录：会话过期或者不对'),
             403 => _t('没有权限'),
             404 => _t('找不到目标'),
             40001 => _t('参数不合法'),
@@ -1247,6 +1393,15 @@ class Cloudreve
             40011 => _t('上传会话已过期'),
             40012 => _t('分块序号不对'),
             40013 => _t('内容长度和会话里声明的大小不符'),
+            40017 => _t('账号被禁用'),
+            40018 => _t('账号还没激活'),
+            40020 => _t('凭证无效'),
+            40021 => _t('用户不存在'),
+            40022 => _t('两步验证码不对'),
+            40023 => _t('登录会话不存在'),
+            40026 => _t('登录验证码没过'),
+            40027 => _t('验证码要刷新'),
+            40080 => _t('邮箱或密码不对'),
             40089 => _t('令牌权限范围不够'),
         );
 
@@ -1261,10 +1416,15 @@ class Cloudreve
 
     private static function state(): array
     {
+        $defaults = array(
+            'account' => '', 'access' => '', 'refresh' => '', 'expires' => 0,
+            'checked' => 0, 'error' => '', 'records' => array(),
+        );
+
         $path = self::statePath();
 
         if (!is_file($path)) {
-            return array('access' => '', 'expires' => 0, 'error' => '', 'records' => array());
+            return $defaults;
         }
 
         $text = (string)@file_get_contents($path);
@@ -1272,10 +1432,10 @@ class Cloudreve
         $decoded = json_decode($body, true);
 
         if (!is_array($decoded)) {
-            return array('access' => '', 'expires' => 0, 'error' => '', 'records' => array());
+            return $defaults;
         }
 
-        return $decoded + array('access' => '', 'expires' => 0, 'error' => '', 'records' => array());
+        return $decoded + $defaults;
     }
 
     private static function saveState(array $state): void

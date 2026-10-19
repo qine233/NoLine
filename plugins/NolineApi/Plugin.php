@@ -27,13 +27,13 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package NolineApi
  * @author 州州
- * @version 1.7.7
+ * @version 1.7.8
  * @link https://ui.zhouzhou.work/
  */
 class Plugin implements PluginInterface
 {
     /** 改这里要同时改文件头注释里的 @version，后台插件列表读的是注释 */
-    private const VERSION = '1.7.7';
+    private const VERSION = '1.7.8';
 
     /** 数据目录放在 uploads 下，不在主题目录内，升级主题不会清空记录 */
     private const DATA_DIR = '/usr/uploads/noline_api';
@@ -79,8 +79,8 @@ class Plugin implements PluginInterface
             . '<strong>主题自动更新默认开着</strong>：后台路过任意一个页面时如果发现 '
             . 'Release 里有新版本，会当场把旧主题和旧插件各整份备份、再换成新版本，不需要点任何东西，'
             . '不想让它自己动手就在那个页面的设置里关掉。连不上 GitHub 的站点可以在设置里填「主题更新镜像」，'
-            . '直连失败会自动退到镜像。图床同样在设置里填 Cloudreve 地址和 '
-            . 'Refresh Token，填好后进写文章页的「附件」标签就能看到上传区。');
+            . '直连失败会自动退到镜像。图床同样在设置里填 Cloudreve 地址和那个网盘账号的'
+            . '邮箱密码，填好后进写文章页的「附件」标签就能看到上传区。');
     }
 
     /** 照 HOOKS 把钩子挂上核心。激活和自愈重登记走的都是这一个入口 */
@@ -351,27 +351,27 @@ class Plugin implements PluginInterface
         );
         $form->addInput($crDir);
 
-        $crRefresh = new Password(
-            'crRefresh',
+        $crEmail = new Text(
+            'crEmail',
             null,
             null,
-            _t('Refresh Token（推荐）'),
-            _t('v4 没有长期有效的个人 token：浏览器用的 access token 默认只活 1 小时，'
-                . 'refresh token 默认 180 天。登录 Cloudreve 后在浏览器控制台执行 '
-                . '<code>localStorage.getItem("refresh_token")</code> 把这一串贴进来，'
-                . '插件会自己在快到期时换新的 access token。原文存库，只发给上面那个地址。')
+            _t('Cloudreve 账号'),
+            _t('图床直接用这个账号登录网盘，文件落在它名下。要求它能在 Cloudreve 网页上正常登录：'
+                . '<strong>开了登录验证码的实例、开了两步验证的账号插件登不进去</strong>'
+                . '（验证码要人看、动态码只在你手上），测试连接会直说卡在哪一步。')
         );
-        $form->addInput($crRefresh);
+        $form->addInput($crEmail);
 
-        $crAccess = new Password(
-            'crAccess',
+        $crPassword = new Password(
+            'crPassword',
             null,
             null,
-            _t('Access Token（备选，活不长）'),
-            _t('拿不到 refresh token 时才填。填了 Refresh Token 就不用管这里——'
-                . '它过期后接口会明确报 401，到时候回来补 Refresh Token。')
+            _t('Cloudreve 密码'),
+            _t('插件登一次拿回会话，之后靠会话干活（v4 的 access 默认只活 1 小时），'
+                . '会话续不动了再拿密码重登——所以在网盘那边改了密码、退出过登录都不用回来补东西。'
+                . '密码原文存库，只发给上面那个实例地址。')
         );
-        $form->addInput($crAccess);
+        $form->addInput($crPassword);
 
         $crMaxSize = new Text(
             'crMaxSize',
