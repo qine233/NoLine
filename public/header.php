@@ -36,12 +36,24 @@ $heroCover = $this->is('post')
     ? noline_post_cover($this) !== ''
     : trim((string)$this->options->logobgcolor) !== '';
 $bodyClass = ($hasHero ? ' has-hero' : '') . ($heroCover ? ' hero-cover' : '');
+
+/* 跨文档视图过渡的开关。COOP 头是 themeInit 发的，这里回头确认它真的挂上了：
+   没挂上就还走原先那套淡入淡出，别让页面既没有过渡、也没有淡出地硬切。 */
+$vtReady = noline_header_sent('Cross-Origin-Opener-Policy');
 ?>
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN"<?php if ($vtReady): ?> data-vt<?php endif; ?>>
 <head>
     <meta charset="<?php $this->options->charset(); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <?php /* 预加载：主样式表在防闪烁脚本和 header() 之后才出现，顶栏头像更要等到 body 里
+              那个 <img>（中间隔着几百行 HTML）。跨文档视图过渡是等新文档「就绪」才换页的，
+              这两个请求越早落地，换页那一瞬越不会闪出一块空头像。
+              头像只在 http(s) 时预载：data: URI 没有请求可提前，preload 反而会报一条警告。 */ ?>
+    <link rel="preload" as="style" href="<?php echo noline_css_url('css/design.css'); ?>?v=<?php echo NOLINE_VERSION; ?>">
+    <?php if ($avatar !== null && preg_match('%^https?://%i', $avatar)): ?>
+    <link rel="preload" as="image" href="<?php echo $avatar; ?>">
+    <?php endif; ?>
     <?php
     /**
      * header() 自己就会输出转义好的 description / keywords meta，不要再手写一遍。
@@ -220,6 +232,29 @@ $bodyClass = ($hasHero ? ' has-hero' : '') . ($heroCover ? ' hero-cover' : '');
         }
         el.setAttribute('data-theme', theme);
         if (reduce) { return; }
+
+        <?php /* 跨文档视图过渡用不用得上，两件事都得成立：浏览器认 @view-transition 这条
+                 at-rule，以及服务端把 COOP 头真送出去了（data-vt 就是 PHP 回头查过 headers_list()
+                 给的标记）。探测走构造样式表——不认识的 at-rule 会被解析器整条丢掉，
+                 cssRules 的长度就是答案；CSS.supports 只能测属性，而属性支持不等于跨文档支持
+                 （Firefox 正卡在这个差上）。 */ ?>
+        var vt = el.hasAttribute('data-vt');
+
+        if (vt) {
+            try {
+                var sheet = new CSSStyleSheet();
+                sheet.replaceSync('@view-transition{navigation:auto}');
+                vt = sheet.cssRules.length > 0;
+            } catch (e) { vt = false; }
+        }
+
+        if (vt) {
+            /* 交换时机交给浏览器：新页没准备好之前，旧页原样挂着。
+               这时候绝不能先藏内容——藏了就被拍进快照里，过渡完是一片白。 */
+            el.classList.add('vt-cross');
+            return;
+        }
+
         el.classList.add('is-loading');
         /* 兜底。main.js 若加载失败（404、被扩展拦下），is-loading 就永远不会被移除，
            整页空白——所以这个定时器必须待在内联脚本里，不能只放在 main.js。 */

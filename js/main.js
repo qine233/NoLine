@@ -29,6 +29,10 @@
 
     var root = document.documentElement;
 
+    /* 跨文档视图过渡是否已经接管站内跳转。这个类是 header.php 的内联脚本探出来才挂的
+       （浏览器认 @view-transition，且服务端确实发了 COOP 头），这里只读结果，不再探一遍。 */
+    var crossVt = root.classList.contains('vt-cross');
+
     var motionQuery = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
     var systemQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
@@ -130,7 +134,6 @@
         }
         leaving = true;
 
-        root.classList.add('is-leaving');
         progressShow(0);
         /* 连等两帧再推进。scaleX(0) 和 scaleX(.7) 若落在同一次样式计算里，
            浏览器看不到起始值，过渡会被直接跳过。 */
@@ -142,6 +145,17 @@
 
         /* 让新页面接着把进度条推完，而不是重新从 0 开始 */
         writeStore(window.sessionStorage, NAV_KEY, '1');
+
+        if (crossVt) {
+            /* 浏览器自己会等新文档就绪再拍快照换页，这期间旧页原样挂着，
+               所以不需要先淡出腾位置——原先那 200ms 只会平白多等五分之一秒。
+               进度条留着：站点慢的时候「点了没反应」比没有过渡更让人不安。 */
+            location.assign(href);
+
+            return;
+        }
+
+        root.classList.add('is-leaving');
 
         /* 和 design.css 里 .18s 的淡出对齐 */
         setTimeout(function () {

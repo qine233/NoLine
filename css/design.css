@@ -4068,7 +4068,36 @@ a.stat-item:active { transform: scale(.95); }
 .back-top:active { transform: scale(.9); }
 
 /* ==========================================================================
-   页面转场
+   跨文档视图过渡（浏览器原生，站内跳转的主路径）
+   --------------------------------------------------------------------------
+   浏览器给新旧两页各拍一张快照再做形态过渡：新页没解析完之前，旧页原样挂着，
+   所以既没有白屏，也不用 JS 去猜「加载得怎么样了」。
+   顶栏挂上名字之后是独立的一组，跨页连续——滚动条一动它不重建、头像不再重新解码，
+   看起来就是同一块从来没变过。整块命名而不是只命名头像：头像在顶栏里，
+   顶栏整组连续时它自然跟着连续，嵌套组没有额外收益，只有额外的兼容风险。
+   生效前提有两个，缺一不可：两页同源，且两边都带
+   Cross-Origin-Opener-Policy: same-origin（functions.php 的 themeInit 发）。
+   不认这条 at-rule 的浏览器整段忽略，自动退回下面的 is-loading / is-leaving。
+   ========================================================================== */
+
+@view-transition {
+    navigation: auto;
+}
+
+.topbar {
+    view-transition-name: noline-topbar;
+}
+
+/* 两页都是深色时，默认的 mix-blend-mode: plus-lighter 会把中间帧提亮成一层白雾；
+   浅色对浅色则是洗淡。root 一律用普通混合，时长压到和原先淡出一致的 .22s。 */
+::view-transition-old(root),
+::view-transition-new(root) {
+    mix-blend-mode: normal;
+    animation-duration: .22s;
+}
+
+/* ==========================================================================
+   页面转场（不支持视图过渡的浏览器走的退路）
    html.is-loading / html.is-leaving 这两个类由 header.php 的内联脚本和 main.js 添加。
    首屏 hero 现在住在 .container 外面（通栏不能给版心框住），所以它得和 container
    一起淡入淡出，否则跳转时是「上半页硬出现、下半页淡进来」。
@@ -4106,6 +4135,14 @@ html.is-leaving .post-hero { opacity: 0; transform: translateY(-8px); transition
 
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+
+    /* 视图过渡的伪元素不在 * 的覆盖范围里，得单独点名。
+       内联脚本在 reduce 时既不挂 vt-cross 也不挂 is-loading，
+       但 @view-transition 是无条件写的，浏览器照样会接管跳转——这里把它的动画时长清零。 */
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) { animation: none !important; }
+
     html.is-loading .container,
     html.is-leaving .container,
     html.is-loading .site-hero, html.is-loading .post-hero,

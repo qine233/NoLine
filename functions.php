@@ -4,7 +4,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
 /**
  * 主题版本号。同时用作静态资源的缓存指纹（?v=），改版本即可强制刷新客户端缓存。
  */
-define('NOLINE_VERSION', '1.28.1');
+define('NOLINE_VERSION', '1.29.0');
 
 /* ==========================================================================
    后台设置
@@ -107,6 +107,14 @@ function themeConfig($form)
  */
 function themeInit($archive)
 {
+    /* 跨文档视图过渡要新旧两页落在同一个渲染进程组里，Chrome 只认这一条：
+       两边都发 Cross-Origin-Opener-Policy: same-origin。缺了这个头，
+       CSS 里的 @view-transition 会被静默忽略，一点动静都没有，所以 header.php
+       得先确认头发出去了，才敢把原先那套淡入淡出关掉。 */
+    if (!headers_sent()) {
+        header('Cross-Origin-Opener-Policy: same-origin');
+    }
+
     if (!$archive->is('single') || !$archive->is('post')) {
         return;
     }
@@ -127,6 +135,26 @@ function themeInit($archive)
 
     noline_bump_views($cid);
     setcookie($cookie, '1', time() + 86400, '/');
+}
+
+/**
+ * 这个响应头到底挂上没有。headers_list() 在开始输出之后照样能读，
+ * 所以模板里问它比让 themeInit 传一个全局变量可靠：中间件或 php.ini 把头发掉、
+ * 或者上面走了别的分支没执行到 header()，这里都能当场看出来。
+ */
+function noline_header_sent($name)
+{
+    $name = strtolower(trim($name));
+
+    foreach (headers_list() as $line) {
+        $pos = strpos($line, ':');
+
+        if ($pos !== false && strtolower(trim(substr($line, 0, $pos))) === $name) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -363,6 +391,108 @@ function noline_gravatar($email, $size = 96, $default = 'mp', $rating = 'g')
 }
 
 /**
+ * usr/uploads 下某个文件的公开地址。拼法照抄 Typecho 自己的附件地址
+ * （Widget_Upload::attachmentHandle）：配了 __TYPECHO_UPLOAD_URL__ 就挂它下面，
+ * 否则挂在站点根下。自己拼字符串会在子目录安装和 CDN 取图的站上直接拼错。
+ */
+function noline_upload_url($rel)
+{
+    return Typecho_Common::url(
+        'usr/uploads/' . ltrim((string)$rel, '/'),
+        defined('__TYPECHO_UPLOAD_URL__')
+            ? __TYPECHO_UPLOAD_URL__
+            : Typecho_Widget::widget('Widget_Options')->siteUrl
+    );
+}
+
+/**
+ * 站点头像转存成站内文件；任何一步不顺都原样退回外部地址。
+ *
+ * Gravatar 镜像发的是 cache-control: max-age=300, no-cache——每打开一张新页面都要先拿
+ * 304 问一次才敢画，顶栏那颗 32px 的小图因此每次跳转都在重新加载。转存进 usr/uploads
+ * 之后它是站内静态文件，浏览器直接命中缓存，跨文档视图过渡换页时顶栏不会再闪一下空头像。
+ *
+ * 只在文件缺失时抓一次；抓失败记一笔、六小时内不再重试，否则镜像站一挂，每个页面请求
+ * 都要替它等满超时。文件名带原地址的哈希，换头像必然换地址，旧文件自然作废，
+ * 不需要额外的失效逻辑。评论头像不走这里：那是一张张别人的图，数量和时效都不该由主题背。
+ */
+function noline_local_avatar($url)
+{
+    $url = trim((string)$url);
+    $remote = parse_url(strtolower($url));
+    $site = parse_url(strtolower((string)Typecho_Widget::widget('Widget_Options')->siteUrl));
+
+    /* 相对地址、data:、已经是站内的图——没有可转存的第三方请求 */
+    if (empty($remote['scheme']) || empty($remote['host'])
+        || !in_array($remote['scheme'], array('http', 'https'), true)
+        || $remote['host'] === (isset($site['host']) ? $site['host'] : '')) {
+        return $url;
+    }
+
+    $dir = __TYPECHO_ROOT_DIR__ . '/usr/uploads/noline_avatar';
+
+    if ((!is_dir($dir) && !@mkdir($dir, 0755, true)) || !is_writable($dir)) {
+        return $url;
+    }
+
+    $base = $dir . '/' . md5($url);
+    $fail = $dir . '/fail-' . md5($url);
+
+    /* 只认这张表里的后缀：一个 .tmp（写一半的临时文件）或者 .fail 不能当图发出去 */
+    $by_suffix = array(
+        'png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg',
+        'gif' => 'image/gif', 'webp' => 'image/webp', 'avif' => 'image/avif',
+        'svg' => 'image/svg+xml',
+    );
+
+    /* glob() 在目录读不动时返回 false，不是空数组——别把它硬转成数组遍历 */
+    $hits = glob($base . '.*');
+
+    foreach (is_array($hits) ? $hits : array() as $hit) {
+        $suffix = strtolower((string)pathinfo($hit, PATHINFO_EXTENSION));
+
+        if (isset($by_suffix[$suffix])) {
+            return noline_upload_url('noline_avatar/' . basename($hit));
+        }
+    }
+
+    if (is_file($fail) && time() - (int)filemtime($fail) < 21600) {
+        return $url;
+    }
+
+    $raw = @file_get_contents($url, false, stream_context_create(array(
+        'http' => array('timeout' => 3, 'header' => "Accept: image/*\r\n"),
+    )));
+
+    $type = '';
+
+    foreach (isset($http_response_header) ? (array)$http_response_header : array() as $line) {
+        if (stripos($line, 'content-type:') === 0) {
+            $type = strtolower(trim((string)explode(';', trim(substr($line, 13)))[0]));
+        }
+    }
+
+    $suffix = array_search($type, $by_suffix, true);
+
+    if ($raw === false || $raw === '' || $suffix === false || strlen($raw) > 512 * 1024) {
+        @file_put_contents($fail, '');
+        return $url;
+    }
+
+    /* 先写临时名再 rename：并发请求只会看到「还没有这个文件」，不会看到半张图 */
+    if (@file_put_contents($base . '.tmp', $raw) === false
+        || !@rename($base . '.tmp', $base . '.' . $suffix)) {
+        @unlink($base . '.tmp');
+        @file_put_contents($fail, '');
+        return $url;
+    }
+
+    @unlink($fail);
+
+    return noline_upload_url('noline_avatar/' . md5($url) . '.' . $suffix);
+}
+
+/**
  * 文章作者头像：优先用后台配置的站点头像，未配置时回退到作者 Gravatar。
  * 返回值已做 HTML 转义，可直接放进 src="" 里。
  */
@@ -372,7 +502,7 @@ function noline_author_avatar($archive, $size = 100)
     $logo = trim((string)$options->logoCss);
 
     if ($logo !== '') {
-        return htmlspecialchars($logo, ENT_QUOTES, 'UTF-8');
+        return htmlspecialchars(noline_local_avatar($logo), ENT_QUOTES, 'UTF-8');
     }
 
     // 不能用 isset($archive->author)：Widget::__isSet() 只查 $row，不会去调 ___author()，
@@ -383,7 +513,7 @@ function noline_author_avatar($archive, $size = 100)
         $mail = (string)$author->mail;
     }
 
-    return htmlspecialchars(noline_gravatar($mail, $size), ENT_QUOTES, 'UTF-8');
+    return htmlspecialchars(noline_local_avatar(noline_gravatar($mail, $size)), ENT_QUOTES, 'UTF-8');
 }
 
 /**
@@ -395,7 +525,7 @@ function noline_profile_avatar()
 {
     $logo = trim((string)Typecho_Widget::widget('Widget_Options')->logoCss);
 
-    return $logo === '' ? null : htmlspecialchars($logo, ENT_QUOTES, 'UTF-8');
+    return $logo === '' ? null : htmlspecialchars(noline_local_avatar($logo), ENT_QUOTES, 'UTF-8');
 }
 
 /**

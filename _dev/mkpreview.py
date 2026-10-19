@@ -95,10 +95,11 @@ FIGURE = ("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewB
 # ---------------------------------------------------------------- 共享外壳
 
 HEAD = """<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-vt>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <link rel="preload" as="style" href="../css/design.css?v=__VERSION__">
     <title>__TITLE__ — Noline 夹具</title>
     <script>
     (function () {
@@ -113,6 +114,17 @@ HEAD = """<!DOCTYPE html>
         }
         el.setAttribute('data-theme', theme);
         if (reduce) { return; }
+        /* 和 public/header.php 保持一份：夹具要能在本地 http 上验视图过渡。
+           data-vt 在这里是写死的，真站上由 PHP 确认 COOP 头挂上后才给。 */
+        var vt = el.hasAttribute('data-vt');
+        if (vt) {
+            try {
+                var sheet = new CSSStyleSheet();
+                sheet.replaceSync('@view-transition{navigation:auto}');
+                vt = sheet.cssRules.length > 0;
+            } catch (e) { vt = false; }
+        }
+        if (vt) { el.classList.add('vt-cross'); return; }
         el.classList.add('is-loading');
         setTimeout(function () { el.classList.remove('is-loading'); }, 900);
     })();
