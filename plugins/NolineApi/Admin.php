@@ -108,7 +108,11 @@ class Admin
             default:
                 // cr_probe / cr_forget 归图床，其余（refresh / upgrade / rollback / drop_backup / clean_work）归更新器
                 if (strpos($action, 'cr_') === 0) {
-                    return Cloudreve::act($action);
+                    try {
+                        return Cloudreve::act($action);
+                    } catch (\Throwable $e) {
+                        return array('error', _t('图床这一步没跑完：%s', $e->getMessage()));
+                    }
                 }
 
                 return Updater::act($action);
@@ -201,7 +205,16 @@ class Admin
         echo self::themeSection($values, $token, $url, $isNoline);
         echo self::apiSection($options);
         echo Updater::section($token, $url);
-        echo Cloudreve::section($token, $url);
+
+        // 图床那一段出任何错都不许把这一页带走——它同时是在线更新的唯一入口
+        try {
+            echo Cloudreve::section($token, $url);
+        } catch (\Throwable $e) {
+            echo '<h3 class="nl-h3">' . self::esc(_t('Cloudreve 图床')) . '</h3>'
+                . '<div class="nl-msg nl-msg-error">'
+                . self::esc(_t('这一段没能显示出来：%s', $e->getMessage()))
+                . '</div>';
+        }
 
         echo '</div></div></div></div>' . self::scripts() . '</body></html>';
     }

@@ -75,11 +75,17 @@ class Cloudreve
      */
     public static function onWriteBottom($content = null)
     {
-        if (!self::ready() || !self::canUpload()) {
-            return;
-        }
+        try {
+            if (!self::ready() || !self::canUpload()) {
+                return;
+            }
 
-        echo self::panel();
+            echo self::panel();
+        } catch (\Throwable $e) {
+            /* 这块 DOM 坏了不该把写文章页一起带走；原因记进状态文件，
+               在「主题管理」的图床区块里当「上次失败」显示出来 */
+            self::note(_t('图床面板没渲染出来：%s', $e->getMessage()));
+        }
     }
 
     /**
