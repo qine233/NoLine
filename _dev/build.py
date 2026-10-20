@@ -29,7 +29,8 @@ DIST = THEME / 'dist' if (THEME / '.git').exists() else THEME.parent / 'dist'
 
 PHP_PAGES = [
     '404.php', 'archive.php', 'bills.php', 'comments.php', 'dcument.php', 'functions.php',
-    'health.php', 'index.php', 'links.php', 'page.php', 'post.php', 'xiaoshi.php',
+    'health.php', 'index.php', 'links.php', 'page.php', 'post.php', 'showcase.php',
+    'xiaoshi.php',
 ]
 ASSET_DIRS = ['css', 'js', 'public']
 DATA_DIRS = ['views']

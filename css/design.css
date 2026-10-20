@@ -147,6 +147,14 @@
     --bill-grain-bg:     rgba(138, 106, 69, .11);
     --bill-seasoning-bg: rgba(122, 90, 168, .10);
     --bill-other-bg:     rgba(107, 116, 128, .10);
+    /* 接口清单里的动词。不复用 BMI 那四档——那组名字说的是体重分档，这一组要的是
+       「读 / 写 / 删」的语色：读走冷、写走暖、删走红，POST 和 PUT 同为写入共用一支。 */
+    --verb-read:      #2f7f8c;
+    --verb-read-bg:   rgba(47, 127, 140, .10);
+    --verb-write:     #a8600f;
+    --verb-write-bg:  rgba(168, 96, 15, .12);
+    --verb-del:       #b3352f;
+    --verb-del-bg:    rgba(179, 53, 47, .11);
     --scrim: rgba(15, 23, 42, .45);
     /* 灯箱：比 --scrim 更重的遮罩，配白字和半透明按钮底 */
     --lightbox-bg: rgba(8, 12, 18, .82);
@@ -328,6 +336,13 @@
     --bill-grain-bg:     rgba(194, 161, 121, .16);
     --bill-seasoning-bg: rgba(177, 151, 221, .16);
     --bill-other-bg:     rgba(154, 164, 176, .16);
+    /* 动词语色同步提亮，掺量抬到 .16——和上面那两组一个道理 */
+    --verb-read:      #58bdd0;
+    --verb-read-bg:   rgba(88, 189, 208, .16);
+    --verb-write:     #e2a75f;
+    --verb-write-bg:  rgba(226, 167, 95, .16);
+    --verb-del:       #e0837a;
+    --verb-del-bg:    rgba(224, 131, 122, .16);
     --scrim: rgba(0, 0, 0, .62);
     --lightbox-bg: rgba(0, 0, 0, .90);
     --lightbox-fg: #e8eef6;
@@ -2944,6 +2959,386 @@ a.status-action:hover { color: var(--accent); background-color: var(--accent-bg)
 @media (prefers-reduced-motion: reduce) {
     .bill-bar-fill { animation: none; }
     .bill-kind-fill { transition: none; }
+}
+
+/* ==========================================================================
+   项目展示页（showcase.php）
+   主题 + 插件的说明书页：四块实况磁贴、能力卡网格、实时色块、接口清单、
+   模板表、安装步骤、已知取舍。磁贴里的版本 / 篇数 / 端点数全是模板现取的，
+   这一节只负责把那些数摆出来，不做任何自己的判断。
+   ========================================================================== */
+
+.show-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: .75rem;
+    margin-top: 1.5rem;
+}
+.show-tile {
+    display: flex;
+    flex-direction: column;
+    gap: .1875rem;
+    padding: .8125rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-sunken);
+    transition: transform .25s var(--ease-spring), box-shadow .25s ease, background-color .25s ease;
+}
+.show-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    background-color: var(--card-bg);
+}
+.show-tile-label {
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+    font-size: .75rem;
+    font-weight: 600;
+    color: var(--text-light);
+}
+.show-tile-label .noline-icon { color: var(--accent); }
+/* 和健康页、记账页同一档：三张个人页的读数不该各写各的字号 */
+.show-tile-value {
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -.015em;
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+.show-tile-value i {
+    margin-left: .25rem;
+    font-size: .8125rem;
+    font-style: normal;
+    font-weight: 600;
+    letter-spacing: 0;
+    color: var(--text-secondary);
+}
+/* 「没装」是两个字，压在同档字号上会像一块招牌；缩一档、换次级色，读作状态而非结论 */
+.show-tile-value.is-off {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    color: var(--text-secondary);
+}
+.show-tile-note { font-size: .75rem; line-height: 1.5; color: var(--text-secondary); }
+
+.show-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .625rem;
+    margin-top: 1.25rem;
+}
+/* 次级按钮：和 .btn-primary 同一圈胶囊几何，只是不铺实心块——一排放五个实心块，
+   下载那颗就再也跳不出来了。 */
+.show-action {
+    display: inline-flex;
+    align-items: center;
+    gap: .4375rem;
+    padding: .625rem 1.0625rem;
+    border: var(--style-border);
+    border-radius: var(--radius-full);
+    font-size: .875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background-color: var(--surface-soft);
+    transition: var(--t);
+}
+.show-action .noline-icon { font-size: 1rem; }
+.show-action:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background-color: var(--accent-bg);
+    transform: translateY(-2px);
+}
+.show-action:active { transform: scale(.95); }
+
+.show-req {
+    margin: 1rem 0 0;
+    font-size: .75rem;
+    line-height: 1.7;
+    color: var(--text-light);
+}
+
+/* 段标题：前面那颗点用暖金，和正文标题的人字标记同源——一支强调色不该同时当文字又当装饰 */
+.show-heading {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin: 2.25rem 0 0;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: var(--text-strong);
+}
+.show-heading::before {
+    content: "";
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--heading-marker);
+}
+
+.show-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: .75rem;
+    margin-top: 1rem;
+}
+.show-card,
+.show-pillar {
+    display: flex;
+    flex-direction: column;
+    gap: .375rem;
+    padding: 1rem 1.0625rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-sunken);
+    transition: var(--t);
+}
+@media (hover: hover) {
+    .show-card:hover,
+    .show-pillar:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+        background-color: var(--card-bg);
+        border-color: var(--card-border);
+    }
+}
+/* 插件那三块给一道左重右轻的边：它们是「能力」，和信息流那种并列卡片不是一类 */
+.show-pillar {
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+.show-card-title {
+    display: flex;
+    align-items: center;
+    gap: .4375rem;
+    font-size: .875rem;
+    font-weight: 700;
+    color: var(--text-strong);
+}
+.show-card-title .noline-icon { font-size: 1rem; color: var(--accent); }
+.show-card-text,
+.show-pillar-text {
+    margin: 0;
+    font-size: .8125rem;
+    line-height: 1.75;
+    color: var(--text-secondary);
+}
+
+.show-block {
+    margin-top: 1rem;
+    padding: 1.125rem 1.125rem 1.25rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-zebra);
+}
+.show-block-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+.show-block-note {
+    font-size: .75rem;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+}
+/* 通用空态的 5rem 内缩是给整张卡片用的，塞进这一格里会把半页撑空 */
+.show-block .empty-state { padding: 1.75rem 1rem 2rem; }
+.show-block .empty-state-icon { width: 3.5rem; height: 3.5rem; font-size: 1.75rem; margin-bottom: .875rem; }
+
+/* 实时色块：五格背景全挂变量，所以深色模式一开这一排自己翻。
+   淡底那两格（--accent-bg / --accent-container）身后是卡片白底，
+   透明度是它们的全部信息，不该再叠一层底色去骗人。 */
+.show-palette {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: .625rem;
+}
+.show-swatch { display: flex; flex-direction: column; gap: .3125rem; }
+.show-swatch-fill {
+    height: 44px;
+    border-radius: var(--radius-md);
+    box-shadow: inset 0 0 0 1px var(--border-color);
+    transition: transform .2s var(--ease-spring), box-shadow .2s ease;
+}
+.show-swatch:hover .show-swatch-fill {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: inset 0 0 0 1px var(--accent), var(--shadow-sm);
+}
+.show-swatch-name {
+    font-family: var(--font-mono);
+    font-size: .6875rem;
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+}
+.show-swatch-role { font-size: .75rem; line-height: 1.5; color: var(--text-light); }
+
+.show-palette-note {
+    margin: .875rem 0 0;
+    font-size: .75rem;
+    line-height: 1.75;
+    color: var(--text-secondary);
+}
+
+.show-pillars {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: .75rem;
+    margin-top: 1rem;
+}
+
+.show-api { display: flex; flex-direction: column; }
+.show-api-row {
+    display: grid;
+    grid-template-columns: 4.5rem 12.5rem 1fr;
+    align-items: baseline;
+    gap: .625rem;
+    padding: .5rem 0;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color .2s ease;
+}
+.show-api-row:last-child { border-bottom: none; }
+.show-api-row:hover { background-color: var(--surface-soft); }
+.show-api-method {
+    justify-self: start;
+    padding: .125rem .5rem;
+    border-radius: var(--radius-pill);
+    font-family: var(--font-mono);
+    font-size: .6875rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+}
+.show-api-method[data-m="get"] { color: var(--verb-read); background-color: var(--verb-read-bg); }
+.show-api-method[data-m="post"],
+.show-api-method[data-m="put"] { color: var(--verb-write); background-color: var(--verb-write-bg); }
+.show-api-method[data-m="delete"] { color: var(--verb-del); background-color: var(--verb-del-bg); }
+.show-api-path {
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    color: var(--text-strong);
+    overflow-wrap: anywhere;
+}
+.show-api-desc { font-size: .8125rem; line-height: 1.6; color: var(--text-secondary); }
+
+.show-tpl {
+    display: flex;
+    flex-direction: column;
+    margin-top: 1rem;
+}
+.show-tpl-row {
+    display: grid;
+    grid-template-columns: 8.5rem 1fr;
+    align-items: baseline;
+    gap: .75rem;
+    padding: .5rem 0;
+    border-bottom: 1px dashed var(--border-color);
+}
+.show-tpl-row:last-child { border-bottom: none; }
+.show-tpl-file {
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    color: var(--text-strong);
+}
+.show-tpl-desc { font-size: .8125rem; line-height: 1.6; color: var(--text-secondary); }
+
+/* 安装步骤：序号之间连一条竖线，五步读起来是一条路径而不是五张并列的卡 */
+.show-steps {
+    display: flex;
+    flex-direction: column;
+    gap: .875rem;
+    margin: 1rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+.show-step {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.75rem 1fr;
+    align-items: start;
+    gap: .625rem;
+}
+.show-step + .show-step::before {
+    content: "";
+    position: absolute;
+    left: .875rem;
+    top: -.875rem;
+    width: 1px;
+    height: .875rem;
+    background-color: var(--border-strong);
+}
+.show-step-no {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    /* 淡底 + 强调色数字。实心块一路排下去会把这一栏压成一条色带 */
+    background-color: var(--accent-bg);
+    color: var(--on-accent-container);
+    font-size: .75rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+.show-step-body { display: flex; flex-direction: column; gap: .25rem; }
+.show-step-title { font-size: .875rem; font-weight: 700; color: var(--text-strong); }
+.show-step-text {
+    margin: 0;
+    font-size: .8125rem;
+    line-height: 1.75;
+    color: var(--text-secondary);
+}
+
+.show-notes {
+    display: flex;
+    flex-direction: column;
+    gap: .625rem;
+    margin: 1rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+.show-note {
+    position: relative;
+    padding-left: 1rem;
+    font-size: .8125rem;
+    line-height: 1.75;
+    color: var(--text-secondary);
+}
+.show-note::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: .625rem;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background-color: var(--border-strong);
+}
+
+.show-foot {
+    margin: 1.75rem 0 0;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--border-strong);
+    font-size: .75rem;
+    line-height: 1.8;
+    color: var(--text-light);
+}
+
+@media (max-width: 640px) {
+    .show-facts { grid-template-columns: repeat(2, 1fr); }
+    /* 动词和路径站得住就行，说明那一段整段换到第二行——窄屏挤成三列会谁都读不清 */
+    .show-api-row { grid-template-columns: 4.25rem 1fr; gap: .5rem; }
+    .show-api-desc { grid-column: 1 / -1; }
+    .show-tpl-row { grid-template-columns: 1fr; gap: .125rem; }
+    .show-block-head { flex-wrap: wrap; }
+    .show-block-note { flex: 1 1 100%; }
 }
 
 /* ==========================================================================

@@ -5,7 +5,7 @@
 
 1. PHP 平衡——花括号 / 圆括号 / 方括号 / 替代语法（if:…endif; 等）
 2. HTML 标签闭合
-3. 页面骨架——9 个页面模板都必须是 container > grid-layout > main-content，
+3. 页面骨架——10 个页面模板都必须是 container > grid-layout > main-content，
    且都 need 了 header.php 与 footer.php
 4. 全局唯一钩子——#noline-progress / #topnav / #nav-scrim / #nav-toggle /
    #nav-search-input / #nav-percent / #nav-cats / #feed-status 以及 .mobile-menu-btn，
@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 PAGE_TEMPLATES = [
     '404.php', 'archive.php', 'dcument.php', 'health.php', 'index.php', 'links.php',
-    'page.php', 'post.php', 'xiaoshi.php',
+    'page.php', 'post.php', 'showcase.php', 'xiaoshi.php',
 ]
 
 VOID = {

@@ -41,6 +41,9 @@ SHOTS = [
     ('post.html', 'post-light.png', 1440, 1040, 1, 'light', False, False),
     ('health.html', 'health.png', 1440, 900, 1, 'light', False, False),
     ('bills.html', 'bills.png', 1440, 1180, 1, 'light', False, False),
+    ('showcase.html', 'showcase.png', 1440, 1240, 1, 'light', False, False),
+    ('showcase.html', 'showcase-dark.png', 1440, 1240, 1, 'dark', False, False),
+    ('showcase.html', 'showcase-mobile.png', 390, 844, 2, 'light', True, True),
     ('index.html', 'index-mobile.png', 390, 844, 2, 'light', True, True),
 ]
 

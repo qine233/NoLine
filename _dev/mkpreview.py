@@ -1537,6 +1537,324 @@ def bills_page():
             .replace('__SLICE__', slice_html).replace('__LOG__', log))
 
 
+# ---------------------------------------------------------------- 项目展示页
+#
+# 这一页的文案全在 showcase.php 顶部那六张 array() 里。夹具不重抄一遍：
+# 中文说明重抄一次就是两份，模板改了夹具不会跟着改，而 classcheck 只看得见 class。
+# 所以这里把那几个字面量解开直接用。语法只认模板里实际写的那几种
+# （array / _t / 单引号串 / 点号拼接 / 整数），碰到别的字符就当场报错，
+# 宁可解析失败，也不要悄悄渲出一份「和模板不一样但看着对」的页面。
+
+PHP_TOK_END = ('end', None)
+
+
+def php_tokenize(src):
+    """拆到第一个解析不了的字符为止——数组字面量的右括号一定先于它出现。"""
+    toks, i, n = [], 0, len(src)
+    unescape = {'n': '\n', 't': '\t', 'r': '\r'}
+    while i < n:
+        c = src[i]
+        if c in ' \t\r\n':
+            i += 1
+            continue
+        if src.startswith('//', i):
+            j = src.find('\n', i)
+            i = n if j < 0 else j
+            continue
+        if src.startswith('/*', i):
+            j = src.find('*/', i + 2)
+            i = n if j < 0 else j + 2
+            continue
+        if c == "'":
+            j, buf = i + 1, []
+            while j < n and src[j] != "'":
+                if src[j] == '\\':
+                    nxt = src[j + 1:j + 2]
+                    buf.append(unescape.get(nxt, nxt))
+                    j += 2
+                    continue
+                buf.append(src[j])
+                j += 1
+            toks.append(('str', ''.join(buf)))
+            i = j + 1
+            continue
+        if c.isdigit():
+            j = i
+            while j < n and src[j].isdigit():
+                j += 1
+            toks.append(('num', int(src[i:j])))
+            i = j
+            continue
+        word = re.match(r'[A-Za-z_]\w*', src[i:])
+        if word:
+            toks.append(('word', word.group(0)))
+            i += word.end()
+            continue
+        if c in '()[],.':
+            toks.append(('punct', c))
+            i += 1
+            continue
+        toks.append(PHP_TOK_END)
+        return toks
+    toks.append(PHP_TOK_END)
+    return toks
+
+
+def php_value(toks, pos):
+    """解一个值：字符串（拼接后）或 list。返回 (值, 新位置)。"""
+    parts, first = [], True
+    while True:
+        kind, val = toks[pos]
+        if kind in ('str', 'num'):
+            parts.append(str(val))
+            pos += 1
+        elif kind == 'word' and val == 'array':
+            assert toks[pos + 1] == ('punct', '('), 'array 后面不是左括号'
+            pos += 2
+            items = []
+            while toks[pos] != ('punct', ')'):
+                if toks[pos] == PHP_TOK_END:
+                    raise SystemExit('array 没闭合，夹具解析器该扩了')
+                item, pos = php_value(toks, pos)
+                items.append(item)
+                if toks[pos] == ('punct', ','):
+                    pos += 1
+            pos += 1
+            parts.append(items)
+        elif kind == 'word' and val == '_t':
+            assert toks[pos + 1] == ('punct', '('), '_t 后面不是左括号'
+            inner, pos = php_value(toks, pos + 2)
+            assert toks[pos] == ('punct', ')'), '_t 没闭合'
+            parts.append(inner)
+            pos += 1
+        else:
+            raise SystemExit('夹具解析器不认识的结构: %r %r' % (kind, val))
+        if first and isinstance(parts[-1], list):
+            return parts[-1], pos
+        first = False
+        if pos < len(toks) and toks[pos] == ('punct', '.'):
+            pos += 1
+            continue
+        return ''.join(parts), pos
+
+
+def php_table(name):
+    """取出 showcase.php 里 $name = array(…) 的内容。"""
+    src = (ROOT / 'showcase.php').read_text(encoding='utf-8')
+    head = src.index('$%s = array(' % name)
+    start = src.index('array(', head)
+    value, _ = php_value(php_tokenize(src[start:]), 0)
+    assert isinstance(value, list) and value, '%s 解出来是空的' % name
+    return value
+
+
+def showcase_page():
+    endpoints = php_table('endpoints')
+    features = php_table('features')
+    pillars = php_table('pillars')
+    templates = php_table('templates')
+    steps = php_table('steps')
+    trades = php_table('trades')
+    swatches = php_table('swatches')
+
+    # 站内计数和强调色在运行时来自数据库与后台配置，夹具里给一组示例数；
+    # 这一页要验的是排版，不是数对不对。
+    tiles = '''
+                <div class="show-facts">
+
+                    <div class="show-tile">
+                        <span class="show-tile-label">{{icon:tag}} 主题版本</span>
+                        <span class="show-tile-value">__VERSION__</span>
+                        <span class="show-tile-note">就是正在渲染这一页的那份</span>
+                    </div>
+
+                    <div class="show-tile">
+                        <span class="show-tile-label">{{icon:box-archive}} 接口插件</span>
+                        <span class="show-tile-value">已启用</span>
+                        <span class="show-tile-note">和主题同一个包、同一次交换</span>
+                    </div>
+
+                    <div class="show-tile">
+                        <span class="show-tile-label">{{icon:code}} 接口端点</span>
+                        <span class="show-tile-value">%d<i>条</i></span>
+                        <span class="show-tile-note">鉴权走请求头 X-Noline-Key</span>
+                    </div>
+
+                    <div class="show-tile">
+                        <span class="show-tile-label">{{icon:calendar}} 本站在跑</span>
+                        <span class="show-tile-value">128<i>篇</i></span>
+                        <span class="show-tile-note">342 条评论 · 开站第 512 天</span>
+                    </div>
+
+                </div>''' % len(endpoints)
+
+    cards = ''.join(
+        '\n                    <div class="show-card">'
+        '\n                        <span class="show-card-title">{{icon:%s}} %s</span>'
+        '\n                        <p class="show-card-text">%s</p>'
+        '\n                    </div>' % (item[0], item[1], item[2])
+        for item in features)
+
+    palette = ''.join(
+        '\n                        <span class="show-swatch">'
+        '\n                            <i class="show-swatch-fill" style="background-color: var(%s)"></i>'
+        '\n                            <code class="show-swatch-name">%s</code>'
+        '\n                            <span class="show-swatch-role">%s</span>'
+        '\n                        </span>' % (item[0], item[0], item[1])
+        for item in swatches)
+
+    pillar_html = ''.join(
+        '\n                    <div class="show-pillar">'
+        '\n                        <span class="show-card-title">{{icon:%s}} %s</span>'
+        '\n                        <p class="show-pillar-text">%s</p>'
+        '\n                    </div>' % (item[0], item[1], item[2])
+        for item in pillars)
+
+    api = ''.join(
+        '\n                        <div class="show-api-row">'
+        '\n                            <span class="show-api-method" data-m="%s">%s</span>'
+        '\n                            <code class="show-api-path">%s</code>'
+        '\n                            <span class="show-api-desc">%s</span>'
+        '\n                        </div>' % (row[0], row[0].upper(), row[1], row[2])
+        for row in endpoints)
+
+    tpl = ''.join(
+        '\n                    <div class="show-tpl-row">'
+        '\n                        <code class="show-tpl-file">%s</code>'
+        '\n                        <span class="show-tpl-desc">%s</span>'
+        '\n                    </div>' % (row[0], row[1])
+        for row in templates)
+
+    steps_html = ''.join(
+        '\n                    <li class="show-step">'
+        '\n                        <span class="show-step-no">%d</span>'
+        '\n                        <div class="show-step-body">'
+        '\n                            <span class="show-step-title">%s</span>'
+        '\n                            <p class="show-step-text">%s</p>'
+        '\n                        </div>'
+        '\n                    </li>' % (i + 1, step[0], step[1])
+        for i, step in enumerate(steps))
+
+    notes = ''.join(
+        '\n                    <li class="show-note">%s</li>' % trade for trade in trades)
+
+    return (SHOWCASE_BODY
+            .replace('__FACTS__', tiles)
+            .replace('__CARDS__', cards)
+            .replace('__PALETTE__', palette)
+            .replace('__PILLARS__', pillar_html)
+            .replace('__API__', api)
+            .replace('__TPL__', tpl)
+            .replace('__STEPS__', steps_html)
+            .replace('__NOTES__', notes))
+
+
+# 夹具固定走「插件已装 + 已登录」那一支：试一下自检 和 末尾那段给你自己看的，
+# 在线上分别要 noline_health_plugin() 和 $this->user->hasLogin() 为真才出现。
+# 这里把两个分支都渲出来一次，是为了让截图能看到它们长什么样；
+# 另一支（没装插件时的 empty-state + 「没启用」）由 showcase.php 自己保证。
+SHOWCASE_BODY = """
+<div class="container">
+    <div class="grid-layout">
+
+        <div class="main-content">
+            <article class="card article-card">
+                <h1 class="post-title page-title">项目展示</h1>
+                <p class="page-subtitle">{{icon:github}} 一个 Typecho 主题和一个可选的 REST 接口插件；这一页由它自己画</p>
+
+                <div class="post-content">
+                    <p>下面这些不是宣传语：版本、端点数、那五格颜色，都是这一页当次请求现取的。
+                        切到深色模式再看一次，整页会跟着翻——包括那一排色块。</p>
+                </div>
+
+__FACTS__
+
+                <div class="show-actions">
+                    <a class="btn-primary" href="#">{{icon:box-archive}} 下载 noline.zip</a>
+                    <a class="show-action" href="#">{{icon:github}} 仓库</a>
+                    <a class="show-action" href="#">{{icon:history}} 更新记录</a>
+                    <a class="show-action" href="#">{{icon:file-lines}} 接口文档</a>
+                    <a class="show-action" href="#">{{icon:paper-plane}} 试一下自检</a>
+                </div>
+
+                <p class="show-req">
+                    环境：Typecho 1.2.x · PHP 7.4 及以上 · 主题当前版本 __VERSION__。
+                    前端没有 CDN：图标是内联 SVG，highlight.js 走本地文件且只在有代码块的那几页加载。
+                </p>
+
+                <h2 class="show-heading">主题画了什么</h2>
+
+                <div class="show-grid">__CARDS__
+                </div>
+
+                <h2 class="show-heading">颜色只有两支</h2>
+
+                <div class="show-block">
+                    <div class="show-block-head">
+                        <span class="card-header">{{icon:compass}}这一排是实时取的</span>
+                        <span class="show-block-note">#425aef</span>
+                    </div>
+
+                    <div class="show-palette">__PALETTE__
+                    </div>
+
+                    <p class="show-palette-note">
+                        后台只填了 #425aef 这一支；深色模式按亮度自动推亮，剩下的层次全是这两支掺透明度——
+                        上面这五格现在显示的就是这一档。
+                        切到深色模式再看一次，这五格会跟着翻，因为每一格挂的都是变量而不是色值。
+                    </p>
+                </div>
+
+                <h2 class="show-heading">插件管了什么</h2>
+
+                <div class="show-pillars">__PILLARS__
+                </div>
+
+                <div class="show-block">
+                    <div class="show-block-head">
+                        <span class="card-header">{{icon:link}}接口清单</span>
+                        <span class="show-block-note">本机正在提供这些端点</span>
+                    </div>
+
+                    <div class="show-api">__API__
+                    </div>
+
+                    <p class="show-palette-note">
+                        三种写法都认：/api/health（伪静态开着）、/index.php/api/health（伪静态关了）、
+                        ?noline_api=health（服务器把 /api 抢走了时的兜底）。
+                        后台顶栏的「主题管理」页是另一个入口，它看的是登录态，不吃接口密钥。
+                    </p>
+                </div>
+
+                <h2 class="show-heading">页面模板</h2>
+
+                <div class="show-tpl">__TPL__
+                </div>
+
+                <h2 class="show-heading">怎么装进去</h2>
+
+                <ol class="show-steps">__STEPS__
+                </ol>
+
+                <h2 class="show-heading">已知取舍</h2>
+
+                <ul class="show-notes">__NOTES__
+                </ul>
+
+                <p class="show-foot">
+                    给你自己看的：版本号一共四处——主题的 NOLINE_VERSION 与 index.php 头部注释的 @version，
+                    插件的 const VERSION 与文件头 @version。前两处必须相等、后两处必须相等，
+                    _dev/build.py 会核对；推一个等于版本号的 tag，Actions 就会打出 noline.zip 并挂到 Release 上。
+                </p>
+            </article>
+        </div>
+
+__SIDEBAR__
+    </div>
+</div>
+"""
+
+
 def render(name, title, body, extra_head='', is_home=False):
     html = HEAD.replace('__TITLE__', title).replace('__EXTRA_HEAD__', extra_head)
     html += body + FOOT
@@ -1682,6 +2000,12 @@ def main():
     # 六月一根空柱是故意留的——那个月一条没记，图上不能凭空少一格
     render('bills.html', '买菜记账',
            bills_page().replace('__SIDEBAR__', SIDEBAR.rstrip('\n')).replace('__TOC__', TOC_CARD.rstrip('\n')))
+
+    # 项目展示页：六张表的内容直接从 showcase.php 的 PHP 字面量里解出来，
+    # 页面上任何一句文案改了，夹具会跟着改，不会各写一份。
+    # 这一页没有目录卡（正文不是长文章，右栏不需要跟着跳锚点），__TOC__ 置空。
+    render('showcase.html', '项目展示',
+           showcase_page().replace('__SIDEBAR__', SIDEBAR.rstrip('\n')).replace('__TOC__', ''))
 
     print('\n提醒：夹具在 noline/_preview/ 下，验证完必须删掉，不能随主题发布。')
 
