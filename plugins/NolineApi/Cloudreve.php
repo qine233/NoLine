@@ -64,28 +64,62 @@ class Cloudreve
     private const KEEP_RECORDS = 20;
 
     /* ======================================================================
-       入口一：编辑器注入与上传请求
+       入口一：编辑器注入配置与上传请求
        ====================================================================== */
 
     /**
-     * 写文章 / 写页面底部的图床面板（admin/write-post.php:bottom、write-page.php:bottom）。
+     * 后台 <head> 里那段 window.NL_CR（admin/header.php:header 输出）。
      *
-     * 挂在 bottom 而不是 richEditor：一旦有插件占了 richEditor，核心就跳过 editor-js.php，
-     * 默认编辑器连带它的插入行为整个没了。这里只在页面收口前追加一块自己的 DOM。
+     * 面板的 DOM 由 assets/admin.js 照着这份配置建：服务端不再拼 HTML，
+     * 也就没有「拼错一个引号把整个写文章页带走」的可能。
+     * 不能写文章的登录态就不输出任何东西。
      */
-    public static function onWriteBottom($content = null)
+    public static function editorConfigTag(): string
     {
-        try {
-            if (!self::ready() || !self::canUpload()) {
-                return;
-            }
-
-            echo self::panel();
-        } catch (\Throwable $e) {
-            /* 这块 DOM 坏了不该把写文章页一起带走；原因记进状态文件，
-               在「主题管理」的图床区块里当「上次失败」显示出来 */
-            self::note(_t('图床面板没渲染出来：%s', $e->getMessage()));
+        if (!self::canUpload()) {
+            return '';
         }
+
+        /* JSON_HEX_TAG 把 < > 转成 \u003C：模板里带 <img ...>，不转义的话
+           正文里出现一个 </script> 就能把这段脚本截断 */
+        $json = json_encode(self::editorConfig(),
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
+
+        if ($json === false) {
+            return '';
+        }
+
+        return '<script>window.NL_CR=' . $json . ';</script>' . "\n";
+    }
+
+    private static function editorConfig(): array
+    {
+        $options = Options::alloc();
+        $md = !empty($options->markdown);
+        $ready = self::ready();
+
+        return array(
+            'ready' => $ready,
+            'endpoint' => rtrim((string)$options->index, '/') . '/?noline_api=' . self::ROUTE,
+            'token' => Security::alloc()->getToken(null),
+            'allow' => self::allowList(),
+            'paste' => $ready && self::config('crPaste', '1') === '1',
+            /* 插入语法在这里算好：JS 里再拼 HTML 就得跟「引号套引号」较劲，容易漏一个 */
+            'tplImg' => self::template(true, $md),
+            'tplFile' => self::template(false, $md),
+            'text' => array(
+                'title' => _t('图床 · Cloudreve'),
+                'pick' => _t('选择文件'),
+                'hint' => _t(
+                    '拖进来也可以；单个不超过 %d MB，传完自动把直链插到光标处。', self::maxSetting()),
+                'notready' => _t('图床没开启，或者实例地址 / 邮箱 / 密码还没填全。补齐后刷新这一页就能传。'),
+                'link' => _t('直链'),
+                'copy' => _t('复制'),
+                'copied' => _t('已复制'),
+                'network' => _t('请求没发出去：网络断了，或者 PHP 先一步拒了这个体积的文件（看 upload_max_filesize）。'),
+                'interrupted' => _t('上传中断。'),
+            ),
+        );
     }
 
     /**
@@ -803,31 +837,8 @@ class Cloudreve
     }
 
     /* ======================================================================
-       编辑器面板
+       正文插入模板
        ====================================================================== */
-
-    private static function panel(): string
-    {
-        $options = Options::alloc();
-        $endpoint = rtrim((string)$options->index, '/') . '/?noline_api=' . self::ROUTE;
-        $max = self::maxSetting();
-        $md = !empty($options->markdown);
-
-        return '<div id="nl-cr" class="nl-cr"'
-            . ' data-endpoint="' . Admin::esc($endpoint) . '"'
-            . ' data-token="' . Admin::esc(Security::alloc()->getToken(null)) . '"'
-            . ' data-paste="' . Admin::esc(self::config('crPaste', '1')) . '"'
-            . ' data-tpl-img="' . Admin::esc(self::template(true, $md)) . '"'
-            . ' data-tpl-file="' . Admin::esc(self::template(false, $md)) . '">'
-            . '<div class="nl-cr-bar">'
-            . '<span class="nl-cr-title">' . Admin::esc(_t('图床 · Cloudreve')) . '</span>'
-            . '<label class="nl-cr-pick btn btn-s">' . Admin::esc(_t('选择文件'))
-            . '<input type="file" multiple></label>'
-            . '<span class="nl-cr-hint">' . Admin::esc(_t('拖进来也可以；单个不超过 %d MB，传完自动把直链插到光标处。', $max))
-            . '</span></div>'
-            . '<ul class="nl-cr-list"></ul>'
-            . '</div>' . self::panelStyle() . self::panelScript();
-    }
 
     /**
      * 插入正文的片段模板。占位符在这里定死，JS 只负责替换，
@@ -845,118 +856,12 @@ class Cloudreve
         return $isImage ? '<img src="{u}" alt="{n}">' : '<a href="{u}">{n}</a>';
     }
 
-    private static function panelStyle(): string
-    {
-        return '<style>'
-            . '.nl-cr{margin:0 0 .8rem;padding:.7rem .8rem;border:1px dashed #cfd6df;border-radius:6px;background:#fbfcfe}'
-            . '.nl-cr-bar{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}'
-            . '.nl-cr-title{font-weight:700;color:#3b4552}'
-            . '.nl-cr-pick{cursor:pointer}'
-            . '.nl-cr-pick input{display:none}'
-            . '.nl-cr-hint{color:#8a94a0;font-size:.86em}'
-            . '.nl-cr-list{list-style:none;margin:.6rem 0 0;padding:0}'
-            . '.nl-cr-item{display:flex;align-items:center;gap:.5rem;padding:.35rem 0;'
-            . 'border-top:1px solid #eef1f5;font-size:.9em}'
-            . '.nl-cr-name{max-width:14rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
-            . '.nl-cr-bar-track{flex:1;height:4px;border-radius:2px;background:#e6eaf0;overflow:hidden}'
-            . '.nl-cr-bar-fill{height:100%;width:0;background:#4482e5;transition:width .2s}'
-            . '.nl-cr-item.ok .nl-cr-bar-fill{background:#4caf70}'
-            . '.nl-cr-item.bad .nl-cr-bar-fill{background:#e05c5c}'
-            . '.nl-cr-item.bad{flex-wrap:wrap}'
-            . '.nl-cr-msg{width:100%;color:#a3342f;word-break:break-all}'
-            . '.nl-cr-item a.nl-cr-copy{text-decoration:none}'
-            . '@media (max-width:757px){.nl-cr-name{max-width:8rem}}'
-            . '</style>';
-    }
-
-    /**
-     * 插入走最朴素的 DOM 写入：#text 在富文本和 Markdown（pagedown）两种编辑器里都是真正存正文的那个
-     * textarea，写完派发一个 input 事件让预览和「有未保存修改」的状态跟上来。
-     * 不用 Typecho.uploadComplete——它只在 Markdown 分支里定义（editor-js.php:212），
-     * 关掉 Markdown 的站点调它就是未定义。
-     * 也不用 Typecho.insertFileToEditor——Markdown 分支里它实现成「弹图片对话框、把 URL 填进输入框、
-     * 等用户再点一次确定」（editor-js.php:197），直链都已经在手上了还多一步。
-     */
-    private static function panelScript(): string
-    {
-        return '<script>(function(){'
-            . 'var box=document.getElementById("nl-cr");if(!box){return;}'
-            . 'var panel=document.getElementById("upload-panel");'
-            . 'if(panel&&panel.firstChild){panel.insertBefore(box,panel.firstChild);}else if(panel){panel.appendChild(box);}'
-            . 'var list=box.querySelector(".nl-cr-list");var input=box.querySelector(".nl-cr-pick input");'
-            /* 插入语法由服务端算好塞进 data 属性：JS 里再拼 HTML 就得跟「引号套引号」较劲，容易漏一个 */
-            . 'var link=function(name,url,isImage){'
-            . 'return box.getAttribute(isImage?"data-tpl-img":"data-tpl-file")'
-            . '.split("{n}").join(name).split("{u}").join(url);};'
-            . 'var put=function(text){var t=document.getElementById("text");if(!t){return;}'
-            . 'var s=t.selectionStart===undefined?t.value.length:t.selectionStart;'
-            . 'var e=t.selectionEnd===undefined?t.value.length:t.selectionEnd;'
-            . 't.value=t.value.slice(0,s)+text+t.value.slice(e);'
-            . 't.focus();t.setSelectionRange(s+text.length,s+text.length);'
-            /* input + keyup：Markdown 的实时预览挂在编辑框的输入事件上，只派 input 它不一定跟 */
-            . '["input","keyup"].forEach(function(type){'
-            . 't.dispatchEvent(new Event(type,{bubbles:true}));});};'
-            . 'var copy=function(text){'
-            . 'if(navigator.clipboard&&navigator.clipboard.writeText){return navigator.clipboard.writeText(text);}'
-            . 'var ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();'
-            . 'try{document.execCommand("copy");}catch(e){}document.body.removeChild(ta);'
-            . 'return Promise.resolve();};'
-            . 'var item=function(name){var li=document.createElement("li");li.className="nl-cr-item";'
-            . 'var nm=document.createElement("span");nm.className="nl-cr-name";nm.textContent=name;'
-            . 'var track=document.createElement("span");track.className="nl-cr-bar-track";'
-            . 'var fill=document.createElement("span");fill.className="nl-cr-bar-fill";'
-            . 'track.appendChild(fill);li.appendChild(nm);li.appendChild(track);'
-            . 'list.appendChild(li);return li;};'
-            . 'var fail=function(li,fill,text){li.className="nl-cr-item bad";fill.style.width="100%";'
-            . 'var em=document.createElement("div");em.className="nl-cr-msg";'
-            . 'em.textContent=text;li.appendChild(em);};'
-            . 'var send=function(file){'
-            . 'if(!file){return;}'
-            . 'var li=item(file.name);var fill=li.querySelector(".nl-cr-bar-fill");'
-            . 'var data=new FormData();'
-            . 'data.append("file",file);data.append("_",box.getAttribute("data-token"));'
-            . 'var xhr=new XMLHttpRequest();xhr.open("POST",box.getAttribute("data-endpoint"),true);'
-            . 'xhr.upload.onprogress=function(ev){if(ev.lengthComputable){fill.style.width=Math.round(ev.loaded*100/ev.total)+"%";}};'
-            . 'xhr.onload=function(){'
-            . 'var res=null;try{res=JSON.parse(xhr.responseText);}catch(e){}'
-            . 'if(!res||res.code!==0){fail(li,fill,(res&&res.message)?res.message:("HTTP "+xhr.status));return;}'
-            . 'var d=res.data;fill.style.width="100%";li.className="nl-cr-item ok";'
-            . 'put(link(d.name,d.url,d.isImage));'
-            . 'var a=document.createElement("a");a.href=d.url;a.target="_blank";a.rel="noopener";'
-            . 'a.className="nl-cr-copy";a.textContent="' . Admin::esc(_t('直链')) . '";li.appendChild(a);'
-            . 'var c=document.createElement("a");c.href="###";c.className="nl-cr-copy";'
-            . 'c.textContent="' . Admin::esc(_t('复制')) . '";'
-            . 'c.onclick=function(ev){ev.preventDefault();copy(d.url).then(function(){'
-            . 'c.textContent="' . Admin::esc(_t('已复制')) . '";});};'
-            . 'li.appendChild(c);};'
-            . 'xhr.onerror=function(){fail(li,fill,"' . Admin::esc(_t(
-                '请求没发出去：网络断了，或者 PHP 先一步拒了这个体积的文件（看 upload_max_filesize）。')) + '");};'
-            . 'xhr.onloadend=function(){if(li.className.indexOf("ok")<0&&li.className.indexOf("bad")<0){'
-            . 'fail(li,fill,"' . Admin::esc(_t('上传中断。')) + '");}};'
-            . 'xhr.send(data);};'
-            . 'if(input){input.addEventListener("change",function(){'
-            . 'var fs=Array.prototype.slice.call(input.files||[]);fs.forEach(send);input.value="";});}'
-            /* 粘贴截图直传：只对图片生效，传文字不拦 */
-            . 'document.addEventListener("paste",function(ev){'
-            . 'if(box.getAttribute("data-paste")==="0"){return;}'
-            . 'var t=ev.target;if(!t||t.id!=="text"){return;}'
-            . 'var items=(ev.clipboardData||{}).items||[];var picked=null;'
-            . 'for(var i=0;i<items.length;i++){if(items[i].kind==="file"&&items[i].type.indexOf("image/")===0){'
-            . 'picked=items[i].getAsFile();break;}}'
-            . 'if(picked){ev.preventDefault();send(picked);}});'
-            /* 拖拽只认图床框自己：附件区里那一块是核心自带上传的落点，不去抢 */
-            . 'box.addEventListener("dragover",function(ev){ev.preventDefault();});'
-            . 'box.addEventListener("drop",function(ev){ev.preventDefault();'
-            . 'Array.prototype.slice.call(ev.dataTransfer.files||[]).forEach(send);});'
-            . '})();</script>';
-    }
-
     /* ======================================================================
        设置与环境
        ====================================================================== */
 
-    /** 开了、地址齐、邮箱密码齐，才往编辑器里塞东西 */
-    private static function ready(): bool
+    /** 开了、地址齐、邮箱密码齐，才往编辑器里塞东西。主题管理页的自检也读这一条 */
+    public static function ready(): bool
     {
         return self::config('crEnabled', '1') === '1'
             && self::baseUrl() !== ''
@@ -964,7 +869,7 @@ class Cloudreve
             && self::setting('crPassword', '') !== '';
     }
 
-    private static function canUpload(): bool
+    public static function canUpload(): bool
     {
         $user = User::alloc();
 

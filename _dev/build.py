@@ -38,9 +38,12 @@ LOOSE = ['screenshot.jpg']
 
 # 插件按文件白名单收：目录里多出任何没列进来的东西都当构建失败处理，
 # 免得哪天在插件目录里落个调试脚本就跟着发出去了。
+# assets/ 是后台皮肤和脚本，它们由 admin/header.php:header 用绝对 URL 引，
+# 不能像 PHP 那样靠 __DIR__ 兜底，所以必须跟着包一起发。
 PLUGIN_DIR = 'NolineApi'
 PLUGIN_ROOT_NAME = 'plugins/NolineApi'
 PLUGIN_FILES = ['Admin.php', 'Bills.php', 'Cloudreve.php', 'Plugin.php', 'Theme.php', 'Updater.php']
+PLUGIN_DIRS = ['assets']
 
 # 明确知道是本地工作区、绝不外发的东西。仓库布局下主题根就是仓库根，
 # 所以 README / 接口文档 / 插件目录也算「在仓库里但不进主题包」。
@@ -126,14 +129,26 @@ def collect():
             fail('插件白名单里的 %s 不存在，发布包和插件的实际文件已经不一致了' % name)
         entries.append((path, PLUGIN_ROOT_NAME + '/' + name))
 
+    for name in PLUGIN_DIRS:
+        subdir = root / name
+        if not subdir.is_dir():
+            fail('插件目录 %s/%s 不存在，后台皮肤和脚本就没地方发了' % (PLUGIN_DIR, name))
+        for path in sorted(subdir.rglob('*')):
+            if not path.is_file():
+                continue
+            if path.name == '.DS_Store':
+                fail('plugins/%s/%s 里混进了 .DS_Store' % (PLUGIN_DIR, name))
+            parts = path.relative_to(root).parts
+            entries.append((path, PLUGIN_ROOT_NAME + '/' + '/'.join(parts)))
+
     extra = sorted(p.name for p in root.iterdir()
                    if p.is_file() and p.name not in PLUGIN_FILES and p.name != '.DS_Store')
     if extra:
         fail('plugins/%s 里有没进白名单的文件：%s——先决定它发不发'
              % (PLUGIN_DIR, '、'.join(extra)))
-    dirs = [p.name for p in root.iterdir() if p.is_dir()]
+    dirs = [p.name for p in root.iterdir() if p.is_dir() and p.name not in PLUGIN_DIRS]
     if dirs:
-        fail('plugins/%s 下出现了子目录 %s：白名单只收平铺的文件'
+        fail('plugins/%s 下出现了没进白名单的子目录 %s'
              % (PLUGIN_DIR, '、'.join(sorted(dirs))))
 
     return entries

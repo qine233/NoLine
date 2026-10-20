@@ -1,0 +1,1572 @@
+@charset "UTF-8";
+
+/**
+ * Noline 后台皮肤：改的是 Typecho 自带的 /admin/* 每一个页面，
+ * 由插件挂在 admin/header.php:header 上、接在核心的三个样式表后面输出，
+ * 所以这里不需要 !important——同一条选择器写在后面就赢。
+ * 需要压过核心那种「.typecho-head-nav #typecho-nav-list > ul .parent a」的长链，
+ * 就照抄它自己的长度，别靠提高优先级硬抢。
+ *
+ * 配色沿用前台那套设计令牌：中性色只有「墨」和「纸」两个三元组是数据，
+ * 文字四档 / 表面三档 / 描边三档全是同一色相换浓度。深色模式只翻这两个三元组
+ * 和几档浓度，不逐个抄 hex。
+ * 字面量颜色只允许出现在下面的 :root 和 [data-nl-theme="dark"] 两个块里。
+ *
+ * 前缀一律 --nl- / .nl-：核心样式表里没有任何 nl 开头的名字，撞不上。
+ */
+
+/* ==========================================================================
+   设计令牌 —— 浅色
+   ========================================================================== */
+
+:root {
+    color-scheme: light;
+
+    --nl-ink-rgb:   54, 54, 54;
+    --nl-paper-rgb: 255, 255, 255;
+
+    --nl-text-1: 1;
+    --nl-text-2: .90;
+    --nl-text-3: .78;
+    --nl-text-4: .50;
+    --nl-line-1: .07;
+    --nl-line-2: .13;
+    --nl-line-3: .20;
+    --nl-fill-1: .02;
+    --nl-fill-2: .05;
+    --nl-fill-3: .08;
+
+    /* 强调色：主题管理页那段 <style> 会写 --nl-accent-user*，缺省回落到靛蓝。
+       间接引用这一层不能省——深色块要能盖掉它。 */
+    --nl-accent:       var(--nl-accent-user, #425aef);
+    --nl-accent-rgb:   var(--nl-accent-user-rgb, 66, 90, 239);
+    --nl-accent-hover: var(--nl-accent-user-hover, #3549c9);
+    --nl-accent-bg:    rgba(var(--nl-accent-rgb), .10);
+    --nl-accent-ring:  rgba(var(--nl-accent-rgb), .35);
+
+    /* 实心色块（强调色按钮、选中项）上的前景。浅色是白字，
+       深色下强调色本身是提亮过的浅蓝紫，前景必须翻回深字才读得出来——
+       而「纸」这个三元组正好跟着模式翻，所以这一条不用在深色块里再写一遍。 */
+    --nl-on-solid: rgb(var(--nl-paper-rgb));
+
+    --nl-text-strong:    rgb(var(--nl-ink-rgb));    --nl-text:           rgba(var(--nl-ink-rgb), var(--nl-text-2));
+    --nl-text-secondary: rgba(var(--nl-ink-rgb), var(--nl-text-3));
+    --nl-text-light:     rgba(var(--nl-ink-rgb), var(--nl-text-4));
+
+    /* 整页底比卡面暗一丝，卡片靠底色差分层，阴影只做一点点 */
+    --nl-bg:      #f7f9fe;
+    --nl-card:    rgb(var(--nl-paper-rgb));
+    --nl-soft:    rgba(var(--nl-ink-rgb), var(--nl-fill-2));
+    --nl-sunken:  rgba(var(--nl-ink-rgb), var(--nl-fill-3));
+    --nl-zebra:   rgba(var(--nl-ink-rgb), var(--nl-fill-1));
+
+    --nl-border:      #e3e8f7;
+    --nl-border-soft: rgba(var(--nl-ink-rgb), var(--nl-line-1));
+    --nl-border-line: rgba(var(--nl-ink-rgb), var(--nl-line-2));
+    --nl-border-input: rgba(var(--nl-ink-rgb), var(--nl-line-3));
+
+    /* 顶栏：核心是死黑一条 #292D33，这里换成薄墨底 + 发丝下沿，跟前台的浅色门面一致 */
+    --nl-nav-bg:     rgba(var(--nl-ink-rgb), .92);
+    --nl-nav-bg-deep: rgba(var(--nl-ink-rgb), .97);
+    --nl-nav-text:   rgba(var(--nl-paper-rgb), .78);
+    --nl-nav-text-hi: rgb(var(--nl-paper-rgb));
+
+    --nl-shadow-sm: 0 1px 2px rgba(var(--nl-ink-rgb), .06);
+    --nl-shadow-md: 0 6px 20px rgba(var(--nl-ink-rgb), .10);
+
+    --nl-radius-lg: 12px;
+    --nl-radius-md: 8px;
+    --nl-radius-pill: 999px;
+
+    --nl-warn-bg:   #fef3c7;
+    --nl-warn-text: #b45309;
+    --nl-ok-bg:     #eaf6ec;
+    --nl-ok-text:   #2c6e3a;
+    --nl-bad-bg:    #fdeeee;
+    --nl-bad-text:  #a3342f;
+
+    --nl-font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui,
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --nl-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+        "Liberation Mono", "Courier New", monospace;
+
+    --nl-transition: color .2s, background-color .2s, border-color .2s, box-shadow .2s, opacity .2s;
+}
+
+/* ==========================================================================
+   设计令牌 —— 深色
+   html[data-nl-theme] 由 header 里那段前置脚本同步写好，不是等 JS 跑完才变，
+   所以进后台不会先白一下再黑。没脚本时停在浅色。
+   ========================================================================== */
+
+html[data-nl-theme="dark"] {
+    color-scheme: dark;
+
+    --nl-ink-rgb:   247, 247, 250;
+    --nl-paper-rgb: 27, 28, 32;
+
+    --nl-text-2: .86;
+    --nl-text-3: .66;
+    --nl-text-4: .46;
+    --nl-line-1: .07;
+    --nl-line-2: .11;
+    --nl-line-3: .16;
+
+    --nl-accent:       var(--nl-accent-user-dark, #8a9bff);
+    --nl-accent-rgb:   var(--nl-accent-user-dark-rgb, 138, 155, 255);
+    --nl-accent-hover: var(--nl-accent-user-dark-hover, #a3b2ff);
+    --nl-accent-bg:    rgba(var(--nl-accent-rgb), .18);
+    --nl-accent-ring:  rgba(var(--nl-accent-rgb), .45);
+
+    --nl-bg:     #17191d;
+    --nl-card:   rgb(var(--nl-paper-rgb));
+    --nl-sunken: rgba(0, 0, 0, .28);
+
+    --nl-border:       #3d3d3f;
+    --nl-border-input: rgba(var(--nl-ink-rgb), .22);
+
+    /* 深色里顶栏再压一层黑才分得清「浮在页面上」；文字反过来是浅墨 */
+    --nl-nav-bg:      rgba(14, 15, 18, .92);
+    --nl-nav-bg-deep: rgba(14, 15, 18, .97);
+    --nl-nav-text:    rgba(var(--nl-ink-rgb), .72);
+    --nl-nav-text-hi: rgb(var(--nl-ink-rgb));
+
+    --nl-shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+    --nl-shadow-md: 0 6px 20px rgba(0, 0, 0, .5);
+
+    --nl-warn-bg:   #3a2f14;
+    --nl-warn-text: #e0b25c;
+    --nl-ok-bg:     rgba(110, 195, 137, .16);
+    --nl-ok-text:   #6ec389;
+    --nl-bad-bg:    rgba(224, 131, 122, .16);
+    --nl-bad-text:  #e0837a;
+}
+
+/* ==========================================================================
+   一、页面底、文字、链接
+   ========================================================================== */
+
+body {
+    background: var(--nl-bg);
+    color: var(--nl-text);
+    font-family: var(--nl-font-sans);
+    -webkit-font-smoothing: antialiased;
+}
+
+a {
+    color: var(--nl-accent);
+    transition: var(--nl-transition);
+}
+
+a:hover {
+    color: var(--nl-accent-hover);
+}
+
+::selection {
+    background: rgba(var(--nl-accent-rgb), .18);
+}
+
+h1, h2, h3, h4,
+.typecho-page-title h2 {
+    color: var(--nl-text-strong);
+    font-weight: 700;
+    letter-spacing: -.01em;
+}
+
+.typecho-page-title h2 {
+    margin: 1.6rem 0 .9rem;
+}
+
+.typecho-page-title h2 a {
+    padding: .25em .7em;
+    background: var(--nl-accent-bg);
+    color: var(--nl-accent);
+    border-radius: var(--nl-radius-pill);
+    font-weight: 600;
+}
+
+.typecho-page-title h2 a:hover {
+    background: rgba(var(--nl-accent-rgb), .18);
+    color: var(--nl-accent-hover);
+}
+
+.typecho-foot {
+    color: var(--nl-text-light);
+}
+
+.typecho-foot .resource,
+.typecho-foot .resource a {
+    color: var(--nl-text-light);
+}
+
+/* ==========================================================================
+   二、顶栏导航
+   核心的 #292D33 是一条不透明的黑带。这里换成薄墨 + 毛玻璃 + 发丝下沿，
+   并且让它吸顶：正文长页面滚动时导航还在，这是后台用得最多的一个东西。
+   ========================================================================== */
+
+.typecho-head-nav {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: var(--nl-nav-bg);
+    backdrop-filter: blur(14px) saturate(1.6);
+    -webkit-backdrop-filter: blur(14px) saturate(1.6);
+    box-shadow: var(--nl-shadow-sm);
+}
+
+.typecho-head-nav a,
+.typecho-head-nav button.menu-bar {
+    color: var(--nl-nav-text);
+    border-radius: var(--nl-radius-md);
+    transition: var(--nl-transition);
+}
+
+.typecho-head-nav a:hover,
+.typecho-head-nav a:focus,
+.typecho-head-nav button.menu-bar:hover,
+.typecho-head-nav button.menu-bar:focus {
+    color: var(--nl-nav-text-hi);
+}
+
+/* 一级菜单：核心的「格子 + 右边框」改成胶囊，hover 和当前项都是薄亮一层 */
+.typecho-head-nav #typecho-nav-list > ul {
+    margin: 0 2px;
+}
+
+.typecho-head-nav #typecho-nav-list > ul:first-child {
+    border-left: none;
+}
+
+.typecho-head-nav #typecho-nav-list > ul .parent a {
+    margin: 0 1px;
+    border-right: none;
+    background: transparent;
+}
+
+.typecho-head-nav #typecho-nav-list > ul .parent a:hover,
+.typecho-head-nav #typecho-nav-list > ul.focus .parent a,
+.typecho-head-nav #typecho-nav-list > ul.root:hover .parent a {
+    background: rgba(var(--nl-paper-rgb), .12);
+}
+
+.typecho-head-nav #typecho-nav-list > ul.focus .parent a {
+    color: var(--nl-nav-text-hi);
+}
+
+/* 二级菜单：展开的那一叠得是不透底的卡片，否则字压在下面的正文上读不清 */
+.typecho-head-nav #typecho-nav-list > ul .child {
+    background: var(--nl-nav-bg-deep);
+    border-radius: 0 0 var(--nl-radius-md) var(--nl-radius-md);
+    box-shadow: var(--nl-shadow-md);
+    overflow: hidden;
+}
+
+.typecho-head-nav #typecho-nav-list > ul .child li a:hover,
+.typecho-head-nav #typecho-nav-list > ul .child li a:focus {
+    background: var(--nl-accent-bg);
+    color: var(--nl-accent);
+}
+
+.typecho-head-nav #typecho-nav-list > ul .child li.focus a {
+    color: var(--nl-accent);
+}
+
+.typecho-head-nav .operate a {
+    border: none;
+    border-radius: var(--nl-radius-md);
+    margin: 0 1px;
+    padding: 0 14px;
+}
+
+.typecho-head-nav .operate a:hover {
+    background-color: rgba(var(--nl-paper-rgb), .12);
+}
+
+.typecho-head-nav .operate a.author {
+    color: var(--nl-nav-text-hi);
+    font-weight: 600;
+}
+
+/* 深色主题切换键：写在 navBar 钩子输出里，靠这里上色 */
+.nl-theme-toggle {
+    border: none;
+    background: transparent;
+    color: var(--nl-nav-text);
+    font: inherit;
+    padding: 0 14px;
+    height: 36px;
+    cursor: pointer;
+    border-radius: var(--nl-radius-md);
+    transition: var(--nl-transition);
+}
+
+.nl-theme-toggle:hover,
+.nl-theme-toggle:focus {
+    background: rgba(var(--nl-paper-rgb), .12);
+    color: var(--nl-nav-text-hi);
+}
+
+.nl-theme-toggle .nl-ico-dark { display: none; }
+
+html[data-nl-theme="dark"] .nl-theme-toggle .nl-ico-light { display: none; }
+html[data-nl-theme="dark"] .nl-theme-toggle .nl-ico-dark { display: inline; }
+
+@media (max-width: 757px) {
+    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul .parent a {
+        background: transparent;
+    }
+
+    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul {
+        border-bottom: none;
+    }
+}
+
+/* ==========================================================================
+   三、按钮 / 胶囊 / 提示
+   ========================================================================== */
+
+.btn,
+.primary,
+.btn-warn,
+input[type="submit"],
+button[type="submit"] {
+    border: none;
+    border-radius: var(--nl-radius-md);
+    padding: 0 14px;
+    height: 34px;
+    font-weight: 600;
+    transition: var(--nl-transition);
+}
+
+.btn {
+    background-color: var(--nl-soft);
+    color: var(--nl-text-secondary);
+}
+
+.btn:hover {
+    background-color: var(--nl-sunken);
+    color: var(--nl-text-strong);
+}
+
+.btn:active,
+.btn.active {
+    background-color: rgba(var(--nl-ink-rgb), .14);
+}
+
+.btn.disabled,
+.btn:disabled {
+    background-color: var(--nl-zebra);
+    color: var(--nl-text-light);
+}
+
+.primary {
+    background-color: var(--nl-accent);
+    color: var(--nl-on-solid);
+    box-shadow: var(--nl-shadow-sm);
+}
+
+.primary:hover {
+    background-color: var(--nl-accent-hover);
+}
+
+/* 深色下强调色是提亮过的浅蓝紫，实心块上的前景得翻成深字才不糊 */
+.btn-warn {
+    background-color: var(--nl-bad-text);
+    color: var(--nl-on-solid);
+}
+
+.btn-warn:hover {
+    background-color: var(--nl-bad-text);
+    filter: brightness(1.12);
+}
+
+.balloon,
+a.balloon-button {
+    background: var(--nl-accent);
+    color: var(--nl-on-solid);
+    border-radius: var(--nl-radius-pill);
+    font-weight: 600;
+}
+
+a.balloon-button:hover {
+    background-color: var(--nl-accent-hover);
+    color: var(--nl-on-solid);
+}
+
+.error,
+.notice,
+.success,
+.message {
+    border-radius: var(--nl-radius-md);
+    border: none;
+    padding: .8rem 1rem;
+    line-height: 1.7;
+}
+
+.error {
+    background: var(--nl-bad-bg);
+    color: var(--nl-bad-text);
+}
+
+.error a {
+    color: var(--nl-bad-text);
+}
+
+.notice {
+    background: var(--nl-warn-bg);
+    color: var(--nl-warn-text);
+}
+
+.notice a {
+    color: var(--nl-warn-text);
+}
+
+.success {
+    background: var(--nl-ok-bg);
+    color: var(--nl-ok-text);
+}
+
+.success a {
+    color: var(--nl-ok-text);
+}
+
+/* 下拉菜单（列表页的「操作」） */
+.dropdown-menu {
+    border: 1px solid var(--nl-border);
+    background: var(--nl-card);
+    border-radius: var(--nl-radius-md);
+    box-shadow: var(--nl-shadow-md);
+    padding: 4px;
+    min-width: 132px;
+    overflow: hidden;
+}
+
+.dropdown-menu li a:hover,
+.dropdown-menu li:hover {
+    background: var(--nl-accent-bg);
+    color: var(--nl-accent);
+}
+
+/* ==========================================================================
+   四、表单控件
+   ========================================================================== */
+
+input[type=text],
+input[type=password],
+input[type=email],
+input[type=url],
+input[type=number],
+textarea {
+    background: var(--nl-card);
+    border: 1px solid var(--nl-border-input);
+    border-radius: var(--nl-radius-md);
+    padding: .5rem .65rem;
+    color: var(--nl-text);
+    transition: var(--nl-transition);
+}
+
+input[type=text]:hover,
+input[type=password]:hover,
+input[type=email]:hover,
+input[type=url]:hover,
+textarea:hover {
+    border-color: rgba(var(--nl-accent-rgb), .45);
+}
+
+input[type=text]:focus,
+input[type=password]:focus,
+input[type=email]:focus,
+input[type=url]:focus,
+input[type=number]:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    border-color: var(--nl-accent);
+    box-shadow: 0 0 0 3px var(--nl-accent-ring);
+}
+
+input[type=text]:disabled,
+input[type=text]:read-only,
+input[type=password]:disabled,
+input[type=password]:read-only,
+input[type=email]:disabled,
+input[type=email]:read-only,
+textarea:disabled,
+textarea:read-only {
+    background: var(--nl-zebra);
+    color: var(--nl-text-light);
+}
+
+select {
+    background: var(--nl-card);
+    border: 1px solid var(--nl-border-input);
+    border-radius: var(--nl-radius-md);
+    padding: 0 .5rem;
+    color: var(--nl-text);
+    height: 34px;
+}
+
+.typecho-option label.typecho-label,
+.typecho-post-area .typecho-label {
+    color: var(--nl-text-strong);
+    font-weight: 600;
+}
+
+.typecho-option .description {
+    color: var(--nl-text-light);
+    line-height: 1.7;
+}
+
+.typecho-option label.required:after {
+    color: var(--nl-bad-text);
+}
+
+.typecho-option-tabs a {
+    border: 1px solid var(--nl-border-line);
+    border-radius: var(--nl-radius-pill);
+    padding: 0 15px;
+    height: 30px;
+    line-height: 30px;
+    color: var(--nl-text-secondary);
+    background: var(--nl-card);
+    transition: var(--nl-transition);
+}
+
+.typecho-option-tabs a:hover {
+    background-color: var(--nl-soft);
+    color: var(--nl-text-strong);
+}
+
+.typecho-option-tabs li.current a,
+.typecho-option-tabs li.active a {
+    background-color: var(--nl-accent);
+    border-color: var(--nl-accent);
+    color: var(--nl-on-solid);
+    font-weight: 600;
+}
+
+/* 标签云那种一长片可点选的行 */
+.typecho-page-main ul.tag-list {
+    background-color: var(--nl-card);
+    border-radius: var(--nl-radius-lg);
+}
+
+.typecho-page-main ul.tag-list li:hover {
+    background-color: var(--nl-soft);
+}
+
+.typecho-page-main ul.tag-list li.checked {
+    background-color: var(--nl-accent-bg);
+    color: var(--nl-accent);
+}
+
+.category-option ul {
+    border: 1px solid var(--nl-border-input);
+    background-color: var(--nl-card);
+    border-radius: var(--nl-radius-md);
+}
+
+/* ==========================================================================
+   五、列表页表格
+   ========================================================================== */
+
+.typecho-table-wrap {
+    background: var(--nl-card);
+    border: 1px solid var(--nl-border);
+    border-radius: var(--nl-radius-lg);
+    box-shadow: var(--nl-shadow-sm);
+    padding: 20px 24px;
+}
+
+.typecho-list-table th {
+    border-bottom: 1px solid var(--nl-border-line);
+    color: var(--nl-text-strong);
+    font-weight: 700;
+    padding: 0 10px 12px;
+}
+
+.typecho-list-table td {
+    border-top: 1px solid var(--nl-border-soft);
+    padding: 12px 10px;
+}
+
+.typecho-list-table tbody tr:first-child td {
+    border-top: none;
+}
+
+.typecho-list-table tbody tr:hover td {
+    background-color: var(--nl-zebra);
+}
+
+.typecho-list-table tbody tr.checked td,
+.typecho-theme-list tbody tr.current td {
+    background-color: var(--nl-accent-bg);
+}
+
+.typecho-list-table .status {
+    color: var(--nl-text-light);
+}
+
+.typecho-list-table-title {
+    color: var(--nl-text-light);
+}
+
+.typecho-list-operate span.operate-delete,
+.typecho-list-operate a.operate-delete,
+.typecho-list-operate span.operate-button-delete,
+.typecho-list-operate a.operate-button-delete {
+    color: var(--nl-bad-text);
+}
+
+/* ==========================================================================
+   六、写文章 / 写页面 / 附件
+   ========================================================================== */
+
+.typecho-post-area .typecho-option input.title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -.015em;
+}
+
+.typecho-post-area .url-slug,
+.typecho-post-area #auto-save-message,
+.typecho-post-area .edit-draft-notice {
+    color: var(--nl-text-light);
+}
+
+.typecho-post-area .is-draft {
+    background: var(--nl-warn-bg);
+    color: var(--nl-warn-text);
+    border-radius: var(--nl-radius-pill);
+    padding: .1em .5em;
+    font-style: normal;
+    font-size: .86em;
+}
+
+.typecho-post-area #slug,
+.typecho-post-area .out-date {
+    background: var(--nl-accent-bg);
+    border: 1px solid transparent;
+    border-radius: var(--nl-radius-md);
+    color: var(--nl-text);
+}
+
+#text {
+    font-family: var(--nl-font-mono);
+    font-size: .95em;
+    line-height: 1.9;
+    resize: vertical;
+}
+
+#wmd-button-bar,
+.wmd-button-row {
+    background: transparent;
+}
+
+.wmd-button-row li {
+    border-radius: var(--nl-radius-md);
+    transition: var(--nl-transition);
+}
+
+.wmd-button-row li:hover {
+    background-color: var(--nl-soft);
+}
+
+.wmd-button-row li.wmd-spacer {
+    background: var(--nl-border-line);
+}
+
+#wmd-preview,
+#custom-field {
+    background: var(--nl-card);
+    border: 1px solid var(--nl-border);
+    border-radius: var(--nl-radius-lg);
+}
+
+#custom-field .typecho-label a {
+    color: var(--nl-text-strong);
+}
+
+#custom-field .typecho-label a:hover {
+    color: var(--nl-accent);
+}
+
+#custom-field td input[type=text] {
+    background: transparent;
+    border-color: transparent;
+}
+
+#custom-field td input[type=text]:focus {
+    background: var(--nl-card);
+    border-color: var(--nl-accent);
+}
+
+.tDnD_whileDrag {
+    background-color: var(--nl-accent-bg);
+}
+
+/* 附件面板：核心的虚线灰框换成套卡片底 + 真线，拖进来高亮用强调色 */
+#upload-panel {
+    border: 1px solid var(--nl-border);
+    background-color: var(--nl-card);
+    color: var(--nl-text-secondary);
+    border-radius: var(--nl-radius-lg);
+    box-shadow: var(--nl-shadow-sm);
+    overflow: hidden;
+}
+
+#upload-panel.drag {
+    background-color: var(--nl-accent-bg);
+    border-color: var(--nl-accent);
+}
+
+.upload-area {
+    padding: 1.1rem;
+    text-align: center;
+    line-height: 1.9;
+    color: var(--nl-text-light);
+    transition: var(--nl-transition);
+}
+
+.upload-area:hover {
+    color: var(--nl-accent);
+    background: var(--nl-accent-bg);
+}
+
+.upload-area .upload-file {
+    font-weight: 600;
+}
+
+#file-list {
+    margin: 0;
+    padding: 0 .9rem .6rem;
+}
+
+#file-list li {
+    padding: .6rem .2rem;
+    border-top: 1px solid var(--nl-border-soft);
+}
+
+#file-list li .info {
+    color: var(--nl-text-light);
+}
+
+#file-list li .delete,
+#file-list li .file {
+    color: var(--nl-text-light);
+}
+
+#file-list li .delete:hover {
+    color: var(--nl-bad-text);
+}
+
+#file-list li.loading {
+    color: var(--nl-text-light);
+}
+
+/* 富文本编辑器自己那几块浮层：全屏、插入链接的对话框、Markdown 实时预览、标签输入。
+   核心把它们全写死成 #FFF / #F6F6F3，深色模式下会凭空浮出几块白。 */
+
+.fullscreen #wmd-button-bar,
+.fullscreen #text,
+.fullscreen .submit {
+    background: var(--nl-card);
+    border-bottom: 1px solid var(--nl-border);
+}
+
+.fullscreen #wmd-preview {
+    background: var(--nl-bg);
+    border-left: 1px solid var(--nl-border);
+}
+
+.wmd-prompt-dialog {
+    background: var(--nl-card);
+    border: 1px solid var(--nl-border);
+    border-radius: var(--nl-radius-lg);
+    box-shadow: var(--nl-shadow-md);
+    color: var(--nl-text);
+}
+
+#wmd-preview {
+    color: var(--nl-text);
+}
+
+#wmd-preview code,
+#wmd-preview pre {
+    background: var(--nl-sunken);
+    color: var(--nl-text-strong);
+    border-radius: var(--nl-radius-md);
+}
+
+/* 核心给行内代码的是 #C13，压在深色卡面上几乎读不出来 */
+#wmd-preview code {
+    color: var(--nl-accent);
+}
+
+#wmd-preview pre code {
+    color: var(--nl-text-strong);
+}
+
+#wmd-preview blockquote {
+    border-left-color: var(--nl-border-line);
+    color: var(--nl-text-secondary);
+}
+
+#wmd-preview table th,
+#wmd-preview table td {
+    border-color: var(--nl-border-input);
+}
+
+#wmd-preview table th {
+    background: var(--nl-soft);
+}
+
+#wmd-preview hr {
+    border-color: var(--nl-border-line);
+}
+
+#wmd-preview .summary:after {
+    background: var(--nl-warn-bg);
+    color: var(--nl-warn-text);
+}
+
+ul.token-input-list {
+    background-color: var(--nl-card);
+    border: 1px solid var(--nl-border-input);
+    border-radius: var(--nl-radius-md);
+}
+
+li.token-input-token {
+    background-color: var(--nl-soft);
+    border-radius: var(--nl-radius-pill);
+    color: var(--nl-text);
+}
+
+li.token-input-selected-token {
+    background-color: var(--nl-accent-bg);
+}
+
+li.token-input-token span {
+    color: var(--nl-text-light);
+}
+
+div.token-input-dropdown {
+    background-color: var(--nl-card);
+    border-color: var(--nl-border);
+}
+
+div.token-input-dropdown p {
+    color: var(--nl-text-secondary);
+}
+
+div.token-input-dropdown ul li,
+div.token-input-dropdown ul li.token-input-dropdown-item {
+    background-color: var(--nl-card);
+}
+
+div.token-input-dropdown ul li.token-input-selected-dropdown-item {
+    background-color: var(--nl-accent);
+    color: var(--nl-on-solid);
+}
+
+.resize {
+    border-color: var(--nl-border-line);
+}
+
+.resize i {
+    background-color: var(--nl-border-line);
+}
+
+.preview .submit {
+    background: var(--nl-warn-bg);
+}
+
+/* ---- 第二轮补齐：核心里还有一批写死的浅底，逐条对着 admin-style.css 找出来的 ---- */
+
+/* 首页的欢迎卡：核心是 #E9E9E6 的一块灰，深色下会亮成白斑 */
+#typecho-welcome {
+    background-color: var(--nl-card);
+    border: 1px solid var(--nl-border);
+    border-radius: var(--nl-radius-lg);
+    box-shadow: var(--nl-shadow-sm);
+}
+
+.welcome-board {
+    color: var(--nl-text-secondary);
+}
+
+.welcome-board em {
+    color: var(--nl-text-strong);
+}
+
+#start-link {
+    border-bottom-color: var(--nl-border-line);
+}
+
+/* 列表页底部分页：核心给 hover 和当前页都是 #E9E9E6 */
+.typecho-pager a:hover {
+    background: var(--nl-soft);
+}
+
+.typecho-pager li.current a {
+    background: var(--nl-accent-bg);
+    color: var(--nl-accent);
+}
+
+/* 登录页底部那行「返回首页 · 用户注册」 */
+.typecho-login .more-link {
+    color: var(--nl-text-light);
+}
+
+/* 已停用的文章行、外观页主题名、分类/标签页的 tag-list */
+.typecho-list-table.deactivate {
+    color: var(--nl-text-light);
+}
+
+.typecho-theme-list cite {
+    color: var(--nl-text-light);
+}
+
+.typecho-page-main ul.tag-list {
+    background-color: transparent;
+}
+
+.typecho-page-main ul.tag-list li:hover {
+    background-color: var(--nl-soft);
+}
+
+.typecho-page-main ul.tag-list li.checked {
+    background-color: var(--nl-warn-bg);
+}
+
+/* 切换主题的那个下拉，标题核心是橙色 */
+.typecho-select-theme h5 {
+    color: var(--nl-warn-text);
+}
+
+/* 评论页展开的回复框 + 右侧小三角 */
+.comment-reply-content {
+    background-color: var(--nl-soft);
+}
+
+.comment-reply-content:after {
+    border-color: transparent var(--nl-soft) transparent transparent;
+}
+
+/* 文章列表里的缩略图边框 */
+.typecho-attachment-photo {
+    border-color: var(--nl-border-input);
+}
+
+/* 编辑器「编辑/预览」两个 tab 的当前项 */
+.wmd-edittab a.active {
+    background: var(--nl-sunken);
+    color: var(--nl-text);
+}
+
+#wmd-preview .embed {
+    border-color: var(--nl-border-input);
+}
+
+/* 固定链接下面那个缩略名输入框，核心是 #FFFBCC 的一块黄 */
+.url-slug #slug {
+    background: var(--nl-warn-bg);
+    color: var(--nl-warn-text);
+    border-radius: var(--nl-radius-md);
+}
+
+/* 表格排序 / 下拉里的 CSS 三角 */
+.i-caret-up, .i-caret-down, .i-caret-left, .i-caret-right {
+    border-color: transparent transparent var(--nl-text-light) transparent;
+}
+
+.i-caret-down {
+    border-color: var(--nl-text-light) transparent transparent transparent;
+}
+
+.i-caret-left {
+    border-color: transparent var(--nl-text-light) transparent transparent;
+}
+
+.i-caret-right {
+    border-color: transparent transparent transparent var(--nl-text-light);
+}
+
+/* 发布时间选择器（jQuery UI datepicker）：整块浮层核心写死白底 */
+#ui-datepicker-div {
+    background: var(--nl-card);
+    border: 1px solid var(--nl-border);
+    border-radius: var(--nl-radius-lg);
+    box-shadow: var(--nl-shadow-md);
+    color: var(--nl-text);
+}
+
+#ui-datepicker-div .ui-datepicker-header {
+    border-bottom-color: var(--nl-border-line);
+}
+
+#ui-datepicker-div .ui-timepicker-div {
+    border-top-color: var(--nl-border-line);
+}
+
+#ui-datepicker-div .ui-datepicker-buttonpane {
+    border-top-color: var(--nl-border-line);
+    /* 核心这两个按钮是 float，父盒没清掉，边框会贴着按钮上沿 */
+    display: flow-root;
+}
+
+#ui-datepicker-div .ui-slider {
+    border-color: var(--nl-border-input);
+    background-color: var(--nl-sunken);
+}
+
+#ui-datepicker-div .ui-datepicker-calendar a {
+    background-color: var(--nl-soft);
+    color: var(--nl-text);
+    border-radius: var(--nl-radius-md);
+}
+
+#ui-datepicker-div .ui-datepicker-calendar a:hover {
+    background-color: var(--nl-sunken);
+    color: var(--nl-text-strong);
+}
+
+#ui-datepicker-div .ui-datepicker-today a {
+    background-color: var(--nl-accent-bg);
+    color: var(--nl-accent);
+}
+
+/* 核心这条带了 !important，只能同样带一次——整份皮肤里就这一处 */
+#ui-datepicker-div .ui-datepicker-current-day a {
+    background-color: var(--nl-accent) !important;
+    color: var(--nl-on-solid);
+}
+
+#ui-datepicker-div .ui-slider .ui-slider-handle {
+    background-color: var(--nl-accent);
+}
+
+/* 「现在/关闭」两个按钮复用了 .btn 的规则，但选择器是 #ui-datepicker-div 那一条，
+   所以 .btn 的改动传不到它们身上。 */
+#ui-datepicker-div .ui-datepicker-current,
+#ui-datepicker-div .ui-datepicker-close {
+    background-color: var(--nl-soft);
+    color: var(--nl-text);
+    border-radius: var(--nl-radius-md);
+}
+
+#ui-datepicker-div .ui-datepicker-current:hover,
+#ui-datepicker-div .ui-datepicker-close:hover {
+    background-color: var(--nl-sunken);
+}
+
+/* 核心的编辑/删除/上传图标和编辑器工具条都是深灰 PNG，深底上等于没画。
+   只在深色下反相，浅色保持原样。 */
+html[data-nl-theme="dark"] .i-edit,
+html[data-nl-theme="dark"] .i-delete,
+html[data-nl-theme="dark"] .i-exlink,
+html[data-nl-theme="dark"] .i-upload,
+html[data-nl-theme="dark"] .i-upload-active,
+html[data-nl-theme="dark"] .i-logo,
+html[data-nl-theme="dark"] .i-logo-s,
+html[data-nl-theme="dark"] .wmd-button-row li span {
+    filter: invert(.85);
+}
+
+/* ==========================================================================
+   七、图床面板（Cloudreve）
+   DOM 由 assets/admin.js 建，这里只管画。类名 nl-cr-*，不进核心的附件列表。
+   ========================================================================== */
+
+.nl-cr {
+    margin: 0 0 .9rem;
+    padding: .8rem .9rem;
+    border: 1px dashed var(--nl-border-input);
+    border-radius: var(--nl-radius-lg);
+    background: var(--nl-bg);
+}
+
+.nl-cr-bar {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    flex-wrap: wrap;
+}
+
+.nl-cr-title {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    font-weight: 700;
+    color: var(--nl-text-strong);
+}
+
+.nl-cr-title:before {
+    content: "";
+    width: .5rem;
+    height: .5rem;
+    border-radius: 50%;
+    background: var(--nl-accent);
+}
+
+/* 未连通：标题那颗点转成警告色，整块淡化，一眼看得出是配置的问题而不是没文件 */
+.nl-cr.nl-cr-off {
+    opacity: .72;
+}
+
+.nl-cr.nl-cr-off .nl-cr-title:before {
+    background: var(--nl-warn-text);
+}
+
+.nl-cr-pick {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    background-color: var(--nl-accent);
+    color: var(--nl-on-solid);
+    border-radius: var(--nl-radius-md);
+    padding: 0 14px;
+    height: 34px;
+    font-weight: 600;
+    transition: var(--nl-transition);
+}
+
+.nl-cr-pick:hover {
+    background-color: var(--nl-accent-hover);
+}
+
+.nl-cr-pick input {
+    display: none;
+}
+
+.nl-cr-hint {
+    color: var(--nl-text-light);
+    font-size: .86em;
+    line-height: 1.7;
+}
+
+.nl-cr-list {
+    list-style: none;
+    margin: .6rem 0 0;
+    padding: 0;
+}
+
+.nl-cr-item {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .4rem 0;
+    border-top: 1px solid var(--nl-border-soft);
+    font-size: .9em;
+}
+
+.nl-cr-item:first-child {
+    border-top: none;
+}
+
+.nl-cr-name {
+    max-width: 14rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--nl-text-secondary);
+}
+
+.nl-cr-track {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--nl-sunken);
+    overflow: hidden;
+}
+
+.nl-cr-fill {
+    height: 100%;
+    width: 0;
+    background: var(--nl-accent);
+    transition: width .2s;
+}
+
+.nl-cr-item.ok .nl-cr-fill {
+    background: var(--nl-ok-text);
+}
+
+.nl-cr-item.bad .nl-cr-fill {
+    background: var(--nl-bad-text);
+}
+
+.nl-cr-item.bad {
+    flex-wrap: wrap;
+}
+
+.nl-cr-msg {
+    width: 100%;
+    color: var(--nl-bad-text);
+    line-height: 1.7;
+    word-break: break-all;
+}
+
+.nl-cr-item a.nl-cr-link {
+    text-decoration: none;
+    font-weight: 600;
+}
+
+@media (max-width: 757px) {
+    .nl-cr-name {
+        max-width: 8rem;
+    }
+}
+
+/* ==========================================================================
+   八、主题管理页（?noline_api=settings）自有的那一套
+   原来写在 Admin::styles() 的 PHP 字符串里，挪到这里统一按令牌画。
+   ========================================================================== */
+
+.nl-bar {
+    margin: 0 0 1rem;
+    padding: .6rem .8rem;
+    background: var(--nl-card);
+    border: 1px solid var(--nl-border);
+    border-radius: var(--nl-radius-lg);
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    flex-wrap: wrap;
+}
+
+.nl-bar .nl-site {
+    margin-left: auto;
+    color: var(--nl-text-light);
+    font-size: .92em;
+}
+
+.nl-h3 {
+    margin: 1.8rem 0 .5rem;
+    font-size: 1.15em;
+}
+
+.nl-h4 {
+    margin: 1.2rem 0 .4rem;
+    font-size: 1em;
+    color: var(--nl-text-secondary);
+}
+
+.nl-lead {
+    margin: 0 0 .8rem;
+    color: var(--nl-text-secondary);
+    line-height: 1.8;
+}
+
+.nl-msg {
+    margin: 0 0 1rem;
+    padding: .7rem .9rem;
+    border-radius: var(--nl-radius-md);
+    line-height: 1.8;
+}
+
+.nl-msg-success {
+    background: var(--nl-ok-bg);
+    color: var(--nl-ok-text);
+}
+
+.nl-msg-error {
+    background: var(--nl-bad-bg);
+    color: var(--nl-bad-text);
+}
+
+.nl-msg-warn {
+    background: var(--nl-warn-bg);
+    color: var(--nl-warn-text);
+}
+
+.nl-form {
+    background: var(--nl-card);
+    border: 1px solid var(--nl-border);
+    border-radius: var(--nl-radius-lg);
+    padding: 0 .9rem .9rem;
+}
+
+.nl-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.nl-table td {
+    padding: .8rem 0;
+    border-bottom: 1px solid var(--nl-border-soft);
+    vertical-align: top;
+}
+
+.nl-table tr:last-child td {
+    border-bottom: none;
+}
+
+.nl-key {
+    width: 11rem;
+    padding-right: 1rem;
+}
+
+.nl-key label {
+    display: block;
+    font-weight: 700;
+    line-height: 1.6;
+    color: var(--nl-text-strong);
+    cursor: pointer;
+}
+
+.nl-key code {
+    display: block;
+    margin-top: .2rem;
+    font-size: .82em;
+    color: var(--nl-text-light);
+    font-weight: 400;
+}
+
+.nl-val input[type=text],
+.nl-val textarea {
+    width: 100%;
+    max-width: 34rem;
+    line-height: 1.7;
+}
+
+.nl-val textarea {
+    font-family: var(--nl-font-mono);
+    font-size: .9em;
+}
+
+.nl-hint {
+    margin: .3rem 0 0;
+    color: var(--nl-text-light);
+    font-size: .86em;
+    line-height: 1.8;
+}
+
+.nl-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+}
+
+.nl-swatch {
+    display: inline-block;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 50%;
+    border: 1px solid var(--nl-border-line);
+    vertical-align: -.35rem;
+    background: var(--nl-accent);
+}
+
+/* 颜色写成非法值时切成斜纹，省得保存完去前台才发现 */
+.nl-swatch.bad {
+    background: repeating-linear-gradient(45deg, var(--nl-sunken),
+        var(--nl-sunken) 4px, transparent 4px, transparent 8px);
+}
+
+.nl-actions {
+    margin: 1rem 0 0;
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    flex-wrap: wrap;
+}
+
+.nl-note {
+    color: var(--nl-text-light);
+    font-size: .86em;
+    line-height: 1.8;
+}
+
+.nl-chips {
+    display: flex;
+    gap: .4rem;
+    flex-wrap: wrap;
+    margin: 0 0 .7rem;
+}
+
+.nl-chip {
+    padding: .2rem .6rem;
+    border-radius: var(--nl-radius-pill);
+    font-size: .86em;
+    border: 1px solid var(--nl-border-line);
+    background: var(--nl-card);
+    color: var(--nl-text-secondary);
+}
+
+.nl-chip-ok {
+    border-color: var(--nl-ok-text);
+    background: var(--nl-ok-bg);
+    color: var(--nl-ok-text);
+}
+
+.nl-chip-warn {
+    border-color: var(--nl-warn-text);
+    background: var(--nl-warn-bg);
+    color: var(--nl-warn-text);
+}
+
+.nl-chip-bad {
+    border-color: var(--nl-bad-text);
+    background: var(--nl-bad-bg);
+    color: var(--nl-bad-text);
+}
+
+.nl-chip-muted {
+    background: var(--nl-zebra);
+    color: var(--nl-text-light);
+}
+
+.nl-ver {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 0 0 1rem;
+    padding: .9rem 1rem;
+    background: var(--nl-card);
+    border: 1px solid var(--nl-border);
+    border-radius: var(--nl-radius-lg);
+}
+
+.nl-ver b {
+    display: block;
+    font-size: 1.3em;
+    line-height: 1.3;
+    word-break: break-all;
+    color: var(--nl-text-strong);
+}
+
+.nl-ver em {
+    display: block;
+    margin-top: .2rem;
+    color: var(--nl-text-light);
+    font-size: .86em;
+    font-style: normal;
+}
+
+.nl-ver-arrow {
+    color: var(--nl-text-light);
+    font-size: 1.3em;
+}
+
+.nl-inline {
+    margin: 0 0 1rem;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    flex-wrap: wrap;
+}
+
+.nl-log {
+    margin: 0 0 1rem;
+    background: var(--nl-card);
+    border: 1px solid var(--nl-border);
+    border-radius: var(--nl-radius-lg);
+    padding: .6rem .9rem;
+}
+
+.nl-log summary {
+    cursor: pointer;
+    color: var(--nl-text-secondary);
+}
+
+.nl-log pre {
+    margin: .7rem 0 0;
+    padding: .7rem .9rem;
+    background: var(--nl-sunken);
+    border-radius: var(--nl-radius-md);
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: .9em;
+    line-height: 1.8;
+    font-family: var(--nl-font-mono);
+}
+
+.nl-list {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--nl-card);
+    border: 1px solid var(--nl-border);
+    border-radius: var(--nl-radius-lg);
+    overflow: hidden;
+}
+
+.nl-list td {
+    padding: .6rem .8rem;
+    border-bottom: 1px solid var(--nl-border-soft);
+    vertical-align: middle;
+}
+
+.nl-list tr:last-child td {
+    border-bottom: none;
+}
+
+.nl-list b {
+    display: block;
+    word-break: break-all;
+    color: var(--nl-text-strong);
+}
+
+.nl-list em {
+    display: block;
+    margin-top: .15rem;
+    color: var(--nl-text-light);
+    font-size: .86em;
+    font-style: normal;
+}
+
+.nl-ops {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.nl-ops form {
+    display: inline-block;
+    margin: 0;
+}
+
+@media (max-width: 757px) {
+    .nl-key {
+        width: auto;
+        display: block;
+        padding-right: 0;
+    }
+
+    .nl-table td {
+        display: block;
+        padding: .4rem 0;
+    }
+
+    .nl-ver {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: .4rem;
+    }
+
+    .nl-ver-arrow {
+        display: none;
+    }
+
+    .nl-ops {
+        text-align: left;
+        white-space: normal;
+    }
+}
+
+/* 尊重系统的「减少动态效果」：进度条之外的过渡全部关掉 */
+@media (prefers-reduced-motion: reduce) {
+    .typecho-head-nav,
+    .typecho-head-nav a,
+    .typecho-head-nav button.menu-bar,
+    .nl-theme-toggle,
+    .btn,
+    .primary,
+    .btn-warn,
+    .typecho-option-tabs a,
+    input[type=text]:hover,
+    textarea:hover,
+    .upload-area,
+    .wmd-button-row li {
+        transition: none;
+    }
+}

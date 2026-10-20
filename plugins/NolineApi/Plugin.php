@@ -27,13 +27,13 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package NolineApi
  * @author 州州
- * @version 1.7.11
+ * @version 1.7.12
  * @link https://ui.zhouzhou.work/
  */
 class Plugin implements PluginInterface
 {
     /** 改这里要同时改文件头注释里的 @version，后台插件列表读的是注释 */
-    private const VERSION = '1.7.11';
+    public const VERSION = '1.7.12';
 
     /** 数据目录放在 uploads 下，不在主题目录内，升级主题不会清空记录 */
     private const DATA_DIR = '/usr/uploads/noline_api';
@@ -64,10 +64,13 @@ class Plugin implements PluginInterface
         array('index.php', 'begin', 'onRequest'),
         // 后台没有给插件留独立页面的挂载点，能塞东西的只有顶栏这一条，页面本身自己渲染
         array('admin/menu.php', 'navBar', 'onAdminMenu'),
-        // 图床面板挂在写文章/写页面的 bottom。不占 richEditor：那个钩子一旦被插件占了，
-        // 核心就跳过 editor-js.php，自带编辑器和它的插入行为一起没了
-        array('admin/write-post.php', 'bottom', 'onEditorBottom'),
-        array('admin/write-page.php', 'bottom', 'onEditorBottom'),
+        // header 是 filter：核心把三个自带样式表拼好的字符串交进来，返回值原样写回 <head>。
+        // 后台皮肤和图床配置都从这一条出去——每个后台页面必经，且排在核心的 file-upload.php 之前，
+        // 面板由 assets/admin.js 在 DOMContentLoaded 时建，跟各页面自己的钩子有没有生效、
+        // include 顺序怎样都无关。
+        // 不再用 admin/write-post.php:bottom：那条钩子只在写文章/写页面存在，
+        // 且面板得由服务端在页面收口后拼 HTML，一旦拼的东西出错就是整个编辑页 500。
+        array('admin/header.php', 'header', 'onAdminHead'),
     );
 
     public static function activate()
@@ -145,6 +148,35 @@ class Plugin implements PluginInterface
                 ->where('name = ?', 'plugins'));
         } catch (\Throwable $e) {
             // 见上文：静默，下个请求再来
+        }
+    }
+
+    /** 这张表对外露一份：主题管理页要逐项核对「代码里声明的钩子」和「库里登记的钩子」 */
+    public static function hooks(): array
+    {
+        return self::HOOKS;
+    }
+
+    /**
+     * 当前这次请求里，核心真正认了这个插件的哪些钩子。
+     *
+     * 数据来自 Plugin::export()，也就是数据库 options.plugins 反序列化出来的那一份——
+     * 在线更新换的是文件、改的是这张表，出问题时第一眼看的就该是这里。
+     * 主题管理页把它列出来，免得「面板没出来」这种问题只能靠猜。
+     *
+     * @return string[] 形如 admin/header.php:header
+     */
+    public static function registeredHooks(): array
+    {
+        try {
+            $plugins = \Typecho\Plugin::export();
+            $handles = isset($plugins['activated'][self::HANDLE]['handles'])
+                && is_array($plugins['activated'][self::HANDLE]['handles'])
+                ? $plugins['activated'][self::HANDLE]['handles'] : array();
+
+            return array_keys($handles);
+        } catch (\Throwable $e) {
+            return array();
         }
     }
 
@@ -322,12 +354,24 @@ class Plugin implements PluginInterface
         $mirrors->input->setAttribute('rows', '4');
         $form->addInput($mirrors);
 
+        $adminSkin = new Radio(
+            'adminSkin',
+            array('1' => _t('开启'), '0' => _t('关闭')),
+            '1',
+            _t('后台皮肤'),
+            _t('用主题的配色和圆角重画后台（顶栏、卡片、按钮、表单、表格、写文章页），'
+                . '右上角多一个深色开关，跟着系统的深浅偏好走。'
+                . '关掉只是不套这套样式，核心的后台功能一样不缺，图床上传也照旧能用（只是那个面板不再有装饰）。')
+        );
+        $form->addInput($adminSkin);
+
         $crEnabled = new Radio(
             'crEnabled',
             array('1' => _t('开启'), '0' => _t('关闭')),
             '1',
             _t('Cloudreve 图床'),
-            _t('关闭时写文章页不出现图床上传区，已插进正文的直链不受影响。')
+            _t('关闭时写文章页的图床区会变成一行说明，告诉你缺哪一项；'
+                . '已经插进正文的直链不受影响。')
         );
         $form->addInput($crEnabled);
 
@@ -482,12 +526,19 @@ class Plugin implements PluginInterface
     }
 
     /**
-     * 写文章 / 写页面页脚（admin/write-post.php:bottom、write-page.php:bottom）。
-     * 两个钩子共用这一个入口，图床面板自己判断该不该出现。
+     * 后台每个页面的 <head>（admin/header.php:header）。
+     *
+     * 核心是 filter：$header 是它拼好的三个 <link>，我们接在后面追加自己的皮肤、
+     * 深色开关的初始值和图床配置，返回值必须原样带上前面的内容，否则核心的样式就没了。
+     * 出任何错都只退回核心那份 $header——后台不能因为插件挂不了样式就打不开。
      */
-    public static function onEditorBottom($content = null)
+    public static function onAdminHead($header = '')
     {
-        Cloudreve::onWriteBottom($content);
+        try {
+            return Admin::head((string)$header);
+        } catch (\Throwable $e) {
+            return (string)$header;
+        }
     }
 
     /**
@@ -767,32 +818,18 @@ class Plugin implements PluginInterface
      */
     private static function accent(string $hex): array
     {
-        $fallback = '#4482e5';
+        $rgb = self::accentRgb($hex);
 
-        if (preg_match('/^#?([0-9a-f]{3})$/i', trim($hex), $m)) {
-            $hex = '#' . $m[1][0] . $m[1][0] . $m[1][1] . $m[1][1] . $m[1][2] . $m[1][2];
-        } elseif (preg_match('/^#?([0-9a-f]{6})$/i', trim($hex), $m)) {
-            $hex = '#' . $m[1];
-        } else {
-            $hex = $fallback;
+        if ($rgb === null) {
+            $rgb = self::accentRgb('#4482e5');
         }
 
-        $rgb = array(
-            (int)hexdec(substr($hex, 1, 2)),
-            (int)hexdec(substr($hex, 3, 2)),
-            (int)hexdec(substr($hex, 5, 2)),
-        );
-
-        // 线性化后的相对亮度（和主题里同一个公式）
-        $channels = array();
-        foreach ($rgb as $c) {
-            $s = $c / 255;
-            $channels[] = $s <= 0.03928 ? $s / 12.92 : pow(($s + 0.055) / 1.055, 2.4);
-        }
-        $l = 0.2126 * $channels[0] + 0.7152 * $channels[1] + 0.0722 * $channels[2];
+        $l = self::luminance($rgb);
 
         return array(
-            'hex' => strtolower($hex),
+            'hex' => '#' . implode('', array_map(function ($c) {
+                return sprintf('%02x', $c);
+            }, $rgb)),
             'rgb' => implode(', ', $rgb),
             'luminance' => round($l, 4),
             // 深色底上放白字还是黑字：亮度 0.45 以下用浅色前景
@@ -802,14 +839,61 @@ class Plugin implements PluginInterface
         );
     }
 
-    private static function lighten(array $rgb, float $ratio): string
+    /**
+     * #rgb / #rrggbb（# 可省）→ [r, g, b]。读不出颜色就返回 null，让调用方决定回落成什么。
+     */
+    public static function accentRgb(string $hex): ?array
     {
-        $out = array();
-        foreach ($rgb as $c) {
-            $out[] = (int)round($c + (255 - $c) * $ratio);
+        $hex = trim($hex);
+
+        if (preg_match('/^#?([0-9a-f]{3})$/i', $hex, $m)) {
+            $hex = $m[1][0] . $m[1][0] . $m[1][1] . $m[1][1] . $m[1][2] . $m[1][2];
+        } elseif (preg_match('/^#?([0-9a-f]{6})$/i', $hex, $m)) {
+            $hex = $m[1];
+        } else {
+            return null;
         }
 
-        return '#' . sprintf('%02x%02x%02x', $out[0], $out[1], $out[2]);
+        return array(
+            (int)hexdec(substr($hex, 0, 2)),
+            (int)hexdec(substr($hex, 2, 2)),
+            (int)hexdec(substr($hex, 4, 2)),
+        );
+    }
+
+    /** 线性化后的相对亮度，和主题里同一个公式 */
+    public static function luminance(array $rgb): float
+    {
+        $channels = array();
+
+        foreach ($rgb as $c) {
+            $s = $c / 255;
+            $channels[] = $s <= 0.03928 ? $s / 12.92 : pow(($s + 0.055) / 1.055, 2.4);
+        }
+
+        return 0.2126 * $channels[0] + 0.7152 * $channels[1] + 0.0722 * $channels[2];
+    }
+
+    /** 每个通道往 $target（0 或 255）推 $ratio：主题的 noline_mix() 同一个算法 */
+    public static function mix(array $rgb, int $target, float $ratio): array
+    {
+        $out = array();
+
+        foreach ($rgb as $c) {
+            $out[] = max(0, min(255, (int)round($c + ($target - $c) * $ratio)));
+        }
+
+        return $out;
+    }
+
+    public static function hex(array $rgb): string
+    {
+        return '#' . vsprintf('%02x%02x%02x', $rgb);
+    }
+
+    private static function lighten(array $rgb, float $ratio): string
+    {
+        return self::hex(self::mix($rgb, 255, $ratio));
     }
 
     /* ======================================================================

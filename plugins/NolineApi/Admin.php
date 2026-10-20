@@ -32,10 +32,130 @@ class Admin
 
     /**
      * 后台右上角的链接（admin/menu.php:navBar）。
+     * 深色开关也挂在这儿：顶栏是唯一每个后台页面都在、又不会被各页面自己 include 掉的位置。
      */
     public static function menuLink()
     {
         echo '<a href="' . self::esc(self::pageUrl()) . '">' . self::esc(_t('主题管理')) . '</a> &nbsp;';
+
+        if (self::skinOn()) {
+            echo self::themeToggle();
+        }
+    }
+
+    /**
+     * 接在核心那三个 <link> 后面，输出后台皮肤 + 图床配置（admin/header.php:header）。
+     */
+    public static function head(string $header): string
+    {
+        return $header . self::skinTags();
+    }
+
+    /**
+     * <head> 里我们追加的那一沓。顺序有讲究：
+     * 深色初值必须最早落到 <html> 上，样式表才能一上来就按深色画。
+     */
+    public static function skinTags(): string
+    {
+        $html = '';
+
+        if (self::skinOn()) {
+            $html .= self::themeBoot();
+            $html .= self::accentStyle();
+            $html .= self::assetTag('admin.css');
+        }
+
+        /* 图床跟皮肤是两回事：把后台样式改动关掉，上传面板照样得能用。
+           面板的样式在 admin.css 里，关掉皮肤时它会退回没有装饰的样子——
+           功能一个不少，只是不跟着主题走，这正是那个开关的意思。 */
+        $html .= Cloudreve::editorConfigTag();
+        $html .= self::assetTag('admin.js');
+
+        return $html;
+    }
+
+    private static function skinOn(): bool
+    {
+        return Plugin::setting('adminSkin', '1') === '1';
+    }
+
+    /**
+     * 同步跑在 <head> 里的一段脚本：把用户选过的深浅色在首屏绘制之前就写到 <html> 上。
+     * 放在这里而不是 admin.js 里，是因为那个文件带 defer，等它跑完页面已经白闪过一次了。
+     */
+    private static function themeBoot(): string
+    {
+        return '<script>(function(r){try{var v=localStorage.getItem("noline:admin-theme");'
+            . 'if(v!=="dark"&&v!=="light"){v=(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}'
+            . 'r.setAttribute("data-nl-theme",v);}catch(e){}})(document.documentElement);</script>' . "\n";
+    }
+
+    private static function themeToggle(): string
+    {
+        $dark = _t('切换到深色');
+        $light = _t('切换到浅色');
+
+        return '<button type="button" id="nl-theme-toggle" class="nl-theme-toggle"'
+            . ' aria-pressed="false"'
+            . ' title="' . self::esc($dark) . '"'
+            . ' data-label-dark="' . self::esc($dark) . '"'
+            . ' data-label-light="' . self::esc($light) . '">'
+            /* 两个图标都写进 DOM，显示哪个由 CSS 按 html[data-nl-theme] 决定，省得在这儿猜初始态 */
+            . '<svg class="nl-ico-light" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"'
+            . ' fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'
+            . '<circle cx="12" cy="12" r="4.2" fill="currentColor" stroke="none"/>'
+            . '<path d="M12 2.6v2.4M12 19v2.4M2.6 12h2.4M19 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M18.7 5.3L17 7M7 17l-1.7 1.7"/>'
+            . '</svg>'
+            . '<svg class="nl-ico-dark" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"'
+            . ' fill="currentColor">'
+            . '<path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.7 8.7 0 1 0 11.1 11.1z"/>'
+            . '</svg></button>';
+    }
+
+    /**
+     * 把主题里那套强调色推导原样搬过来，后台和前台用同一个色。
+     * 算法在 Plugin 里（对外接口 /api/theme 返回的也是它），这里只负责变成 CSS 变量。
+     */
+    private static function accentStyle(): string
+    {
+        $options = Options::alloc();
+
+        // 主题选项是整块序列化存的，用户没去后台保存过一次就没有这个键；直接读会撞 __get()
+        $configured = isset($options->accentColor) ? (string)$options->accentColor : '';
+        $rgb = Plugin::accentRgb($configured);
+
+        if ($rgb === null) {
+            // 没配过就一行都不输出，admin.css 里 var() 的缺省值是唯一的一份靛蓝
+            return '';
+        }
+
+        $hover = Plugin::mix($rgb, 0, 0.18);
+        $dark = Plugin::luminance($rgb) > 0.5 ? $rgb : Plugin::mix($rgb, 255, 0.30);
+        $darkHover = Plugin::mix($dark, 255, 0.12);
+
+        return '<style id="nl-admin-accent">:root{'
+            . '--nl-accent-user:' . self::esc(Plugin::hex($rgb)) . ';'
+            . '--nl-accent-user-rgb:' . self::esc(implode(', ', $rgb)) . ';'
+            . '--nl-accent-user-hover:' . self::esc(Plugin::hex($hover)) . ';'
+            . '--nl-accent-user-dark:' . self::esc(Plugin::hex($dark)) . ';'
+            . '--nl-accent-user-dark-rgb:' . self::esc(implode(', ', $dark)) . ';'
+            . '--nl-accent-user-dark-hover:' . self::esc(Plugin::hex($darkHover))
+            . '}</style>' . "\n";
+    }
+
+    /**
+     * 静态资源：<link> 或 <script src>，带版本号查询参数——改完文件不用清缓存，URL 自己变。
+     */
+    private static function assetTag(string $file): string
+    {
+        $url = rtrim((string)Options::alloc()->pluginUrl, '/') . '/NolineApi/assets/' . $file
+            . '?v=' . Plugin::VERSION;
+
+        if (substr($file, -4) === '.css') {
+            return '<link rel="stylesheet" href="' . self::esc($url) . '">' . "\n";
+        }
+
+        return '<script src="' . self::esc($url) . '" defer></script>' . "\n";
     }
 
     /**
@@ -178,7 +298,7 @@ class Admin
             . '<link rel="stylesheet" href="' . self::esc($options->adminStaticUrl('css', 'normalize.css', true)) . '">'
             . '<link rel="stylesheet" href="' . self::esc($options->adminStaticUrl('css', 'grid.css', true)) . '">'
             . '<link rel="stylesheet" href="' . self::esc($options->adminStaticUrl('css', 'style.css', true)) . '">'
-            . '<style>' . self::styles() . '</style>'
+            . self::skinTags()
             . '</head><body><div class="main"><div class="body container">'
             . '<div class="typecho-page-title"><h2>' . self::esc(_t('主题管理')) . '</h2></div>'
             . '<div class="row typecho-page-main" role="main"><div class="col-mb-12">';
@@ -204,6 +324,7 @@ class Admin
 
         echo self::themeSection($values, $token, $url, $isNoline);
         echo self::apiSection($options);
+        echo self::hookSection();
         echo Updater::section($token, $url);
 
         // 图床那一段出任何错都不许把这一页带走——它同时是在线更新的唯一入口
@@ -266,63 +387,43 @@ class Admin
         return '<span class="nl-chip nl-chip-' . $level . '">' . self::esc($text) . '</span>';
     }
 
-    private static function styles(): string
+    /**
+     * 后台挂钩自检。
+     *
+     * 皮肤、深色开关、图床面板三条命脉全挂在 admin/header.php:header 上；它要没登记上，
+     * 页面只会退回核心原样、一句错都不报——「面板怎么没出来」光看后台是猜不出来的，
+     * 所以把「当前代码声明的钩子」和「数据库里登记的钩子」并排列在这儿对。
+     */
+    private static function hookSection(): string
     {
-        return '.nl-bar{margin:0 0 1rem;padding:.6rem .8rem;background:#fff;border:1px solid #e3e3e3;'
-            . 'border-radius:4px;display:flex;align-items:center;gap:.4rem}'
-            . '.nl-bar .nl-site{margin-left:auto;color:#777;font-size:.92em}'
-            . '.nl-h3{margin:1.6rem 0 .4rem;font-size:1.15em}'
-            . '.nl-lead{margin:0 0 .8rem;color:#666;line-height:1.7}'
-            . '.nl-msg{margin:0 0 1rem;padding:.7rem .9rem;border-radius:4px;line-height:1.7}'
-            . '.nl-msg-success{background:#eaf6ec;border:1px solid #b7dfc0;color:#2c6e3a}'
-            . '.nl-msg-error{background:#fdeeee;border:1px solid #f0bcbc;color:#a3342f}'
-            . '.nl-msg-warn{background:#fdf6e3;border:1px solid #e8d9a6;color:#8a6d1f}'
-            . '.nl-form{background:#fff;border:1px solid #e3e3e3;border-radius:4px;padding:0 .8rem .8rem}'
-            . '.nl-table{width:100%;border-collapse:collapse}'
-            . '.nl-table td{padding:.8rem 0;border-bottom:1px solid #f0f0f0;vertical-align:top}'
-            . '.nl-table tr:last-child td{border-bottom:none}'
-            . '.nl-key{width:11rem;padding-right:1rem}'
-            . '.nl-key label{display:block;font-weight:700;line-height:1.6;cursor:pointer}'
-            . '.nl-key code{display:block;margin-top:.2rem;font-size:.82em;color:#999;font-weight:400}'
-            . '.nl-val input[type=text],.nl-val textarea{width:100%;max-width:34rem;line-height:1.6}'
-            . '.nl-val textarea{font-family:Menlo,Consolas,monospace;font-size:.9em}'
-            . '.nl-hint{margin:.3rem 0 0;color:#888;font-size:.86em;line-height:1.7}'
-            . '.nl-switch{display:inline-flex;align-items:center;gap:.3rem}'
-            . '.nl-swatch{display:inline-block;width:1.4rem;height:1.4rem;border-radius:50%;'
-            . 'border:1px solid rgba(0,0,0,.15);vertical-align:-.35rem;background:#4482e5}'
-            . '.nl-swatch.bad{background:repeating-linear-gradient(45deg,#eee,#eee 4px,#fff 4px,#fff 8px)}'
-            . '.nl-actions{margin:1rem 0 0;display:flex;align-items:center;gap:.8rem;flex-wrap:wrap}'
-            . '.nl-note{color:#888;font-size:.86em;line-height:1.7}'
-            . '.nl-chips{display:flex;gap:.4rem;flex-wrap:wrap;margin:0 0 .6rem}'
-            . '.nl-chip{padding:.2rem .6rem;border-radius:999px;font-size:.86em;border:1px solid #e3e3e3;background:#fff}'
-            . '.nl-chip-ok{border-color:#b7dfc0;background:#eaf6ec;color:#2c6e3a}'
-            . '.nl-chip-warn{border-color:#e8d9a6;background:#fdf6e3;color:#8a6d1f}'
-            . '.nl-chip-bad{border-color:#f0bcbc;background:#fdeeee;color:#a3342f}'
-            . '.nl-chip-muted{border-color:#e3e3e3;background:#f7f7f7;color:#666}'
-            . '.nl-ver{display:flex;align-items:center;gap:1rem;margin:0 0 1rem;padding:.9rem 1rem;'
-            . 'background:#fff;border:1px solid #e3e3e3;border-radius:4px}'
-            . '.nl-ver b{display:block;font-size:1.3em;line-height:1.3;word-break:break-all}'
-            . '.nl-ver em{display:block;margin-top:.2rem;color:#888;font-size:.86em;font-style:normal}'
-            . '.nl-ver-arrow{color:#bbb;font-size:1.3em}'
-            . '.nl-inline{margin:0 0 1rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}'
-            . '.nl-log{margin:0 0 1rem;background:#fff;border:1px solid #e3e3e3;border-radius:4px;padding:.6rem .9rem}'
-            . '.nl-log summary{cursor:pointer;color:#666}'
-            . '.nl-log pre{margin:.7rem 0 0;padding:.7rem .9rem;background:#f7f7f7;border-radius:4px;'
-            . 'white-space:pre-wrap;word-break:break-word;font-size:.9em;line-height:1.7;'
-            . 'font-family:Menlo,Consolas,monospace}'
-            . '.nl-h4{margin:1.2rem 0 .4rem;font-size:1em;color:#444}'
-            . '.nl-list{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e3e3e3;border-radius:4px}'
-            . '.nl-list td{padding:.6rem .8rem;border-bottom:1px solid #f0f0f0;vertical-align:middle}'
-            . '.nl-list tr:last-child td{border-bottom:none}'
-            . '.nl-list b{display:block;word-break:break-all}'
-            . '.nl-list em{display:block;margin-top:.15rem;color:#888;font-size:.86em;font-style:normal}'
-            . '.nl-ops{text-align:right;white-space:nowrap}'
-            . '.nl-ops form{display:inline-block;margin:0}'
-            . '@media (max-width:757px){.nl-key{width:auto;display:block;padding-right:0}'
-            . '.nl-table td{display:block;padding:.4rem 0}'
-            . '.nl-ver{flex-direction:column;align-items:flex-start;gap:.4rem}'
-            . '.nl-ver-arrow{display:none}'
-            . '.nl-ops{text-align:left;white-space:normal}}';
+        $registered = Plugin::registeredHooks();
+        $chips = array();
+
+        foreach (Plugin::hooks() as $hook) {
+            $key = $hook[0] . ':' . $hook[1];
+            $on = in_array($key, $registered, true);
+            $chips[] = self::chip($on ? 'ok' : 'bad', $key . ' ' . ($on ? _t('已登记') : _t('未登记')));
+        }
+
+        $skin = self::skinOn();
+        $chips[] = self::chip($skin ? 'ok' : 'muted', _t('后台皮肤') . ($skin ? _t('开') : _t('关')));
+
+        $ready = Cloudreve::ready();
+        $chips[] = self::chip($ready ? 'ok' : 'warn', _t('图床设置') . ($ready ? _t('已填齐') : _t('没填齐')));
+
+        return '<h3 class="nl-h3">' . self::esc(_t('后台挂钩自检')) . '</h3>'
+            . '<div class="nl-chips">' . implode('', $chips) . '</div>'
+            . '<p class="nl-lead">'
+            . self::esc(_t('后台皮肤、顶栏的深色开关、写文章页的图床面板都走 '))
+            . '<code>admin/header.php:header</code>'
+            . self::esc(_t(' 这一条钩子；接口和主题管理页各走自己那条。上面只要有一条显示「未登记」，'
+                . '去「控制台 → 插件」把 NolineApi 停用再启用一次就补齐了。'))
+            . '</p>'
+            . '<p class="nl-note">'
+            . self::esc(_t('在线更新换的是文件，换不掉库里那份登记——插件自己会在下一次请求比对并重写这张表，'
+                . '等不及就手动停用启用一遍。面板长什么样不用猜：进「写文章」切到「附件」标签，最上面那块就是；'
+                . '设置没填齐时它是灰的一行，写明缺了哪一项。'))
+            . '</p>';
     }
 
     private static function scripts(): string
@@ -331,7 +432,7 @@ class Admin
             /* 强调色色块：边打字边染，写成非法颜色就切成斜纹，省得保存完才去前台发现颜色没变 */
             . 'function paint(){document.querySelectorAll(".nl-swatch").forEach(function(el){'
             . 'var i=document.getElementById(el.getAttribute("data-for"));var v=i?i.value.trim():"";'
-            . 'if(!v){el.style.background="#4482e5";el.className="nl-swatch";return;}'
+            . 'if(!v){el.style.background="";el.className="nl-swatch";return;}'
             . 'if(v.charAt(0)!=="#"){v="#"+v;}'
             . 'if(!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)){el.style.background="";el.className="nl-swatch bad";return;}'
             . 'el.style.background=v;el.className="nl-swatch";});}'
