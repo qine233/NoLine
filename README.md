@@ -1,6 +1,6 @@
 # Noline
 
-> 一个克制、无描边的 Typecho 主题，配一个可选的 REST 接口插件。当前版本 **1.29.4**。
+> 一个克制、无描边的 Typecho 主题，配一个可选的 REST 接口插件。当前版本 **1.29.7**。
 
 Noline 主张「无描边卡片」与「设计令牌驱动」：层次靠留白、圆角和一套统一的颜色令牌划分，
 不靠重描边和强阴影。所有颜色集中在 `:root`，浅色深色各一套，强调色在后台填一个十六进制就够，
@@ -193,6 +193,11 @@ Noline 主张「无描边卡片」与「设计令牌驱动」：层次靠留白�
    - 登录页、通知条（保留 `error/notice/success` 的语义色，不被卡片白底洗掉）跟着同一套令牌。
    深色开关在顶栏，选择记在 `localStorage`，页面绘制前就同步写好，不会先白一下再黑。
    所有「先藏起来」的规则都挂在 `html.nl-js` 后面，关掉 JS 也只是没动画，不会少内容。
+   - **1.2 和 1.3 两套后台标记都吃得住**：1.3 动了骨架——`<div class="main">` 换成 `<main>`、
+     `.typecho-table-wrap` 整层删掉、页头的「新增」从 `<h2>` 里挪到外面、列表页的批量操作条从
+     `<div>` 变成 `<form>`、空态从 `<h6 class="typecho-list-table-title">` 变成 `<td class="none">`、
+     勾选高亮改用 `li:has(input:checked)`。这些位置皮肤都是两条选择器并写，不做浏览器嗅探，
+     也不靠 `!important`。
    不喜欢可以在插件设置里关掉「后台皮肤」——只是不套这套样式，核心功能一样不缺，
    图床上传照旧能用。
 6. 记账没有后台录入表单，**写入只有接口一条路**（插件设置页只管可见性和开关，主题页只画不能写）。
@@ -293,10 +298,10 @@ DELETE /api/bills/records?id=     按 id 删一条
 
 ```bash
 python3 _dev/build.py            # 本地先过一遍门槛
-git tag -a 1.29.4 -m "1.29.4" && git push origin 1.29.4
+git tag -a 1.29.7 -m "1.29.7" && git push origin 1.29.7
 ```
 
-tag 名用 `1.29.4` 或 `v1.29.4`（工作流只认这两种形状），且必须等于 `NOLINE_VERSION`。
+tag 名用 `1.29.7` 或 `v1.29.7`（工作流只认这两种形状），且必须等于 `NOLINE_VERSION`。
 后台「主题管理 → 主题与插件更新」读的是 `releases/latest` 那个附件，所以**没有 `noline.zip` 的 Release
 等于没发布**：页面会报「这个 Release 没有 noline.zip 附件」。
 也可以不推 tag，直接在 Actions 页手动运行工作流、手填 tag。

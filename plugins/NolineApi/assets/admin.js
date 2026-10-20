@@ -125,7 +125,7 @@
      */
     function reveal() {
         var nodes = document.querySelectorAll(
-            '.typecho-list-table.nl-cards > tbody > tr, #typecho-welcome, section.container'
+            '.typecho-list-table.nl-cards > tbody > tr, #typecho-welcome, .welcome-board, section.latest-link'
         );
         var list = Array.prototype.slice.call(nodes);
 

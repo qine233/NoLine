@@ -78,7 +78,9 @@
        判据是「身后有没有内容穿过」，卡片和表单控件一律不给。
        --glass-inset 是那圈磨砂边光，--shadow-glass 是向远处投的那一大片，两个一起才有体积。 */
     --nl-glass-bg:      rgba(255, 255, 255, .72);
-    --nl-glass-bg-deep: rgba(255, 255, 255, .88);
+    /* 二级菜单和窄屏抽屉铺这么大一块，身后全是正文；.88 底下那层白字已经能读出影子了。
+       浮层要的是「磨砂」，不是「透视」，所以比胶囊更实一档。 */
+    --nl-glass-bg-deep: rgba(255, 255, 255, .96);
     --nl-glass-inset:
         inset 0 1px 1px rgba(255, 255, 255, .60), inset 0 -1px 1px rgba(255, 255, 255, .60),
         inset 1px 0 2px rgba(0, 0, 0, .06), inset -1px 0 2px rgba(0, 0, 0, .06);
@@ -174,7 +176,7 @@ html[data-nl-theme="dark"] {
 
     /* 深色玻璃：底色就是这一页的底，边光反而要更亮，才有那圈磨砂感 */
     --nl-glass-bg:      rgba(23, 25, 29, .72);
-    --nl-glass-bg-deep: rgba(18, 20, 24, .88);
+    --nl-glass-bg-deep: rgba(18, 20, 24, .96);
     --nl-glass-inset:
         inset 0 1px 1px rgba(255, 255, 255, .85), inset 0 -1px 1px rgba(255, 255, 255, .85),
         inset 2px 0 3px rgba(0, 0, 0, .16), inset -2px 0 3px rgba(0, 0, 0, .16);
@@ -245,6 +247,29 @@ body.fullscreen .main {
     }
 }
 
+/* 1.3 的 grid.css 整个换成了 flex 那套：.container 变成 flex 轨道、.row 写死
+   width:100vw。后台两处被它误伤——普通页面的 .body.container 里其实只有一个 .row，
+   flex 轨道让页头和正文挤到同一行；.row 撑满视口宽，直接顶穿上面那条 max-width。
+   控制台首页的 .typecho-dashboard 也是 .container，它里面是页头 + 一整排栅格，同理。
+   1.2 的 grid 里 .container 只有浮动、.row 没有宽度，所以这两条改回去两代都安全。 */
+.body.container,
+.typecho-dashboard {
+    display: block;
+}
+
+.row {
+    width: 100%;
+}
+
+/* 同一代 style.css 还给 .typecho-list-table 刷了白底 + 30px 白边框（核心自己把表格
+   做成了白卡）。我们的卡片面另有其人：外层是 .typecho-table-wrap，摊开以后是每一行。
+   留着它一是卡中卡，二是那 30px 边框把内容宽吃掉 60px——摊成两列的列表刚好被挤到
+   换行，一屏一张卡。div 和 table 两层都叫这个类，两边都得清。 */
+.typecho-list-table {
+    background: none;
+    border: none;
+}
+
 a {
     color: var(--nl-accent);
     transition: var(--nl-transition);
@@ -295,7 +320,10 @@ h1, h2, h3, h4 {
     background-color: var(--nl-marker);
 }
 
-.typecho-page-title h2 a {
+/* 1.3 的 page-title.php 把「新增」链接从 <h2> 里挪了出来，成了 h2 的兄弟节点，
+   所以两条链都得留着：1.2 走 h2 a，1.3 走 .typecho-page-title a。 */
+.typecho-page-title h2 a,
+.typecho-page-title a {
     padding: .3125rem .75rem;
     background-color: var(--nl-accent-container);
     border-radius: var(--nl-radius-pill);
@@ -306,12 +334,18 @@ h1, h2, h3, h4 {
     transition: var(--nl-transition);
 }
 
-.typecho-page-title h2 a:hover {
+.typecho-page-title a {
+    margin-left: 0;
+}
+
+.typecho-page-title h2 a:hover,
+.typecho-page-title a:hover {
     background-color: rgba(var(--nl-accent-rgb), .20);
     color: var(--nl-accent-hover);
 }
 
-.typecho-page-title h2 a:active {
+.typecho-page-title h2 a:active,
+.typecho-page-title a:active {
     transform: scale(.95);
 }
 
@@ -332,6 +366,16 @@ h1, h2, h3, h4 {
    二级菜单是从胶囊下沿展开的一叠卡片。这里把它照搬过来——
    胶囊 fixed 脱离文档流（正文靠 .main 的 padding-top 让位），
    核心那些 float 一律改成 flex，长链接靠省略号而不是靠换行。
+
+   两代结构都要吃，因为插件装在各种版本的后台上：
+     1.2.x  <div .typecho-head-nav><nav #typecho-nav-list><ul.root><li.parent><a>
+            + <ul.child>（是 li.parent 的兄弟）+ <div.operate> + <button.menu-bar>
+     1.3.x  <header .typecho-head-nav><nav><menu><li><a> + 嵌套 <menu>
+            + <li.operate> + <details.menu-bar><summary>
+            （#typecho-nav-list、.parent、.child、ul 全都没了）
+   1.3 真正致命的是这条：.typecho-head-nav menu { background:#292D33 }。
+   顶层那条 <menu> 自己就是一块黑布，铺在胶囊里，于是整条导航「一抹黑」，
+   而容器明明是玻璃——只有项级选择器跟着换成 nav>menu>li 才压得住。
    ========================================================================== */
 
 .typecho-head-nav {
@@ -359,8 +403,11 @@ h1, h2, h3, h4 {
 
 /* 胶囊里每一项都是同一颗药丸：核心的「padding 0 20px + 36px 行高」改成
    flex 居中，图标和文字才有同一条基准线。
-   menu-bar 那个汉堡是核心给窄屏准备的（默认 display:none），这里别顺手把它显示出来。 */
-.typecho-head-nav a {
+   1.3 的核心用 nav>menu>li>a 这条长链给项挂 display:block + 右边框，
+   通用那条 .typecho-head-nav a 压不住它，所以链长得一模一样地再写一遍。 */
+.typecho-head-nav a,
+.typecho-head-nav .menu-bar summary,
+.typecho-head-nav nav>menu>li>a {
     display: inline-flex;
     align-items: center;
     gap: .375rem;
@@ -379,6 +426,8 @@ h1, h2, h3, h4 {
     transition: var(--nl-transition);
 }
 
+/* 汉堡在 1.2 是 <button class="menu-bar">，在 1.3 是 <details class="menu-bar">
+   包一个 <summary>。宽屏下两者都不该露脸。 */
 .typecho-head-nav button.menu-bar {
     display: none;
     align-items: center;
@@ -397,10 +446,21 @@ h1, h2, h3, h4 {
     transition: var(--nl-transition);
 }
 
+.typecho-head-nav .menu-bar {
+    display: none;
+    margin: 0;
+    border: none;
+    background: none;
+}
+
 .typecho-head-nav a:hover,
 .typecho-head-nav a:focus,
+.typecho-head-nav nav>menu>li>a:hover,
+.typecho-head-nav nav>menu>li>a:focus,
 .typecho-head-nav button.menu-bar:hover,
-.typecho-head-nav button.menu-bar:focus {
+.typecho-head-nav button.menu-bar:focus,
+.typecho-head-nav .menu-bar summary:hover,
+.typecho-head-nav .menu-bar summary:focus {
     background-color: var(--nl-nav-hover);
     color: var(--nl-nav-fg-hi);
     text-decoration: none;
@@ -408,59 +468,87 @@ h1, h2, h3, h4 {
 
 /* 点下去缩一下。前台那套按钮全都有这条，后台不该只有颜色反馈。 */
 .typecho-head-nav a:active,
+.typecho-head-nav nav>menu>li>a:active,
 .typecho-head-nav button.menu-bar:active {
     transform: scale(.95);
 }
 
 /* --- 一级菜单：核心的 float:left 格子排成一行 --- */
 
-.typecho-head-nav #typecho-nav-list {
+.typecho-head-nav #typecho-nav-list,
+.typecho-head-nav nav,
+.typecho-head-nav nav>menu {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: .125rem;
     float: none;
+    position: static;
+    width: auto;
     min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    background: none;
 }
 
-.typecho-head-nav #typecho-nav-list > ul {
+.typecho-head-nav #typecho-nav-list > ul,
+.typecho-head-nav nav>menu>li {
     position: relative;   /* 二级菜单挂在这一组自己身上 */
+    display: flex;
     float: none;
     margin: 0;
+    padding: 0;
 }
 
-/* 核心给第一组 ul 挂的 border-left 和给 .operate a 挂的左右边框都是那条黑带上的
-   「分隔线」。选择器比上面几条长，压住它们只能照抄同样的长度，不能靠加 !important。 */
-.typecho-head-nav #typecho-nav-list > ul:first-child {
+/* 核心给第一组挂的 border-left、给项挂的右边框，都是那条黑带上的「分隔线」。
+   选择器比上面几条长，压住它们只能照抄同样的长度，不能靠加 !important。 */
+.typecho-head-nav #typecho-nav-list > ul:first-child,
+.typecho-head-nav nav>menu>li:first-child {
     border-left: none;
 }
 
-.typecho-head-nav #typecho-nav-list > ul .parent a {
+.typecho-head-nav #typecho-nav-list > ul .parent a,
+.typecho-head-nav nav>menu>li>a {
     border-right: none;
     background: none;
 }
 
-.typecho-head-nav #typecho-nav-list > ul .parent a:hover,
-.typecho-head-nav #typecho-nav-list > ul.root:hover .parent a {
+/* 当前项：淡强调色整颗填实，比原来那条加粗更认得出来。
+   1.3 写的是 li:not(.operate).focus>a，:not 里那个类也要算进权重。 */
+.typecho-head-nav #typecho-nav-list > ul.focus .parent a,
+.typecho-head-nav nav>menu>li:not(.operate).focus>a,
+.typecho-head-nav nav>menu>li:not(.operate):hover>a,
+.typecho-head-nav nav>menu>li>a:hover+menu,
+.typecho-head-nav nav>menu>li>a:focus+menu {
+    font-weight: 600;
+}
+
+.typecho-head-nav #typecho-nav-list > ul.focus .parent a,
+.typecho-head-nav nav>menu>li:not(.operate).focus>a {
+    background-color: var(--nl-nav-active);
+    color: var(--nl-nav-fg-hi);
+}
+
+.typecho-head-nav nav>menu>li:not(.operate):hover>a {
     background-color: var(--nl-nav-hover);
     color: var(--nl-nav-fg-hi);
 }
 
-/* 当前项：淡强调色整颗填实，比原来那条加粗更认得出来 */
-.typecho-head-nav #typecho-nav-list > ul.focus .parent a {
-    background-color: var(--nl-nav-active);
-    color: var(--nl-nav-fg-hi);
-    font-weight: 600;
-}
-
 /* --- 二级菜单：从胶囊下沿展开的一叠卡片 --- */
 
-.typecho-head-nav #typecho-nav-list > ul .child {
+.typecho-head-nav #typecho-nav-list > ul .child,
+.typecho-head-nav nav>menu>li>menu {
+    position: absolute;
     top: calc(100% + .5rem);
     left: 0;
+    display: none;
+    flex-flow: column;
     min-width: 11rem;
     max-width: 17rem;
+    margin: 0;
     padding: .375rem;
+    list-style: none;
     background-color: var(--nl-glass-bg-deep);
     border: var(--nl-style-border);
     border-radius: var(--nl-radius-lg);
@@ -468,22 +556,44 @@ h1, h2, h3, h4 {
     -webkit-backdrop-filter: var(--nl-glass-blur);
     backdrop-filter: var(--nl-glass-blur);
     overflow: hidden;
+    z-index: 250;
 }
 
-.typecho-head-nav #typecho-nav-list > ul .child li a {
+/* 展开的触发两代不一样：1.2 是 ul.root:hover .child，1.3 是 li 的 :hover /
+   :focus-within，外加核心自己那条 a:hover+menu。全部照抄长度写齐，
+   少一条就会有一侧的悬停打不开面板。 */
+.typecho-head-nav #typecho-nav-list > ul.root:hover .child,
+.typecho-head-nav nav>menu>li:hover>menu,
+.typecho-head-nav nav>menu>li:focus-within>menu,
+.typecho-head-nav nav>menu>li:focus>menu,
+.typecho-head-nav nav>menu>li>a:hover+menu,
+.typecho-head-nav nav>menu>li>a:focus+menu {
+    display: flex;
+}
+
+.typecho-head-nav #typecho-nav-list > ul .child li a,
+.typecho-head-nav nav>menu>li>menu>li>a {
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
     border-radius: var(--nl-radius-md);
     padding: 0 .75rem;
+    background: none;
     font-size: .9375rem;
     font-weight: 500;
 }
 
 .typecho-head-nav #typecho-nav-list > ul .child li a:hover,
-.typecho-head-nav #typecho-nav-list > ul .child li a:focus {
+.typecho-head-nav #typecho-nav-list > ul .child li a:focus,
+.typecho-head-nav nav>menu>li>menu>li>a:hover,
+.typecho-head-nav nav>menu>li>menu>li>a:focus {
     background-color: var(--nl-nav-hover);
     color: var(--nl-nav-fg-hi);
 }
 
-.typecho-head-nav #typecho-nav-list > ul .child li.focus a {
+.typecho-head-nav #typecho-nav-list > ul .child li.focus a,
+.typecho-head-nav nav>menu>li>menu>li.focus>a {
     background-color: var(--nl-nav-active);
     color: var(--nl-nav-fg-hi);
     font-weight: 600;
@@ -491,22 +601,26 @@ h1, h2, h3, h4 {
 
 /* --- 右侧动作簇：主题管理 / 深色开关 / 用户名 / 登出 / 网站 --- */
 
-.typecho-head-nav .operate {
+.typecho-head-nav .operate,
+.typecho-head-nav nav>menu>li.operate {
     display: flex;
     align-items: center;
     gap: .25rem;
     float: none;
+    flex: 0 0 auto;
     margin-left: auto;
-    flex-shrink: 0;
+    justify-content: flex-end;
 }
 
-.typecho-head-nav .operate a {
+.typecho-head-nav .operate a,
+.typecho-head-nav nav>menu>li.operate>a {
     padding: 0 .75rem;
     border: none;
     font-size: .875rem;
 }
 
-.typecho-head-nav .operate a.author {
+.typecho-head-nav .operate a.author,
+.typecho-head-nav nav>menu>li.operate>a.author {
     color: var(--nl-text-strong);
     font-weight: 700;
 }
@@ -514,9 +628,16 @@ h1, h2, h3, h4 {
 /* 核心给动作簇 hover 上的是黑带上的深色块（#202328），选择器比通用那条长一级，
    照抄长度压回来，不然薄白胶囊上会闪出四块黑。 */
 .typecho-head-nav .operate a:hover,
-.typecho-head-nav .operate a:focus {
+.typecho-head-nav .operate a:focus,
+.typecho-head-nav nav>menu>li.operate>a:hover,
+.typecho-head-nav nav>menu>li.operate>a:focus {
     background-color: var(--nl-nav-hover);
     color: var(--nl-nav-fg-hi);
+}
+
+.typecho-head-nav .operate a:first-child,
+.typecho-head-nav nav>menu>li.operate>a:first-child {
+    border-left: none;
 }
 
 /* 深色主题切换键：写在 navBar 钩子输出里，靠这里上色。
@@ -552,11 +673,24 @@ h1, h2, h3, h4 {
 html[data-nl-theme="dark"] .nl-theme-toggle .nl-ico-light { display: none; }
 html[data-nl-theme="dark"] .nl-theme-toggle .nl-ico-dark { display: inline; }
 
-/* 窄屏：胶囊铺满顶边，导航收成往下展开的抽屉（menu-bar 那个按钮是核心自带的）。
-   核心那几条移动规则的选择器比这里长，凡是要改的地方都照抄它的长度，
-   尤其是 bottom:36px / width:100% 那两条——它们是给「贴屏幕底部的黑条」写的，
-   导航移到顶上之后不覆盖就会把面板顶到屏幕外面去。 */
+/* 窄屏：胶囊铺满顶边，导航收成往下展开的抽屉（menu-bar 那个汉堡是核心自带的）。
+   核心那几条移动规则的选择器比这里长，凡是要改的地方都照抄它的长度。
+   两代的抽屉开关不是一回事：1.2 靠核心 JS 给 <button> 挂 .focus，
+   1.3 是原生 <details>，开合状态写在 .menu-bar[open] 上，面板是它的兄弟 <menu>。
+   1.3 核心那套窄屏是给「整屏侧边抽屉」写的（nav 变成 position:fixed + 100vw，
+   汉堡是 sticky 的黑条），这里要的是胶囊下面垂下来的一块面板，逐条按原长度改回来。 */
 @media (max-width: 757px) {
+    /* 1.3 窄屏给 <body> 加了 36px 顶边距（它那条汉堡是 sticky 的黑条），
+       还要在抽屉打开时锁掉整页滚动（它是全屏侧抽屉）。我们这条胶囊本来就 fixed 悬着，
+       正文让位由 .main 的 padding-top 负责，那 36px 只会多出一道空隙。 */
+    body {
+        padding-top: 0;
+    }
+
+    body:has(.menu-bar[open]) {
+        overflow: visible;
+    }
+
     .typecho-head-nav {
         top: .375rem;
         right: .375rem;
@@ -570,20 +704,64 @@ html[data-nl-theme="dark"] .nl-theme-toggle .nl-ico-dark { display: inline; }
     }
 
     .typecho-head-nav a,
-    .typecho-head-nav button.menu-bar {
+    .typecho-head-nav nav>menu>li>a,
+    .typecho-head-nav button.menu-bar,
+    .typecho-head-nav .menu-bar summary {
         padding: 0 .625rem;
         font-size: .875rem;
     }
 
-    .typecho-head-nav #typecho-nav-list {
+    /* 收起态：整条菜单不见，只留汉堡 */
+    .typecho-head-nav #typecho-nav-list,
+    .typecho-head-nav nav>menu {
         display: none;
     }
 
-    .typecho-head-nav button.menu-bar {
+    /* 核心给「已展开」那个汉堡写的是 .typecho-head-nav button.menu-bar.focus{color:#FFF}，
+       比通用那条多一个类。薄白胶囊上这就是一行看不见的白字，照抄它的长度压回来。 */
+    .typecho-head-nav button.menu-bar,
+    .typecho-head-nav button.menu-bar.focus {
         display: inline-flex;
+        background: none;
+        color: var(--nl-nav-fg);
     }
 
-    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list {
+    .typecho-head-nav button.menu-bar.focus {
+        background-color: var(--nl-nav-hover);
+        color: var(--nl-nav-fg-hi);
+    }
+
+    .typecho-head-nav .menu-bar {
+        display: block;
+        position: static;
+        background: none;
+        z-index: auto;
+    }
+
+    .typecho-head-nav .menu-bar summary {
+        border-radius: var(--nl-radius-pill);
+        cursor: pointer;
+        list-style: none;
+    }
+
+    .typecho-head-nav .menu-bar[open] summary {
+        border-bottom: none;
+        background-color: var(--nl-nav-hover);
+        color: var(--nl-nav-fg-hi);
+    }
+
+    .typecho-head-nav nav,
+    .typecho-head-nav nav:has(.menu-bar[open]) {
+        overflow: visible;
+        width: auto;
+        height: auto;
+        position: static;
+        background: none;
+    }
+
+    /* 展开态。选择器里带上 nav，权重才够压过核心那条 nav>menu{display:none}。 */
+    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list,
+    .typecho-head-nav nav>.menu-bar[open]~menu {
         display: block;
         position: absolute;
         top: calc(100% + .375rem);
@@ -601,14 +779,17 @@ html[data-nl-theme="dark"] .nl-theme-toggle .nl-ico-dark { display: inline; }
         backdrop-filter: var(--nl-glass-blur);
     }
 
-    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul {
+    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul,
+    .typecho-head-nav nav>.menu-bar[open]~menu>li {
         position: static;
         float: none;
+        display: block;
         border-bottom: none;
     }
 
     /* 竖排里项撑满整行，横排那套胶囊留白换成 44px 高的行 */
-    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul .parent a {
+    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul .parent a,
+    .typecho-head-nav nav>.menu-bar[open]~menu>li>a {
         display: flex;
         width: 100%;
         height: 44px;
@@ -618,13 +799,16 @@ html[data-nl-theme="dark"] .nl-theme-toggle .nl-ico-dark { display: inline; }
     }
 
     .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul.focus .parent a,
-    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul .parent a:hover {
+    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul .parent a:hover,
+    .typecho-head-nav nav>.menu-bar[open]~menu>li:not(.operate).focus>a,
+    .typecho-head-nav nav>.menu-bar[open]~menu>li:not(.operate):hover>a {
         background-color: var(--nl-nav-active);
         color: var(--nl-nav-fg-hi);
     }
 
     /* 子菜单不再往右飘出屏幕，摊平成一节缩进；「文件」那条返回项在竖排里没意义 */
-    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul .child {
+    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul .child,
+    .typecho-head-nav nav>menu>li>menu {
         position: static;
         width: auto;
         max-width: none;
@@ -640,12 +824,27 @@ html[data-nl-theme="dark"] .nl-theme-toggle .nl-ico-dark { display: inline; }
         -webkit-backdrop-filter: none;
     }
 
-    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul .child li {
+    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul .child li,
+    .typecho-head-nav nav>menu>li>menu>li {
         border-bottom: none;
     }
 
     .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul .child li.return {
         display: none;
+    }
+
+    /* 动作簇在竖排里就是一节一节的行，核心给它铺的是黑带上的深块 */
+    .typecho-head-nav nav>menu>li.operate {
+        flex-flow: column;
+        align-items: stretch;
+        justify-content: flex-start;
+        margin-left: 0;
+    }
+
+    .typecho-head-nav nav>menu>li.operate>a,
+    .typecho-head-nav nav>menu>li.operate>a:hover,
+    .typecho-head-nav nav>menu>li.operate>a:focus {
+        background: none;
     }
 }
 
@@ -879,6 +1078,20 @@ select {
     border-radius: var(--nl-radius-lg);
 }
 
+/* 核心只是把大小不一的词摊在灰底上；前台的分类药丸才是这套视觉语言的说法。
+   字号留给 size-N 表达词频，形状、边界和 hover 归皮肤。 */
+.typecho-page-main ul.tag-list li {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    margin: 0 .375rem .375rem 0;
+    padding: .3125rem .8125rem;
+    background-color: var(--nl-card);
+    border: 1px solid var(--nl-border-line);
+    border-radius: var(--nl-radius-pill);
+    transition: var(--nl-transition);
+}
+
 .typecho-page-main ul.tag-list li:hover {
     background-color: var(--nl-soft);
 }
@@ -888,7 +1101,15 @@ select {
     color: var(--nl-accent);
 }
 
-.category-option ul {
+/* 1.3 的空态是一行 <li class="none">，核心只给了个 #999 */
+.tag-list .none {
+    color: var(--nl-text-light);
+}
+
+/* 1.3 把这条挂到了 .typecho-post-area #edit-secondary 底下，裸类名压不住，
+   深色模式下的分类框会漏出核心写死的 #FFF。 */
+.category-option ul,
+.typecho-post-area #edit-secondary .category-option ul {
     border: 1px solid var(--nl-border-input);
     background-color: var(--nl-card);
     border-radius: var(--nl-radius-md);
@@ -928,6 +1149,12 @@ select {
 
 .typecho-list-table tbody tr.checked td,
 .typecho-theme-list tbody tr.current td {
+    background-color: var(--nl-accent-bg);
+}
+
+/* 1.3 改成核心自己用 tr:has(input:checked) 高亮勾选行，写死 #FFF9E8，深色下是一块刺眼的奶油。
+   :has 单独成一条规则：老浏览器解析不了会把整条规则丢掉，不能和上面那条并到一个选择器列表里。 */
+.typecho-list-table tbody tr:has(input[type="checkbox"]:checked) {
     background-color: var(--nl-accent-bg);
 }
 
@@ -1007,21 +1234,33 @@ select {
     background: transparent;
 }
 
-.wmd-button-row li {
+/* 1.3 把整条工具条的规则都挂到 #wmd-button-bar 底下（多一个 id 就是一级权重），
+   不带 id 的这两条只还压得住 1.2；hover 那块 #E9E9E6 在深色下会亮成白斑。 */
+.wmd-button-row li,
+#wmd-button-bar .wmd-button-row li {
     border-radius: var(--nl-radius-md);
     transition: var(--nl-transition);
 }
 
-.wmd-button-row li:hover {
+.wmd-button-row li:hover,
+#wmd-button-bar .wmd-button-row li:hover {
     background-color: var(--nl-soft);
 }
 
-.wmd-button-row li.wmd-spacer {
+/* 1.3 同样把它收进 #wmd-button-bar：不带 id 压不住它那根 #E9E9E6 的竖线 */
+.wmd-button-row li.wmd-spacer,
+#wmd-button-bar .wmd-button-row li.wmd-spacer {
     background: var(--nl-border-line);
 }
 
+/* 自定义字段在 1.3 换了结构（admin/custom-fields.php）：
+   1.2 是 <label class="typecho-label"><a> + 一张 .typecho-list-table，
+   1.3 是 <details id="custom-field"><summary> + <ul class="fields"><li class="field">。
+   核心 1.3 那批规则写成 .typecho-post-area #custom-field xxx，比我们的裸 id 多一级，
+   连 #FFF 的底色都会盖回来，所以整组照抄它的长度。 */
 #wmd-preview,
-#custom-field {
+#custom-field,
+.typecho-post-area #custom-field {
     background: var(--nl-card);
     border: 1px solid var(--nl-border);
     border-radius: var(--nl-radius-lg);
@@ -1031,16 +1270,44 @@ select {
     color: var(--nl-text-strong);
 }
 
+.typecho-post-area #custom-field .typecho-label a {
+    color: var(--nl-text-strong);
+}
+
 #custom-field .typecho-label a:hover {
     color: var(--nl-accent);
 }
 
-#custom-field td input[type=text] {
+.typecho-post-area #custom-field .typecho-label a:hover {
+    color: var(--nl-accent);
+}
+
+.typecho-post-area #custom-field summary {
+    color: var(--nl-text-strong);
+}
+
+.typecho-post-area #custom-field summary:hover {
+    color: var(--nl-accent);
+}
+
+.typecho-post-area #custom-field summary::marker {
+    color: var(--nl-text-light);
+}
+
+.typecho-post-area #custom-field .fields .field {
+    border-bottom-color: var(--nl-border-soft);
+}
+
+#custom-field td input[type=text],
+#custom-field .field input[type=text],
+#custom-field .field textarea {
     background: transparent;
     border-color: transparent;
 }
 
-#custom-field td input[type=text]:focus {
+#custom-field td input[type=text]:focus,
+#custom-field .field input[type=text]:focus,
+#custom-field .field textarea:focus {
     background: var(--nl-card);
     border-color: var(--nl-accent);
 }
@@ -1213,11 +1480,14 @@ div.token-input-dropdown ul li.token-input-selected-dropdown-item {
     color: var(--nl-on-solid);
 }
 
-.resize {
+/* 编辑器下面那道拖拽手柄。1.3 把它挂在 #wmd-editarea 底下，权重多一级。 */
+.resize,
+#wmd-editarea .resize {
     border-color: var(--nl-border-line);
 }
 
-.resize i {
+.resize i,
+#wmd-editarea .resize i {
     background-color: var(--nl-border-line);
 }
 
@@ -1257,8 +1527,9 @@ div.token-input-dropdown ul li.token-input-selected-dropdown-item {
     color: var(--nl-accent);
 }
 
-/* 登录页底部那行「返回首页 · 用户注册」 */
-.typecho-login .more-link {
+/* 登录页底部那行「返回首页 · 用户注册」——1.3 写成 .typecho-login-wrap .typecho-login .more-link */
+.typecho-login .more-link,
+.typecho-login-wrap .typecho-login .more-link {
     color: var(--nl-text-light);
 }
 
@@ -1283,6 +1554,12 @@ div.token-input-dropdown ul li.token-input-selected-dropdown-item {
     background-color: var(--nl-warn-bg);
 }
 
+/* 1.3 的标签云不再由 tableSelectable 打 .checked，核心改成 li:has(input:checked) 直接涂 #FFFBCC。
+   :has 单独成一条规则：老浏览器解析不了会把整条丢掉，不能并进上面的选择器列表。 */
+.typecho-page-main ul.tag-list li:has(input[type="checkbox"]:checked) {
+    background-color: var(--nl-warn-bg);
+}
+
 /* 切换主题的那个下拉，标题核心是橙色 */
 .typecho-select-theme h5 {
     color: var(--nl-warn-text);
@@ -1302,8 +1579,11 @@ div.token-input-dropdown ul li.token-input-selected-dropdown-item {
     border-color: var(--nl-border-input);
 }
 
-/* 编辑器「编辑/预览」两个 tab 的当前项 */
-.wmd-edittab a.active {
+/* 编辑器「编辑/预览」两个 tab 的当前项。
+   1.3 把这些规则全收进 #wmd-button-bar 底下（多一个 id 就是一级权重），
+   不带 id 的那条只还留着 1.2 的形状。 */
+.wmd-edittab a.active,
+#wmd-button-bar .wmd-edittab a.active {
     background: var(--nl-sunken);
     color: var(--nl-text);
 }
@@ -1914,7 +2194,6 @@ html[data-nl-theme="dark"] .wmd-button-row li span {
 .typecho-table-wrap,
 #custom-field,
 #typecho-welcome,
-section.container,
 .typecho-page-main [role="main"] > .typecho-post-option,
 .typecho-login {
     background-color: var(--nl-card);
@@ -1933,8 +2212,7 @@ section.container,
 
 .typecho-table-wrap,
 #custom-field,
-#typecho-welcome,
-section.container {
+#typecho-welcome {
     padding: 1.25rem 1.375rem;
 }
 
@@ -2102,6 +2380,53 @@ section.container {
     color: var(--nl-text-light);
 }
 
+/* 空态那张卡：核心在 1.3 把 <h6 class="typecho-list-table-title"> 换成了 <td class="none">，
+   只剩一行 #999 的灰字，落在正常卡的版式里读起来像报错。改成虚线留白 + 一颗金点，
+   并且不参与 hover——空的那张卡没有可点的东西，抬起和描边都是假的可供性。 */
+.typecho-list-table.nl-cards > tbody > tr.nl-row-full {
+    justify-content: center;
+    padding: 2.25rem 1.375rem;
+    background-color: transparent;
+    border: 1px dashed var(--nl-border-input);
+    box-shadow: none;
+}
+
+.typecho-list-table.nl-cards > tbody > tr.nl-row-full:hover {
+    border-color: var(--nl-border-input);
+    box-shadow: none;
+    transform: none;
+}
+
+.typecho-list-table.nl-cards > tbody > tr.nl-row-full::after {
+    display: none;
+}
+
+.typecho-list-table.nl-cards tr.nl-row-full td {
+    border: none;
+    padding: 0;
+}
+
+.typecho-list-table td.none,
+.typecho-list-table.nl-cards tr.nl-row-full td.none,
+.typecho-list-table.nl-cards tr.nl-row-full h6 {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    color: var(--nl-text-secondary);
+    font-size: .9375rem;
+    font-weight: 500;
+}
+
+.typecho-list-table td.none::before,
+.typecho-list-table.nl-cards tr.nl-row-full td.none::before,
+.typecho-list-table.nl-cards tr.nl-row-full h6::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: var(--nl-marker);
+}
+
 .typecho-list-table.nl-cards td a.operate-action,
 .typecho-list-table.nl-cards td .hidden-by-mouse {
     font-size: .8125rem;
@@ -2141,7 +2466,10 @@ section.container {
     margin: 0;
 }
 
-.typecho-pager a {
+/* 1.3 把分页写成 .typecho-pager li a（多一级元素），
+   我们的 .typecho-pager a 压不住它的 padding:0 10px + 2px 圆角和 hover 灰底。 */
+.typecho-pager a,
+.typecho-pager li a {
     padding: .4375rem .875rem;
     border: var(--nl-style-border);
     border-radius: var(--nl-radius-pill);
@@ -2152,7 +2480,8 @@ section.container {
     box-shadow: var(--nl-shadow-sm);
 }
 
-.typecho-pager a:hover {
+.typecho-pager a:hover,
+.typecho-pager li a:hover {
     background-color: var(--nl-card);
     border-color: var(--nl-accent-ring);
     color: var(--nl-accent);
@@ -2319,7 +2648,11 @@ section.container {
     float: none;
 }
 
-.typecho-option-tabs a {
+/* 1.3 把这两条的链子加长到 .typecho-option-tabs li a（多一个 li 就多一级），
+   我们只写 .typecho-option-tabs a 会被它的 border:1px + display:flex 压住，
+   药丸当场变回两个贴边的方块。照抄它的长度，两代才吃同一套。 */
+.typecho-option-tabs a,
+.typecho-option-tabs li a {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2334,7 +2667,8 @@ section.container {
     transition: var(--nl-transition);
 }
 
-.typecho-option-tabs a:hover {
+.typecho-option-tabs a:hover,
+.typecho-option-tabs li a:hover {
     background-color: var(--nl-sunken);
     color: var(--nl-accent);
 }
@@ -2383,8 +2717,24 @@ body.fullscreen .typecho-post-area [role="complementary"] {
     border-color: var(--nl-border);
 }
 
-/* --- 9.5 控制台首页：欢迎卡 + 快捷动作 --- */
+/* --- 9.5 控制台首页（核心 admin/index.php）：欢迎横幅 + 三栏「最近」 ---
+   真实结构是 .typecho-dashboard > .welcome-board（一条横幅，里面是 #start-link 快捷链接）
+   + 三个 section.latest-link。核心给这两样的都只有灰字，没有面。 */
 
+/* 选择器带 .row：它同时是 .col-mb-12，grid 的 .row [class*="col-"] 有两个权重级，
+   裸类名压不住它那 10px 左右内边距。 */
+.row .welcome-board {
+    padding: 1.5rem 1.625rem;
+    background-color: var(--nl-card);
+    border: var(--nl-style-border);
+    border-radius: var(--nl-radius-lg);
+    box-shadow: var(--nl-shadow-sm);
+    color: var(--nl-text-secondary);
+    font-size: 1rem;
+}
+
+/* 句子里的 <em> 是三个计数，核心抬成 2em 的衬线大字——正好是前台 .stat-item 那套
+   「数字比句子重」的写法，只把字色换成强调色、字体收回无衬线。 */
 .welcome-board em {
     font-family: var(--nl-font-sans);
     font-size: 1.5rem;
@@ -2404,11 +2754,13 @@ body.fullscreen .typecho-post-area [role="complementary"] {
 
 #start-link li {
     float: none;
+    display: flex;
+    align-items: center;
     margin: 0;
 }
 
-/* 核心把这三个链接做成了纯图标（.i-edit 那套 sprite + text-indent），
-   所以这里给的是「装图标的药丸」：内边距按 16px 图标配，字在不在都成立。 */
+/* 快捷链接是纯文字（撰写新文章 / 待审核的评论 / 更换外观…），
+   1.3 起核心自己把它们排成 flex 一行，正好接药丸。 */
 #start-link a {
     display: inline-flex;
     align-items: center;
@@ -2432,8 +2784,16 @@ body.fullscreen .typecho-post-area [role="complementary"] {
     transform: scale(.95);
 }
 
-/* 右栏卡的标题挂同一颗金点：页头、分组标题、卡标题是一套层级语言 */
-section.container h3::before {
+/* 三栏「最近」：各收一张卡，标题挂页头同一颗金点 */
+section.latest-link {
+    padding: 1.25rem 1.375rem;
+    background-color: var(--nl-card);
+    border: var(--nl-style-border);
+    border-radius: var(--nl-radius-lg);
+    box-shadow: var(--nl-shadow-sm);
+}
+
+section.latest-link h3::before {
     content: "";
     display: inline-block;
     width: 5px;
@@ -2444,42 +2804,77 @@ section.container h3::before {
     background-color: var(--nl-marker);
 }
 
-/* 右栏那几个 section 里的链接列表核心一点没管，默认就是黑点 + 蓝字，
-   在一屋子卡片里格外扎眼。收成行，hover 和顶栏同一套底色。 */
-section.container .post-list {
+/* 列表核心排成「日期｜标题」，日期定宽 37px 加一道右边框，中文标题一长就错位。
+   改成日期在前、细字、等宽数字，标题吃掉剩下的宽度并自己截断。
+   选择器要带上 .typecho-dashboard：1.3 的 .typecho-dashboard ul li 有两个类。 */
+.typecho-dashboard section.latest-link ul {
     margin: 0;
     padding: 0;
     list-style: none;
 }
 
-section.container .post-list li + li {
-    margin-top: .25rem;
+.typecho-dashboard section.latest-link li {
+    display: flex;
+    align-items: baseline;
+    gap: .625rem;
+    margin-bottom: 0;
+    padding: .5rem 0;
+    border-top: 1px solid var(--nl-border-soft);
+    white-space: normal;
 }
 
-section.container .post-list a {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    padding: .5rem .75rem;
-    border-radius: var(--nl-radius-md);
+.typecho-dashboard section.latest-link li:first-child {
+    padding-top: 0;
+    border-top: none;
+}
+
+.typecho-dashboard section.latest-link li:last-child {
+    padding-bottom: 0;
+}
+
+section.latest-link span {
+    flex-shrink: 0;
+    width: auto;
+    padding-right: 0;
+    border-right: none;
+    color: var(--nl-text-light);
+    font-size: .8125rem;
+    font-variant-numeric: tabular-nums;
+    text-align: left;
+}
+
+section.latest-link a {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     color: var(--nl-text-secondary);
     transition: var(--nl-transition);
 }
 
-section.container .post-list a:hover {
-    background-color: var(--nl-nav-hover);
+section.latest-link a:hover {
     color: var(--nl-accent-hover);
 }
 
 /* --- 9.6 登录页：一张居中的卡，别是浮在灰底上的一块白 --- */
 
-.typecho-login {
+/* 1.3 把登录框包进 .typecho-login-wrap（display:table 做垂直居中），
+   规则写成 .typecho-login-wrap .typecho-login，裸类名压不住它的
+   display:table-cell + padding:30px 0 100px —— 那样卡片会摊满整宽、左右没有内边距。 */
+.typecho-login,
+.typecho-login-wrap .typecho-login {
+    display: block;
+    width: 22rem;
+    max-width: calc(100% - 2rem);
+    margin: 12vh auto 0;
     padding: 2.5rem 2rem;
     border-radius: var(--nl-radius-img);
     box-shadow: var(--nl-shadow-lg);
 }
 
-.typecho-login h1 {
+.typecho-login h1,
+.typecho-login-wrap .typecho-login h1 {
     margin-bottom: 1.5rem;
 }
 
@@ -2541,7 +2936,8 @@ html.nl-js .nl-reveal.nl-shown {
 
     .typecho-head-nav a:active,
     .nl-theme-toggle:active,
-    .typecho-page-title h2 a:active {
+    .typecho-page-title h2 a:active,
+    .typecho-page-title a:active {
         transform: none;
     }
 
