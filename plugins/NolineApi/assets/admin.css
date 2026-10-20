@@ -64,19 +64,60 @@
     --nl-border-soft: rgba(var(--nl-ink-rgb), var(--nl-line-1));
     --nl-border-line: rgba(var(--nl-ink-rgb), var(--nl-line-2));
     --nl-border-input: rgba(var(--nl-ink-rgb), var(--nl-line-3));
+    --nl-style-border: 1px solid var(--nl-border);
 
-    /* 顶栏：核心是死黑一条 #292D33，这里换成薄墨底 + 发丝下沿，跟前台的浅色门面一致 */
-    --nl-nav-bg:     rgba(var(--nl-ink-rgb), .92);
-    --nl-nav-bg-deep: rgba(var(--nl-ink-rgb), .97);
-    --nl-nav-text:   rgba(var(--nl-paper-rgb), .78);
-    --nl-nav-text-hi: rgb(var(--nl-paper-rgb));
+    /* 淡强调色整颗填实的选中态（当前导航项、当前筛选药丸）。
+       它和 --nl-accent-bg 是两支浓度，.14 才在白底药丸里读得出「这是一整块」。 */
+    --nl-accent-container: rgba(var(--nl-accent-rgb), .14);
 
-    --nl-shadow-sm: 0 1px 2px rgba(var(--nl-ink-rgb), .06);
-    --nl-shadow-md: 0 6px 20px rgba(var(--nl-ink-rgb), .10);
+    /* 标题锚点那颗金点。刻意不跟强调色走——强调色是蓝，蓝点压在满页蓝链接上
+       整页就一个颜色，标题就没有「这一段从这儿开始」的锚点了。 */
+    --nl-marker: #f2ba4b;
+
+    /* 磨砂玻璃只给浮层：吸顶胶囊、胶囊下面的二级菜单、筛选药丸条。
+       判据是「身后有没有内容穿过」，卡片和表单控件一律不给。
+       --glass-inset 是那圈磨砂边光，--shadow-glass 是向远处投的那一大片，两个一起才有体积。 */
+    --nl-glass-bg:      rgba(255, 255, 255, .72);
+    --nl-glass-bg-deep: rgba(255, 255, 255, .88);
+    --nl-glass-inset:
+        inset 0 1px 1px rgba(255, 255, 255, .60), inset 0 -1px 1px rgba(255, 255, 255, .60),
+        inset 1px 0 2px rgba(0, 0, 0, .06), inset -1px 0 2px rgba(0, 0, 0, .06);
+    --nl-glass-blur: saturate(180%) blur(20px);
+    --nl-shadow-glass: 0 5px 100px -5px rgba(140, 140, 140, .50);
+
+    /* 顶栏前景。核心的后台导航是通栏死黑，字是白的；改成薄白玻璃胶囊之后
+       前景整组翻回墨色，但开关只这一组——加新按钮只要 inherit 就自动跟着走。 */
+    --nl-nav-fg:     var(--nl-text-secondary);
+    --nl-nav-fg-hi:  var(--nl-accent);
+    --nl-nav-hover:  var(--nl-soft);
+    --nl-nav-active: var(--nl-accent-container);
+
+    /* 阴影四档：卡片静息 / 抬起 / 浮层 / 一大片远投影。
+       纯黑透明阴影在深色底上会消失，所以两种主题各一套。 */
+    --nl-shadow-sm:  0 8px 16px -4px rgba(44, 45, 48, .05);
+    --nl-shadow-md:  0 8px 12px -3px rgba(44, 45, 48, .08);
+    --nl-shadow-lg:  0 16px 32px -12px rgba(44, 45, 48, .14);
+    --nl-shadow-lift: 0 24px 40px -18px rgba(44, 45, 48, .18);
+    /* hover 时那圈强调色投影，和卡片抬起配成一对 */
+    --nl-shadow-main: 0 8px 12px -3px rgba(var(--nl-accent-rgb), .20);
 
     --nl-radius-lg: 12px;
     --nl-radius-md: 8px;
     --nl-radius-pill: 999px;
+    --nl-radius-img: 16px;
+
+    /* 布局骨架：内容列和前台首屏同宽，滚动时卡片和顶栏胶囊在同一条竖线上对齐。
+       --nl-nav-h 是 fixed 顶栏让出来的那条高度（胶囊 44 + 上下各 .5rem），
+       顶栏改尺寸只动这一条。 */
+    --nl-layout-max: 1200px;
+    --nl-nav-h: 60px;
+    --nl-nav-pill-h: 44px;
+
+    /* 页顶环境光：只留强调色两层，淡到只能从卡片间隙透出来。 */
+    --nl-page-glow:
+        radial-gradient(1100px 560px at 14% -10%, rgba(var(--nl-accent-rgb), .10), transparent 60%),
+        radial-gradient(900px 520px at 100% -6%, rgba(var(--nl-accent-rgb), .06), transparent 55%),
+        radial-gradient(760px 480px at 50% 108%, rgba(var(--nl-ink-rgb), .04), transparent 60%);
 
     --nl-warn-bg:   #fef3c7;
     --nl-warn-text: #b45309;
@@ -90,7 +131,10 @@
     --nl-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
         "Liberation Mono", "Courier New", monospace;
 
+    --nl-ease-spring: cubic-bezier(.34, 1.56, .64, 1);
     --nl-transition: color .2s, background-color .2s, border-color .2s, box-shadow .2s, opacity .2s;
+    /* 卡片那套「底色、描边、投影、位移同时过渡」。分开写就会有一先一后。 */
+    --nl-transition-card: box-shadow .3s, border-color .3s, background-color .25s, transform .3s;
 }
 
 /* ==========================================================================
@@ -125,14 +169,32 @@ html[data-nl-theme="dark"] {
     --nl-border:       #3d3d3f;
     --nl-border-input: rgba(var(--nl-ink-rgb), .22);
 
-    /* 深色里顶栏再压一层黑才分得清「浮在页面上」；文字反过来是浅墨 */
-    --nl-nav-bg:      rgba(14, 15, 18, .92);
-    --nl-nav-bg-deep: rgba(14, 15, 18, .97);
-    --nl-nav-text:    rgba(var(--nl-ink-rgb), .72);
-    --nl-nav-text-hi: rgb(var(--nl-ink-rgb));
+    --nl-accent-container: rgba(var(--nl-accent-rgb), .20);
+    --nl-marker: #e8c476;
 
-    --nl-shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
-    --nl-shadow-md: 0 6px 20px rgba(0, 0, 0, .5);
+    /* 深色玻璃：底色就是这一页的底，边光反而要更亮，才有那圈磨砂感 */
+    --nl-glass-bg:      rgba(23, 25, 29, .72);
+    --nl-glass-bg-deep: rgba(18, 20, 24, .88);
+    --nl-glass-inset:
+        inset 0 1px 1px rgba(255, 255, 255, .85), inset 0 -1px 1px rgba(255, 255, 255, .85),
+        inset 2px 0 3px rgba(0, 0, 0, .16), inset -2px 0 3px rgba(0, 0, 0, .16);
+    --nl-shadow-glass: 0 5px 100px -5px rgba(0, 0, 0, .55);
+
+    /* 深色里顶栏再压一层黑才分得清「浮在页面上」 */
+    --nl-nav-hover: rgba(var(--nl-ink-rgb), .10);
+
+    /* 阴影：纯黑透明阴影在深色底上会消失，所以四档全部重写 */
+    --nl-shadow-sm:   0 8px 16px -4px rgba(0, 0, 0, .32);
+    --nl-shadow-md:   0 8px 12px -3px rgba(0, 0, 0, .40);
+    --nl-shadow-lg:   0 16px 32px -8px rgba(0, 0, 0, .55);
+    --nl-shadow-lift: 0 24px 40px -18px rgba(0, 0, 0, .60);
+    --nl-shadow-main: 0 8px 12px -3px rgba(var(--nl-accent-rgb), .28);
+
+    /* 深色下的环境光：只剩强调色两层，深度压到读得出「亮一层」就停 */
+    --nl-page-glow:
+        radial-gradient(1100px 560px at 14% -10%, rgba(var(--nl-accent-rgb), .12), transparent 60%),
+        radial-gradient(900px 520px at 100% -6%, rgba(var(--nl-accent-rgb), .07), transparent 55%),
+        radial-gradient(760px 480px at 50% 108%, rgba(0, 0, 0, .30), transparent 60%);
 
     --nl-warn-bg:   #3a2f14;
     --nl-warn-text: #e0b25c;
@@ -146,11 +208,41 @@ html[data-nl-theme="dark"] {
    一、页面底、文字、链接
    ========================================================================== */
 
+/* 页顶那三层环境光画在 body 上，只从卡片之间的缝隙透出来。
+   不写成 background 简写：核心给 body 的底色要留着当回退。 */
 body {
-    background: var(--nl-bg);
+    background-color: var(--nl-bg);
+    background-image: var(--nl-page-glow);
+    background-repeat: no-repeat;
     color: var(--nl-text);
     font-family: var(--nl-font-sans);
     -webkit-font-smoothing: antialiased;
+}
+
+/* 顶栏改成 fixed 的悬浮胶囊之后不占文档流，正文先让出它那一行。
+   .main 只在带导航的后台页里出现，登录页那套 .typecho-login-wrap 不受影响。
+   全屏写正文时（body.fullscreen 由核心挂）导航是隐藏的，让位也就不要了。 */
+.main {
+    padding-top: calc(var(--nl-nav-h) + .5rem);
+}
+
+body.fullscreen .main {
+    padding-top: 0;
+}
+
+/* 内容列和前台首屏同宽。核心的 .container 是 Bootstrap 那套 1160 阶梯，
+   窄屏下它自己会跟着视口走，这里只放宽最宽一档和左右留白。 */
+.body.container {
+    max-width: var(--nl-layout-max);
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+}
+
+@media (max-width: 767px) {
+    .body.container {
+        padding-left: .875rem;
+        padding-right: .875rem;
+    }
 }
 
 a {
@@ -166,31 +258,65 @@ a:hover {
     background: rgba(var(--nl-accent-rgb), .18);
 }
 
-h1, h2, h3, h4,
-.typecho-page-title h2 {
+h1, h2, h3, h4 {
     color: var(--nl-text-strong);
     font-weight: 700;
     letter-spacing: -.01em;
 }
 
+/* --- 页头（照前台的段落锚点：一颗金点 + 一行重字 + 右边的动作药丸） --- */
+
+.typecho-page-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin: 1.5rem 0 1.25rem;
+}
+
 .typecho-page-title h2 {
-    margin: 1.6rem 0 .9rem;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin: 0;
+    color: var(--nl-text-strong);
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1.3;
+    letter-spacing: -.02em;
+}
+
+.typecho-page-title h2::before {
+    content: "";
+    flex-shrink: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: var(--nl-marker);
 }
 
 .typecho-page-title h2 a {
-    padding: .25em .7em;
-    background: var(--nl-accent-bg);
-    color: var(--nl-accent);
+    padding: .3125rem .75rem;
+    background-color: var(--nl-accent-container);
     border-radius: var(--nl-radius-pill);
+    font-size: .8125rem;
     font-weight: 600;
+    line-height: 1.4;
+    color: var(--nl-accent-hover);
+    transition: var(--nl-transition);
 }
 
 .typecho-page-title h2 a:hover {
-    background: rgba(var(--nl-accent-rgb), .18);
+    background-color: rgba(var(--nl-accent-rgb), .20);
     color: var(--nl-accent-hover);
 }
 
+.typecho-page-title h2 a:active {
+    transform: scale(.95);
+}
+
 .typecho-foot {
+    padding: 2.5rem 0 2rem;
     color: var(--nl-text-light);
 }
 
@@ -200,25 +326,74 @@ h1, h2, h3, h4,
 }
 
 /* ==========================================================================
-   二、顶栏导航
-   核心的 #292D33 是一条不透明的黑带。这里换成薄墨 + 毛玻璃 + 发丝下沿，
-   并且让它吸顶：正文长页面滚动时导航还在，这是后台用得最多的一个东西。
+   二、顶栏：一条居中悬浮的玻璃胶囊
+   核心的导航是通栏死黑一条（#292D33）加每格右边框，那是「网站后台」的样子。
+   前台的导航是一颗居中的 44px 玻璃药丸：项是药丸、当前项整颗填淡强调色、
+   二级菜单是从胶囊下沿展开的一叠卡片。这里把它照搬过来——
+   胶囊 fixed 脱离文档流（正文靠 .main 的 padding-top 让位），
+   核心那些 float 一律改成 flex，长链接靠省略号而不是靠换行。
    ========================================================================== */
 
 .typecho-head-nav {
-    position: sticky;
-    top: 0;
-    z-index: 30;
-    background: var(--nl-nav-bg);
-    backdrop-filter: blur(14px) saturate(1.6);
-    -webkit-backdrop-filter: blur(14px) saturate(1.6);
-    box-shadow: var(--nl-shadow-sm);
+    position: fixed;
+    top: .5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .125rem .375rem;
+    width: max-content;
+    max-width: calc(100vw - 1.5rem);
+    min-height: var(--nl-nav-pill-h);
+    padding: 0 .625rem;
+    background-color: var(--nl-glass-bg);
+    border: var(--nl-style-border);
+    border-radius: var(--nl-radius-pill);
+    box-shadow: var(--nl-shadow-glass), var(--nl-glass-inset);
+    -webkit-backdrop-filter: var(--nl-glass-blur);
+    backdrop-filter: var(--nl-glass-blur);
+    transition: var(--nl-transition);
 }
 
-.typecho-head-nav a,
+/* 胶囊里每一项都是同一颗药丸：核心的「padding 0 20px + 36px 行高」改成
+   flex 居中，图标和文字才有同一条基准线。
+   menu-bar 那个汉堡是核心给窄屏准备的（默认 display:none），这里别顺手把它显示出来。 */
+.typecho-head-nav a {
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    height: 36px;
+    padding: 0 .875rem;
+    border: none;
+    border-radius: var(--nl-radius-pill);
+    background: none;
+    color: var(--nl-nav-fg);
+    font-family: inherit;
+    font-size: .9375rem;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: var(--nl-transition);
+}
+
 .typecho-head-nav button.menu-bar {
-    color: var(--nl-nav-text);
-    border-radius: var(--nl-radius-md);
+    display: none;
+    align-items: center;
+    gap: .375rem;
+    height: 36px;
+    padding: 0 .875rem;
+    border: none;
+    border-radius: var(--nl-radius-pill);
+    background: none;
+    color: var(--nl-nav-fg);
+    font-family: inherit;
+    font-size: .9375rem;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
     transition: var(--nl-transition);
 }
 
@@ -226,76 +401,137 @@ h1, h2, h3, h4,
 .typecho-head-nav a:focus,
 .typecho-head-nav button.menu-bar:hover,
 .typecho-head-nav button.menu-bar:focus {
-    color: var(--nl-nav-text-hi);
+    background-color: var(--nl-nav-hover);
+    color: var(--nl-nav-fg-hi);
+    text-decoration: none;
 }
 
-/* 一级菜单：核心的「格子 + 右边框」改成胶囊，hover 和当前项都是薄亮一层 */
+/* 点下去缩一下。前台那套按钮全都有这条，后台不该只有颜色反馈。 */
+.typecho-head-nav a:active,
+.typecho-head-nav button.menu-bar:active {
+    transform: scale(.95);
+}
+
+/* --- 一级菜单：核心的 float:left 格子排成一行 --- */
+
+.typecho-head-nav #typecho-nav-list {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .125rem;
+    float: none;
+    min-width: 0;
+}
+
 .typecho-head-nav #typecho-nav-list > ul {
-    margin: 0 2px;
+    position: relative;   /* 二级菜单挂在这一组自己身上 */
+    float: none;
+    margin: 0;
 }
 
+/* 核心给第一组 ul 挂的 border-left 和给 .operate a 挂的左右边框都是那条黑带上的
+   「分隔线」。选择器比上面几条长，压住它们只能照抄同样的长度，不能靠加 !important。 */
 .typecho-head-nav #typecho-nav-list > ul:first-child {
     border-left: none;
 }
 
 .typecho-head-nav #typecho-nav-list > ul .parent a {
-    margin: 0 1px;
     border-right: none;
-    background: transparent;
+    background: none;
 }
 
 .typecho-head-nav #typecho-nav-list > ul .parent a:hover,
-.typecho-head-nav #typecho-nav-list > ul.focus .parent a,
 .typecho-head-nav #typecho-nav-list > ul.root:hover .parent a {
-    background: rgba(var(--nl-paper-rgb), .12);
+    background-color: var(--nl-nav-hover);
+    color: var(--nl-nav-fg-hi);
 }
 
+/* 当前项：淡强调色整颗填实，比原来那条加粗更认得出来 */
 .typecho-head-nav #typecho-nav-list > ul.focus .parent a {
-    color: var(--nl-nav-text-hi);
+    background-color: var(--nl-nav-active);
+    color: var(--nl-nav-fg-hi);
+    font-weight: 600;
 }
 
-/* 二级菜单：展开的那一叠得是不透底的卡片，否则字压在下面的正文上读不清 */
+/* --- 二级菜单：从胶囊下沿展开的一叠卡片 --- */
+
 .typecho-head-nav #typecho-nav-list > ul .child {
-    background: var(--nl-nav-bg-deep);
-    border-radius: 0 0 var(--nl-radius-md) var(--nl-radius-md);
-    box-shadow: var(--nl-shadow-md);
+    top: calc(100% + .5rem);
+    left: 0;
+    min-width: 11rem;
+    max-width: 17rem;
+    padding: .375rem;
+    background-color: var(--nl-glass-bg-deep);
+    border: var(--nl-style-border);
+    border-radius: var(--nl-radius-lg);
+    box-shadow: var(--nl-shadow-lg), var(--nl-glass-inset);
+    -webkit-backdrop-filter: var(--nl-glass-blur);
+    backdrop-filter: var(--nl-glass-blur);
     overflow: hidden;
+}
+
+.typecho-head-nav #typecho-nav-list > ul .child li a {
+    border-radius: var(--nl-radius-md);
+    padding: 0 .75rem;
+    font-size: .9375rem;
+    font-weight: 500;
 }
 
 .typecho-head-nav #typecho-nav-list > ul .child li a:hover,
 .typecho-head-nav #typecho-nav-list > ul .child li a:focus {
-    background: var(--nl-accent-bg);
-    color: var(--nl-accent);
+    background-color: var(--nl-nav-hover);
+    color: var(--nl-nav-fg-hi);
 }
 
 .typecho-head-nav #typecho-nav-list > ul .child li.focus a {
-    color: var(--nl-accent);
-}
-
-.typecho-head-nav .operate a {
-    border: none;
-    border-radius: var(--nl-radius-md);
-    margin: 0 1px;
-    padding: 0 14px;
-}
-
-.typecho-head-nav .operate a:hover {
-    background-color: rgba(var(--nl-paper-rgb), .12);
-}
-
-.typecho-head-nav .operate a.author {
-    color: var(--nl-nav-text-hi);
+    background-color: var(--nl-nav-active);
+    color: var(--nl-nav-fg-hi);
     font-weight: 600;
 }
 
-/* 深色主题切换键：写在 navBar 钩子输出里，靠这里上色 */
-.nl-theme-toggle {
+/* --- 右侧动作簇：主题管理 / 深色开关 / 用户名 / 登出 / 网站 --- */
+
+.typecho-head-nav .operate {
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+    float: none;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.typecho-head-nav .operate a {
+    padding: 0 .75rem;
     border: none;
-    background: transparent;
-    color: var(--nl-nav-text);
-    font: inherit;
-    padding: 0 14px;
+    font-size: .875rem;
+}
+
+.typecho-head-nav .operate a.author {
+    color: var(--nl-text-strong);
+    font-weight: 700;
+}
+
+/* 核心给动作簇 hover 上的是黑带上的深色块（#202328），选择器比通用那条长一级，
+   照抄长度压回来，不然薄白胶囊上会闪出四块黑。 */
+.typecho-head-nav .operate a:hover,
+.typecho-head-nav .operate a:focus {
+    background-color: var(--nl-nav-hover);
+    color: var(--nl-nav-fg-hi);
+}
+
+/* 深色主题切换键：写在 navBar 钩子输出里，靠这里上色。
+   前台顶栏的图标按钮是 38px 方块 + radius-md，这里跟着它做，不做成第二颗药丸。 */
+.nl-theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
     height: 36px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--nl-nav-fg);
+    font-size: 1.0625rem;
     cursor: pointer;
     border-radius: var(--nl-radius-md);
     transition: var(--nl-transition);
@@ -303,8 +539,12 @@ h1, h2, h3, h4,
 
 .nl-theme-toggle:hover,
 .nl-theme-toggle:focus {
-    background: rgba(var(--nl-paper-rgb), .12);
-    color: var(--nl-nav-text-hi);
+    background-color: var(--nl-nav-hover);
+    color: var(--nl-nav-fg-hi);
+}
+
+.nl-theme-toggle:active {
+    transform: scale(.92);
 }
 
 .nl-theme-toggle .nl-ico-dark { display: none; }
@@ -312,13 +552,100 @@ h1, h2, h3, h4,
 html[data-nl-theme="dark"] .nl-theme-toggle .nl-ico-light { display: none; }
 html[data-nl-theme="dark"] .nl-theme-toggle .nl-ico-dark { display: inline; }
 
+/* 窄屏：胶囊铺满顶边，导航收成往下展开的抽屉（menu-bar 那个按钮是核心自带的）。
+   核心那几条移动规则的选择器比这里长，凡是要改的地方都照抄它的长度，
+   尤其是 bottom:36px / width:100% 那两条——它们是给「贴屏幕底部的黑条」写的，
+   导航移到顶上之后不覆盖就会把面板顶到屏幕外面去。 */
 @media (max-width: 757px) {
-    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul .parent a {
-        background: transparent;
+    .typecho-head-nav {
+        top: .375rem;
+        right: .375rem;
+        bottom: auto;
+        left: .375rem;
+        transform: none;
+        width: auto;
+        max-width: none;
+        padding: .25rem .5rem;
+        border-radius: var(--nl-radius-img);
+    }
+
+    .typecho-head-nav a,
+    .typecho-head-nav button.menu-bar {
+        padding: 0 .625rem;
+        font-size: .875rem;
+    }
+
+    .typecho-head-nav #typecho-nav-list {
+        display: none;
+    }
+
+    .typecho-head-nav button.menu-bar {
+        display: inline-flex;
+    }
+
+    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list {
+        display: block;
+        position: absolute;
+        top: calc(100% + .375rem);
+        right: 0;
+        bottom: auto;
+        left: 0;
+        width: auto;
+        float: none;
+        padding: .375rem;
+        background-color: var(--nl-glass-bg-deep);
+        border: var(--nl-style-border);
+        border-radius: var(--nl-radius-img);
+        box-shadow: var(--nl-shadow-lg), var(--nl-glass-inset);
+        -webkit-backdrop-filter: var(--nl-glass-blur);
+        backdrop-filter: var(--nl-glass-blur);
     }
 
     .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul {
+        position: static;
+        float: none;
         border-bottom: none;
+    }
+
+    /* 竖排里项撑满整行，横排那套胶囊留白换成 44px 高的行 */
+    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul .parent a {
+        display: flex;
+        width: 100%;
+        height: 44px;
+        border: none;
+        border-radius: var(--nl-radius-md);
+        background: none;
+    }
+
+    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul.focus .parent a,
+    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul .parent a:hover {
+        background-color: var(--nl-nav-active);
+        color: var(--nl-nav-fg-hi);
+    }
+
+    /* 子菜单不再往右飘出屏幕，摊平成一节缩进；「文件」那条返回项在竖排里没意义 */
+    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul .child {
+        position: static;
+        width: auto;
+        max-width: none;
+        min-width: 0;
+        margin: 0 0 .375rem;
+        padding: 0 0 0 .75rem;
+        background: none;
+        border: none;
+        border-left: 1px solid var(--nl-border);
+        border-radius: 0;
+        box-shadow: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+
+    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul .child li {
+        border-bottom: none;
+    }
+
+    .typecho-head-nav button.menu-bar.focus + #typecho-nav-list > ul .child li.return {
+        display: none;
     }
 }
 
@@ -608,8 +935,30 @@ select {
     color: var(--nl-text-light);
 }
 
+/* 分组标题（启用的插件 / 禁用的插件）核心是一行居中的灰字。
+   下面已经是一叠左对齐的卡，标题居中会被读成「某张卡的题」；跟着左缘走，
+   再挂上和页头同一颗金点，说明它和页头是同一套层级语言。 */
 .typecho-list-table-title {
-    color: var(--nl-text-light);
+    margin: 1.75rem 0 .75rem;
+    color: var(--nl-text-secondary);
+    font-size: .9375rem;
+    font-weight: 700;
+    text-align: left;
+}
+
+.typecho-list-table-title:first-child {
+    margin-top: 0;
+}
+
+.typecho-list-table-title::before {
+    content: "";
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    margin-right: .4375rem;
+    vertical-align: .125em;
+    border-radius: 50%;
+    background-color: var(--nl-marker);
 }
 
 .typecho-list-operate span.operate-delete,
@@ -622,12 +971,6 @@ select {
 /* ==========================================================================
    六、写文章 / 写页面 / 附件
    ========================================================================== */
-
-.typecho-post-area .typecho-option input.title {
-    font-size: 1.35rem;
-    font-weight: 700;
-    letter-spacing: -.015em;
-}
 
 .typecho-post-area .url-slug,
 .typecho-post-area #auto-save-message,
@@ -1553,6 +1896,625 @@ html[data-nl-theme="dark"] .wmd-button-row li span {
     }
 }
 
+/* ==========================================================================
+   九、结构改造：把后台排成前台的样子
+   前八节改的是颜色，这一节改的是「怎么排」。原则：
+   布局全靠 CSS 换 display，JS 只做两件不需要挪节点的事——
+   给表格的每一格补 data-label（列头消失后字段名要回到格子里）、
+   给卡片挂进场动画。核心 JS 引用的那批节点（#text、#title、#wmd-button-bar、
+   #wmd-preview、#upload-panel、#file-list、.typecho-option-tabs、.tab-content、
+   各级 form）一个都不重新挂载——它们一旦被包进新的父盒，
+   pagedown、拖拽上传、自动保存和提交就会开始用错引用。
+   ========================================================================== */
+
+/* --- 9.1 卡片面：前台 .card 的那一份配方，原样抄过来 ---
+   12px 圆角 + 1px 蓝调描边 + 一层很浅的投影。
+   描边负责划线，投影负责抬起，两件事分开做，所以投影才敢这么淡。 */
+
+.typecho-table-wrap,
+#custom-field,
+#typecho-welcome,
+section.container,
+.typecho-page-main [role="main"] > .typecho-post-option,
+.typecho-login {
+    background-color: var(--nl-card);
+    border: var(--nl-style-border);
+    border-radius: var(--nl-radius-lg);
+    box-shadow: var(--nl-shadow-sm);
+}
+
+/* 圆角要裁住里面的表格和图，所以 overflow 一起给；
+   带绝对定位浮层的（附件面板、下拉）不放进来，会被裁掉。 */
+.typecho-table-wrap,
+#custom-field,
+.typecho-login {
+    overflow: hidden;
+}
+
+.typecho-table-wrap,
+#custom-field,
+#typecho-welcome,
+section.container {
+    padding: 1.25rem 1.375rem;
+}
+
+/* 通知条不进上面那组：卡片的白底会把 .error / .success / .notice 的语义色洗掉，
+   三条连排时就成了三块没有区别的白板。它只要一点竖向节奏。
+   里面的 <p> 归零：段落默认上下各 1em，会把一条本来看得完的提示撑成三行高。 */
+.typecho-page-main .message {
+    margin-bottom: .75rem;
+    padding: .55rem 1rem;
+    line-height: 1.6;
+    font-size: .9375rem;
+}
+
+.typecho-page-main .message p {
+    margin: 0;
+}
+
+.typecho-page-main [role="main"] > .typecho-post-option {
+    margin-bottom: 1.25rem;
+    padding: 1rem 1.25rem;
+}
+
+/* 竖向节奏：整块内容下面留前台那种收尾距离。
+   列里各项的间距不动——核心自己给的是 em，全局重写会把卡片内的表单行也一起撑开。 */
+.typecho-page-main {
+    margin-bottom: 2.5rem;
+}
+
+/* --- 9.2 列表页：表格摊成一张卡一条记录 ---
+   .nl-cards 由 admin.js 打在「有列头、且列数对得上」的表上；
+   没打上就是原来的表格，脚本没跑也不会出现没有字段名的卡片。
+   字段名从 data-label 回到每一格里，用前台 .stat-item 那种小标签的写法。 */
+
+.typecho-list-table.nl-cards,
+.typecho-list-table.nl-cards > tbody,
+.typecho-list-table.nl-cards > tbody > tr {
+    display: block;
+}
+
+.typecho-list-table.nl-cards > colgroup,
+.typecho-list-table.nl-cards > thead {
+    display: none;
+}
+
+.typecho-list-table.nl-cards > tbody {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.typecho-list-table.nl-cards > tbody > tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: .875rem 1.25rem;
+    flex: 1 1 20rem;
+    position: relative;
+    padding: 1.125rem 1.375rem;
+    background-color: var(--nl-card);
+    border: var(--nl-style-border);
+    border-radius: var(--nl-radius-lg);
+    box-shadow: var(--nl-shadow-sm);
+    transition: var(--nl-transition-card);
+}
+
+/* hover：抬起 3px + 描边转强调色环 + 顶部那根强调色发丝摊开。
+   这三件事必须同时发生，分开过渡就散了。 */
+.typecho-list-table.nl-cards > tbody > tr:hover {
+    border-color: var(--nl-accent-ring);
+    box-shadow: var(--nl-shadow-lift);
+    transform: translateY(-3px);
+}
+
+.typecho-list-table.nl-cards > tbody > tr::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 1.375rem;
+    right: 1.375rem;
+    height: 2px;
+    border-radius: 0 0 2px 2px;
+    background-color: var(--nl-accent);
+    opacity: 0;
+    transform: scaleX(.6);
+    transition: var(--nl-transition);
+}
+
+.typecho-list-table.nl-cards > tbody > tr:hover::after {
+    opacity: 1;
+    transform: none;
+}
+
+.typecho-list-table.nl-cards > tbody > tr.checked {
+    border-color: var(--nl-accent);
+    background-color: var(--nl-card);
+    box-shadow: var(--nl-shadow-main);
+}
+
+/* 勾选态原来靠单元格底色，卡片上底色是整个面，改说描边；
+   核心那两条给 td 上底色的规则要按住，不然一格一块黄。 */
+.typecho-list-table.nl-cards > tbody > tr.checked td,
+.typecho-list-table.nl-cards > tbody > tr:hover td,
+.typecho-theme-list.nl-cards > tbody > tr.current td {
+    background-color: transparent;
+}
+
+/* 一格一块，标签在上、值在下。这里不用 flex 排格子内部的行：
+   操作列里是「设置 • 禁用」这样的连排链接，一旦 flex 就把每个内联元素拆成一行。 */
+.typecho-list-table.nl-cards td {
+    display: block;
+    flex: 1 1 6.5rem;
+    min-width: 0;
+    padding: 0;
+    border-top: none;
+    word-break: break-word;
+}
+
+.typecho-list-table.nl-cards td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: .25rem;
+    font-size: .6875rem;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--nl-text-light);
+}
+
+/* 没有字段名的格子（核心拿 &nbsp; 当列头的那些）就不该留一行空标签 */
+.typecho-list-table.nl-cards td[data-label=""]::before,
+.typecho-list-table.nl-cards td[data-label="\a0"]::before {
+    content: none;
+}
+
+/* 勾选格没有字段名，让它只占自己那么宽，好和主格并到第一行去。
+   顶上补一条和标签等高的空白：别的格子第一行是标签，它第一行就是内容，
+   不补的话勾选框会比主格的标题高出小半个行。 */
+.typecho-list-table.nl-cards td[data-label=""] {
+    flex: 0 0 auto;
+    padding-top: 1.125rem;
+}
+
+/* 主格：JS 认出的那一格（最左边有字段名的那格）字号抬回来，宽度给到别的格的两倍。
+   基准宽度故意小于卡宽，这样左边那颗勾选框还能和它并排。 */
+.typecho-list-table.nl-cards td.nl-lead {
+    flex: 2 1 12rem;
+}
+
+.typecho-list-table.nl-cards td.nl-lead::before {
+    font-size: .625rem;
+}
+
+.typecho-list-table.nl-cards td.nl-lead a {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+/* 「暂无数据」那一行是一个 colspan 的格子，别把它塞进第一列去 */
+.typecho-list-table.nl-cards tr.nl-row-full {
+    display: block;
+    flex: 1 1 100%;
+    text-align: center;
+    color: var(--nl-text-light);
+}
+
+.typecho-list-table.nl-cards td a.operate-action,
+.typecho-list-table.nl-cards td .hidden-by-mouse {
+    font-size: .8125rem;
+}
+
+/* 卡片已经各自有边框了，包着它们的那层白底就多余——只留内边距 */
+.typecho-page-main:has(.nl-cards) .typecho-table-wrap {
+    padding: 0;
+    background: none;
+    border: none;
+    box-shadow: none;
+    overflow: visible;
+}
+
+@media (max-width: 757px) {
+    .typecho-list-table.nl-cards > tbody > tr {
+        flex: 1 1 100%;
+        padding: 1rem 1.125rem;
+    }
+}
+
+/* --- 9.3 分页 / 批量操作：一排药丸 ---
+   不是浮层，所以不给玻璃，给的是「卡底 + 细边 + 选中填淡强调色」。 */
+
+.typecho-pager {
+    float: none;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: .25rem;
+    margin: 1.5rem 0 0;
+}
+
+.typecho-pager li {
+    height: auto;
+    line-height: 1;
+    margin: 0;
+}
+
+.typecho-pager a {
+    padding: .4375rem .875rem;
+    border: var(--nl-style-border);
+    border-radius: var(--nl-radius-pill);
+    background-color: var(--nl-card);
+    color: var(--nl-text-secondary);
+    font-size: .875rem;
+    font-weight: 600;
+    box-shadow: var(--nl-shadow-sm);
+}
+
+.typecho-pager a:hover {
+    background-color: var(--nl-card);
+    border-color: var(--nl-accent-ring);
+    color: var(--nl-accent);
+}
+
+.typecho-pager li.current a {
+    background-color: var(--nl-accent-container);
+    border-color: transparent;
+    color: var(--nl-accent-hover);
+    box-shadow: none;
+}
+
+.typecho-list-operate {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin: 1.25rem 0;
+    color: var(--nl-text-secondary);
+}
+
+.typecho-list-operate .operate,
+.typecho-list-operate .search {
+    float: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+
+.typecho-list-operate .search {
+    margin-left: auto;
+}
+
+.table-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin: 1rem 0 0;
+}
+
+/* --- 9.4 写文章 / 写页面：一整张卡，标题当 hero，正文沉进卡里 ---
+   两栏各自成为一张卡（前台是「正文流 + 右栏组件」两列），
+   栏内的控件不再各套一层边框——那是「表单」的样子，不是这篇文章的样子。 */
+
+.typecho-post-area [role="main"],
+.typecho-post-area [role="complementary"] {
+    background-color: var(--nl-card);
+    border: var(--nl-style-border);
+    border-radius: var(--nl-radius-img);
+    box-shadow: var(--nl-shadow-sm);
+}
+
+.typecho-post-area [role="main"] {
+    padding: 1.5rem 1.75rem;
+}
+
+.typecho-post-area [role="complementary"] {
+    padding: 1rem;
+}
+
+/* 标题输入框：不要边框，只要字号和下划线。
+   核心那条 .typecho-post-area input.title 是 1.17em，这里换成前台文章标题的 1.75rem/800。 */
+.typecho-post-area p.title {
+    margin: 0;
+}
+
+.typecho-post-area input.title {
+    padding: .25rem 0 .5rem;
+    border: none;
+    border-bottom: 2px solid var(--nl-border);
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1.3;
+    letter-spacing: -.02em;
+    color: var(--nl-text-strong);
+    transition: var(--nl-transition);
+}
+
+.typecho-post-area input.title::placeholder {
+    color: var(--nl-text-light);
+}
+
+.typecho-post-area input.title:focus {
+    border-bottom-color: var(--nl-accent);
+}
+
+.typecho-post-area .url-slug {
+    margin: 0 0 1.25rem;
+    font-family: var(--nl-font-mono);
+    font-size: .8125rem;
+}
+
+/* 正文框：卡里的一块「沉」，聚焦才升起来一圈强调色环 */
+#text {
+    padding: 1rem 1.125rem;
+    background-color: var(--nl-soft);
+    border: 1px solid transparent;
+    border-radius: var(--nl-radius-lg);
+    color: var(--nl-text);
+    transition: var(--nl-transition);
+}
+
+#text:hover {
+    background-color: var(--nl-sunken);
+}
+
+#text:focus {
+    background-color: var(--nl-card);
+    border-color: var(--nl-accent);
+    box-shadow: 0 0 0 3px var(--nl-accent-bg);
+    outline: none;
+}
+
+/* 工具条贴到正文框上沿，读起来就是「这块框自带的一排按钮」 */
+#wmd-button-bar {
+    margin: .5rem 0 0;
+    padding: .25rem .375rem;
+    background-color: var(--nl-soft);
+    border-radius: var(--nl-radius-md);
+}
+
+#wmd-preview {
+    margin: 1.25rem 0 0;
+    padding: 1.25rem 1.375rem;
+    background-color: var(--nl-soft);
+    border-radius: var(--nl-radius-lg);
+}
+
+/* 摘要分隔条核心写死了米黄底 + 橙字，深色下是一块脏斑 */
+#wmd-preview .summary::after {
+    background-color: var(--nl-accent-bg);
+    color: var(--nl-accent-hover);
+}
+
+/* 提交行：前台卡片底部那条分隔线以上的东西是内容，以下是动作 */
+.typecho-post-area .submit {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin: 1.25rem 0 0;
+    padding-top: 1.125rem;
+    border-top: 1px solid var(--nl-border);
+}
+
+.typecho-post-area .submit .right {
+    margin-left: auto;
+}
+
+/* 右栏那副 tab（高级 / 附件）改成两颗药丸，当前那颗填淡强调色 */
+.typecho-option-tabs {
+    display: flex;
+    justify-content: center;
+    gap: .25rem;
+    margin: 0 0 1rem;
+    font-size: .875rem;
+}
+
+.typecho-option-tabs li {
+    float: none;
+}
+
+.typecho-option-tabs a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: auto;
+    margin: 0;
+    padding: .4375rem .875rem;
+    line-height: 1.4;
+    border: none;
+    border-radius: var(--nl-radius-pill);
+    background-color: var(--nl-soft);
+    color: var(--nl-text-secondary);
+    transition: var(--nl-transition);
+}
+
+.typecho-option-tabs a:hover {
+    background-color: var(--nl-sunken);
+    color: var(--nl-accent);
+}
+
+.typecho-option-tabs li.current a,
+.typecho-option-tabs li.active a,
+.typecho-option-tabs li.current a:hover,
+.typecho-option-tabs li.active a:hover {
+    background-color: var(--nl-accent-container);
+    color: var(--nl-accent-hover);
+    font-weight: 600;
+}
+
+.typecho-option-tabs li:first-child a,
+.typecho-option-tabs li:last-child a {
+    border-radius: var(--nl-radius-pill);
+}
+
+/* 右栏里的每一个 option：靠分隔线分组，不再各自套边框 */
+#edit-secondary .typecho-post-option {
+    padding: .875rem .5rem;
+    border-bottom: 1px solid var(--nl-border-soft);
+}
+
+#edit-secondary .typecho-post-option:last-child {
+    border-bottom: none;
+}
+
+#edit-secondary .typecho-label {
+    color: var(--nl-text-strong);
+    font-weight: 600;
+}
+
+/* 全屏写正文（body.fullscreen，核心挂的）：卡面、标题、页头都被核心隐藏了，
+   留在原地只会是一块空白边框，这里整层收回。 */
+body.fullscreen .typecho-post-area [role="main"],
+body.fullscreen .typecho-post-area [role="main"] > * {
+    background: none;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+}
+
+body.fullscreen .typecho-post-area [role="complementary"] {
+    border-color: var(--nl-border);
+}
+
+/* --- 9.5 控制台首页：欢迎卡 + 快捷动作 --- */
+
+.welcome-board em {
+    font-family: var(--nl-font-sans);
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+}
+
+#start-link {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin: 0;
+    padding: 0 0 1.25rem;
+    list-style: none;
+    border-bottom: 1px solid var(--nl-border-soft);
+}
+
+#start-link li {
+    float: none;
+    margin: 0;
+}
+
+/* 核心把这三个链接做成了纯图标（.i-edit 那套 sprite + text-indent），
+   所以这里给的是「装图标的药丸」：内边距按 16px 图标配，字在不在都成立。 */
+#start-link a {
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    min-height: 34px;
+    padding: 0 .875rem;
+    background-color: var(--nl-soft);
+    border-radius: var(--nl-radius-pill);
+    color: var(--nl-text-secondary);
+    font-size: .875rem;
+    font-weight: 600;
+    transition: var(--nl-transition);
+}
+
+#start-link a:hover {
+    background-color: var(--nl-accent-container);
+    color: var(--nl-accent-hover);
+}
+
+#start-link a:active {
+    transform: scale(.95);
+}
+
+/* 右栏卡的标题挂同一颗金点：页头、分组标题、卡标题是一套层级语言 */
+section.container h3::before {
+    content: "";
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    margin-right: .4375rem;
+    vertical-align: .125em;
+    border-radius: 50%;
+    background-color: var(--nl-marker);
+}
+
+/* 右栏那几个 section 里的链接列表核心一点没管，默认就是黑点 + 蓝字，
+   在一屋子卡片里格外扎眼。收成行，hover 和顶栏同一套底色。 */
+section.container .post-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+section.container .post-list li + li {
+    margin-top: .25rem;
+}
+
+section.container .post-list a {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .5rem .75rem;
+    border-radius: var(--nl-radius-md);
+    color: var(--nl-text-secondary);
+    transition: var(--nl-transition);
+}
+
+section.container .post-list a:hover {
+    background-color: var(--nl-nav-hover);
+    color: var(--nl-accent-hover);
+}
+
+/* --- 9.6 登录页：一张居中的卡，别是浮在灰底上的一块白 --- */
+
+.typecho-login {
+    padding: 2.5rem 2rem;
+    border-radius: var(--nl-radius-img);
+    box-shadow: var(--nl-shadow-lg);
+}
+
+.typecho-login h1 {
+    margin-bottom: 1.5rem;
+}
+
+/* --- 9.7 进场：卡片依次浮起来，和前台信息流同一句话 ---
+   藏起来这一步只发生在 html.nl-js 下面，而 nl-js 是 admin.js 自己挂的。
+   脚本没跑（皮肤开着、JS 被拦）时这两条都不成立，页面就是一屏静止的卡片——
+   「动画没播」可以接受，「页面是空的」不可以。
+
+   用 animation 而不是 transition：延迟由 JS 写在 animation-delay 上，
+   它不会像 transition-delay 那样把 hover 的抬起一起拖慢。
+   fill-mode 是 backwards 而不是 both——both 会把 transform 一直钉在 none，
+   hover 那 3px 就永远抬不起来。收尾状态交给 .nl-shown 自己声明。 */
+
+@keyframes nl-rise {
+    from {
+        opacity: 0;
+        transform: translateY(18px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+html.nl-js .nl-reveal {
+    opacity: 0;
+    transform: translateY(18px);
+}
+
+html.nl-js .nl-reveal.nl-shown {
+    opacity: 1;
+    transform: none;
+    animation: nl-rise .55s var(--nl-ease-spring) backwards;
+}
+
 /* 尊重系统的「减少动态效果」：进度条之外的过渡全部关掉 */
 @media (prefers-reduced-motion: reduce) {
     .typecho-head-nav,
@@ -1566,7 +2528,29 @@ html[data-nl-theme="dark"] .wmd-button-row li span {
     input[type=text]:hover,
     textarea:hover,
     .upload-area,
+    .typecho-list-table.nl-cards > tbody > tr,
+    .typecho-list-table.nl-cards > tbody > tr::after,
     .wmd-button-row li {
         transition: none;
+    }
+
+    /* 位移是这一节里唯一还会「动」的东西，减动效下连位移一起收掉 */
+    .typecho-list-table.nl-cards > tbody > tr:hover {
+        transform: none;
+    }
+
+    .typecho-head-nav a:active,
+    .nl-theme-toggle:active,
+    .typecho-page-title h2 a:active {
+        transform: none;
+    }
+
+    /* 进场整层取消：不是放慢，是不藏——减动效的人要立刻看到内容。
+       .nl-shown 那条选择器更长，光写 .nl-reveal 压不住它，动画照旧会播。 */
+    html.nl-js .nl-reveal,
+    html.nl-js .nl-reveal.nl-shown {
+        opacity: 1;
+        transform: none;
+        animation: none;
     }
 }

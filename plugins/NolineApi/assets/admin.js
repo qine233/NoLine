@@ -1,9 +1,14 @@
 /**
- * Noline 后台脚本：只做两件事。
+ * Noline 后台脚本：只做三件事。
  *
  * 1) 深色开关。当前值由 header.php 里那段前置脚本同步写在 <html data-nl-theme> 上
  *    （等这里跑完再设就会先白一下），本文件只负责点下去之后翻面 + 记住选择。
- * 2) Cloudreve 图床面板。配置从 window.NL_CR 读，DOM 全在这里建，
+ * 2) 后台结构改造。列表页那张 <table> 摊成「一行一张卡」，字段名从列头搬回每一格的
+ *    data-label；卡片进场。这一步只加类、只加数据属性、只插装饰节点，
+ *    绝不重新挂载核心 JS 引用的节点（#text / #title / #wmd-* / #upload-panel /
+ *    #file-list / .typecho-option-tabs / .tab-content / 各级 form）——被包进新父盒之后
+ *    pagedown、拖拽上传、自动保存就会开始用错引用。
+ * 3) Cloudreve 图床面板。配置从 window.NL_CR 读，DOM 全在这里建，
  *    服务端不再拼 HTML——面板挂在 admin/header.php:header 之后，
  *    跟核心的 file-upload.php 什么时候渲染、插件的 bottom 钩子有没有生效都脱钩了。
  *
@@ -40,6 +45,125 @@
                 // 隐私模式下 localStorage 会抛，记不住就记不住，这一页照样是切换了的
             }
         });
+    }
+
+    /* ---------------------------------------------------------------- 结构改造 */
+
+    /**
+     * 列表页的表格摊成卡片。CSS 那边一切都挂在 .nl-cards 上，
+     * 所以这一层判断失误的代价是「这一张表还是原来的表」，不是排版坏掉。
+     *
+     * 三种表不动：
+     * - 写文章页里的（自定义字段那张是输入框矩阵，不是记录列表）
+     * - 列头少于两条的（没有字段名可搬）
+     * - 有任何一行单元格数和列头数对不上的（合并行、插件塞的行）
+     */
+    function cardTables() {
+        var tables = document.querySelectorAll('table.typecho-list-table');
+
+        Array.prototype.forEach.call(tables, function (table) {
+            if (table.closest('.typecho-post-area') || table.closest('#custom-field')) {
+                return;
+            }
+
+            var heads = [];
+            Array.prototype.forEach.call(table.querySelectorAll('thead th'), function (th) {
+                heads.push((th.textContent || '').replace(/\u00a0/g, '').trim());
+            });
+
+            var rows = table.querySelectorAll('tbody > tr');
+            if (heads.length < 2 || !rows.length) {
+                return;
+            }
+
+            var shaped = 0;
+
+            Array.prototype.forEach.call(rows, function (tr) {
+                var cells = tr.querySelectorAll('td');
+
+                /* 「暂无数据」那一行是一个 colspan 的格子，它要的是一张通栏的空卡 */
+                if (cells.length === 1 && (cells[0].colSpan || 1) > 1) {
+                    tr.className = tr.className ? tr.className + ' nl-row-full' : 'nl-row-full';
+                    shaped += 1;
+                    return;
+                }
+
+                if (cells.length !== heads.length) {
+                    return;
+                }
+
+                /* 主格 = 最左边那个有列名的格子。每张后台表的「标题」列位置都不一样
+                   （文章在第二列、评论在第三列、附件在第一列），但排最前面的那一列
+                   名字总是它。按字数猜会随内容漂，同一张表两张卡长得不一样。 */
+                var lead = null;
+
+                Array.prototype.forEach.call(cells, function (cell, i) {
+                    var label = heads[i];
+                    cell.setAttribute('data-label', label);
+
+                    if (!lead && label) {
+                        lead = cell;
+                    }
+                });
+
+                if (lead) {
+                    lead.className += ' nl-lead';
+                }
+                shaped += 1;
+            });
+
+            if (shaped === rows.length) {
+                table.className += ' nl-cards';
+            }
+        });
+    }
+
+    /**
+     * 卡片依次浮起来。IntersectionObserver 不在就直接全亮——
+     * 动画是可有可无的，内容不是。
+     * 延迟写在 animation-delay 上，收尾时清掉，免得拖慢之后的 hover。
+     */
+    function reveal() {
+        var nodes = document.querySelectorAll(
+            '.typecho-list-table.nl-cards > tbody > tr, #typecho-welcome, section.container'
+        );
+        var list = Array.prototype.slice.call(nodes);
+
+        if (!list.length) {
+            return;
+        }
+
+        list.forEach(function (node, i) {
+            node.className += ' nl-reveal';
+            node.style.animationDelay = Math.min(i, 7) * 55 + 'ms';
+        });
+
+        if (!('IntersectionObserver' in window)) {
+            list.forEach(show);
+            return;
+        }
+
+        var io = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (!entry.isIntersecting) {
+                    return;
+                }
+                show(entry.target);
+                io.unobserve(entry.target);
+            });
+        }, { rootMargin: '0px 0px -6% 0px' });
+
+        list.forEach(function (node) {
+            io.observe(node);
+        });
+
+        function show(node) {
+            node.className += ' nl-shown';
+            /* 进场结束之后不留延迟：CSS 里 hover 的抬起和它共用一个元素 */
+            setTimeout(function () {
+                node.style.animationDelay = '';
+            }, 700);
+        }
     }
 
     /* ---------------------------------------------------------------- 图床面板 */
@@ -261,7 +385,12 @@
     }
 
     function start() {
+        /* CSS 里所有「先藏起来」的规则都挂在 html.nl-js 下面，这个标记是本文件挂的：
+           脚本没跑起来就没有藏，也就没有一片空白。 */
+        root.classList.add('nl-js');
         bindThemeToggle();
+        cardTables();
+        reveal();
 
         var cfg = window.NL_CR;
         if (cfg) {

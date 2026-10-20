@@ -100,11 +100,13 @@ def shell(title, body, dark=False, accent=True):
             % (title, boot, links, acc, style, json.dumps(CR, ensure_ascii=False), body))
 
 
-WRITE = NAV.replace('__TOGGLE__', TOGGLE) + '''
+# 编辑器一页拍不下两种 tab 状态（核心用 display:none 切），所以同一个骨架出两页：
+# write.html 看「选项」，writefiles.html 看「附件 + 图床面板」。
+WRITE_HTML = NAV.replace('__TOGGLE__', TOGGLE) + '''
 <div class="main">
   <div class="body container">
     <div class="typecho-page-title"><h2>发布文章</h2></div>
-    <div class="row typecho-page-main" role="form">
+    <div class="row typecho-page-main typecho-post-area" role="form">
       <form method="post" name="write_post">
         <div class="col-mb-12 col-tb-9" role="main">
           <p class="title">
@@ -114,14 +116,8 @@ WRITE = NAV.replace('__TOGGLE__', TOGGLE) + '''
             <label for="slug" class="sr-only">网址缩略名</label>
             https://ui.zhouzhou.work/<input type="text" id="slug" name="slug" class="mono" value="admin-skin">
           </p>
-          <p>
-            <label for="text" class="sr-only">文章内容</label>
-            <textarea id="text" name="text" class="w-100 mono" style="height:320px">正文从这里开始。
-
-粘贴一张截图（Ctrl+V）就会走图床，传完把直链插回光标处。</textarea>
-          </p>
-          <div class="wmd-edittab"><a href="###">编辑</a><a href="###" class="active">预览</a></div>
-          <div id="wmd-button-bar" class="wmd-button-row">
+          <div class="editor wmd-button-row" id="wmd-button-bar">
+            <div class="wmd-edittab"><a href="###" class="active">撰写</a><a href="###">预览</a></div>
             <ul class="wmd-row">
               <li class="wmd-button" id="wmd-bold-button"><span class="editor-editor-bold"></span></li>
               <li class="wmd-button" id="wmd-italic-button"><span class="editor-editor-italic"></span></li>
@@ -144,79 +140,73 @@ WRITE = NAV.replace('__TOGGLE__', TOGGLE) + '''
             <hr>
             <p class="summary">摘要之后的内容</p>
           </div>
+          <p>
+            <label for="text" class="sr-only">文章内容</label>
+            <textarea id="text" name="text" class="w-100 mono" style="height:320px">正文从这里开始。
+
+粘贴一张截图（Ctrl+V）就会走图床，传完把直链插回光标处。</textarea>
+          </p>
+          <section id="custom-field" class="typecho-post-option">
+            <label id="custom-field-expand" class="typecho-label"><a href="##"><i class="i-caret-right"></i> 自定义字段</a></label>
+            <table class="typecho-list-table mono">
+              <colgroup><col width="20%"><col width="15%"><col width="55%"><col width="10%"></colgroup>
+              <tbody>
+                <tr><td>封面</td><td>文本</td><td><input type="text" value="https://cdn/1.jpg" class="w-100"></td><td><a href="###" class="btn btn-mini">删除</a></td></tr>
+                <tr><td><input type="text" value="cover"></td><td><select><option>文本</option></select></td><td><input type="text" class="w-100"></td><td><a href="###" class="btn btn-mini">删除</a></td></tr>
+              </tbody>
+            </table>
+            <p><a href="###" class="btn btn-s">增加自定义字段</a></p>
+          </section>
           <p class="submit clearfix">
-            <span class="left"><button type="button" class="btn"><i class="i-caret-left"></i> 取消预览</button></span>
+            <span class="left"><button type="button" id="btn-cancel-preview" class="btn"><i class="i-caret-left"></i> 取消预览</button></span>
             <span class="right">
-              <button type="button" class="btn primary">发布文章</button>
-              <button type="button" class="btn">保存草稿</button>
+              <button type="button" id="btn-preview" class="btn"><i class="i-exlink"></i> 预览文章</button>
+              <button type="submit" id="btn-save" class="btn">保存草稿</button>
+              <button type="submit" id="btn-submit" class="btn primary">发布文章</button>
             </span>
           </p>
+        </div>
 
-          <section class="typecho-post-option category-option">
-            <label class="typecho-label">分类</label>
-            <ul>
-              <li><input type="checkbox" id="category-1" checked><label for="category-1">日记</label></li>
-              <li><input type="checkbox" id="category-2"><label for="category-2">技术</label></li>
-            </ul>
-          </section>
+        <div id="edit-secondary" class="col-mb-12 col-tb-3" role="complementary">
+          <ul class="typecho-option-tabs clearfix">
+            <li class="__ADV_ON__ w-50"><a href="#tab-advance">选项</a></li>
+            <li class="__FIL_ON__ w-50"><a href="#tab-files" id="tab-files-btn">附件</a></li>
+          </ul>
 
-          <div class="typecho-post-option">
-            <label for="tags" class="sr-only">标签</label>
-            <ul class="token-input-list">
-              <li class="token-input-token"><p>typecho</p><span class="token-input-delete-token">×</span></li>
-              <li class="token-input-token"><p>主题</p><span class="token-input-delete-token">×</span></li>
-              <li class="token-input-input-token"><input type="text" value="cs"></li>
-            </ul>
-            <div class="token-input-dropdown" style="position:static">
-              <p>从标签列表中选择</p>
+          <div id="tab-advance" class="tab-content" __ADV_HIDE__>
+            <section class="typecho-post-option">
+              <label for="date" class="typecho-label">发布日期</label>
+              <p><input class="typecho-date w-100" type="text" id="date" value="2026-10-20 23:59"></p>
+            </section>
+            <section class="typecho-post-option category-option">
+              <label class="typecho-label">分类</label>
               <ul>
-                <li class="token-input-dropdown-item">css</li>
-                <li class="token-input-selected-dropdown-item">设计</li>
+                <li><input type="checkbox" id="category-1" checked><label for="category-1">日记</label></li>
+                <li><input type="checkbox" id="category-2"><label for="category-2">技术</label></li>
               </ul>
+            </section>
+            <section class="typecho-post-option">
+              <label for="tags" class="typecho-label">标签</label>
+              <p><input id="tags" name="tags" type="text" value="typecho, 主题" class="w-100 text"></p>
+            </section>
+            <button type="button" id="advance-panel-btn" class="btn btn-xs">高级选项 <i class="i-caret-down"></i></button>
+            <div id="advance-panel">
+              <section class="typecho-post-option visibility-option">
+                <label for="visibility" class="typecho-label">公开度</label>
+                <p><select id="visibility" name="visibility"><option value="public">公开</option><option value="private">私密</option><option value="hidden">隐藏</option></select></p>
+              </section>
+              <section class="typecho-post-option">
+                <label for="password" class="typecho-label">密码保护</label>
+                <p><input id="password" name="password" type="text" class="w-100 text"></p>
+              </section>
+              <section class="typecho-post-option">
+                <label for="description" class="typecho-label">摘要</label>
+                <p><textarea id="description" class="w-100" rows="3"></textarea></p>
+              </section>
             </div>
           </div>
 
-          <div class="typecho-post-option">
-            <label class="sr-only">自定义字段</label>
-            <table class="typecho-list-table" id="custom-field">
-              <thead><tr><th width="40%">名称</th><th width="50%">值</th><th width="10%">&nbsp;</th></tr></thead>
-              <tbody><tr><td><input type="text" value="cover"></td><td><input type="text" value="https://cdn/1.jpg"></td><td><a href="###" class="btn btn-mini">删除</a></td></tr></tbody>
-            </table>
-            <p><a href="###" class="btn btn-s">增加自定义字段</a></p>
-          </div>
-        </div>
-
-        <div class="col-mb-12 col-tb-3 col-tb-dark-3" role="complementary">
-          <ul class="typecho-option-tabs fix-warp-btn">
-            <li><a href="###" class="tab-button" data-target="#tab-advance">高级</a></li>
-            <li class="active"><a href="###" class="tab-button" data-target="#tab-files">附件</a></li>
-          </ul>
-
-          <div class="tab-content" id="tab-advance" style="display:none">
-            <section class="typecho-post-option">
-              <label for="password" class="typecho-label">密码保护</label>
-              <p><input id="password" name="password" type="text" class="w-100 text"></p>
-            </section>
-            <section class="typecho-post-option">
-              <label class="typecho-label">允许访问</label>
-              <p><select name="allow"><option value="all">所有人</option><option value="registered">登录用户</option></select></p>
-            </section>
-            <section class="typecho-post-option">
-              <label class="typecho-label">发布时间</label>
-              <p><input type="text" class="text" value="2026-10-20"><input type="text" class="text" value="23:59"></p>
-            </section>
-            <section class="typecho-post-option">
-              <label class="typecho-label">状态</label>
-              <p><label class="row"><input type="radio" name="status" checked> 发布</label>
-                 <label class="row"><input type="radio" name="status"> 隐藏</label></p>
-            </section>
-            <section class="typecho-post-option">
-              <label for="description" class="typecho-label">摘要</label>
-              <p><textarea id="description" class="w-100" rows="3"></textarea></p>
-            </section>
-          </div>
-
-          <div class="tab-content" id="tab-files">
+          <div id="tab-files" class="tab-content" __FIL_HIDE__>
             <div id="upload-panel" class="p">
               <div class="upload-area" draggable="true">拖放文件到这里<br>或者 <a href="###" class="upload-file">选择文件上传</a></div>
               <ul id="file-list">
@@ -237,6 +227,16 @@ WRITE = NAV.replace('__TOGGLE__', TOGGLE) + '''
   </div>
 </div>
 '''
+
+def write_page(advance):
+    return (WRITE_HTML
+            .replace('__ADV_ON__', 'active' if advance else '')
+            .replace('__FIL_ON__', '' if advance else 'active')
+            .replace('__ADV_HIDE__', '' if advance else 'style="display:none"')
+            .replace('__FIL_HIDE__', 'style="display:none"' if advance else ''))
+
+WRITE = write_page(True)
+WRITE_FILES = write_page(False)
 
 # 主题管理页：整页都是 .nl-* 自己定义的，皮肤关掉时它也还得能读
 SETTINGS = '''
@@ -296,7 +296,7 @@ SETTINGS = '''
     <div class="nl-ver">
       <span><b>1.29.4</b><em>主题</em></span>
       <span class="nl-ver-arrow">→</span>
-      <span><b>1.29.5</b><em>Release · 2 小时前</em></span>
+      <span><b>1.29.6</b><em>Release · 2 小时前</em></span>
       <span class="nl-inline"><button class="btn btn-s primary" type="button">立即更新</button></span>
     </div>
     <details class="nl-log"><summary>上一次换装的记录</summary><pre>备份 usr/themes/noline → …
@@ -335,6 +335,7 @@ LIST = '''
               <td><a href="###">Cloudreve 直链的取法</a> <span class="tip">隐藏</span></td>
               <td>技术</td><td>0</td><td>2026-10-12</td>
             </tr>
+            <tr><td colspan="5">没有更多文章了</td></tr>
           </tbody>
         </table>
       </div>
@@ -351,20 +352,38 @@ LIST = '''
 PLUGINS = '''
 <div class="main"><div class="body container">
   <div class="typecho-page-title"><h2>插件管理</h2></div>
-  <div class="row typecho-page-main" role="main"><div class="col-mb-12">
-    <div class="typecho-list-table">
-      <ul class="typecho-list">
-        <li class="item">
-          <h3><a href="###">Noline 对外接口</a> <span class="tip">1.7.12</span></h3>
-          <div class="actions"><a class="btn btn-s" href="###">设置</a> <a class="btn btn-s" href="###">停用</a></div>
-          <p class="description">把主题设置、健康数据和买菜流水以 JSON 接口暴露出去。</p>
-        </li>
-        <li class="item deactivate">
-          <h3><a href="###">Hello Word</a> <span class="tip">1.0.0</span></h3>
-          <div class="actions"><a class="btn btn-s" href="###">启用</a></div>
-          <p class="description">一个示例插件。</p>
-        </li>
-      </ul>
+  <div class="row typecho-page-main" role="main"><div class="col-mb-12 typecho-list">
+    <h4 class="typecho-list-table-title">启用的插件</h4>
+    <div class="typecho-table-wrap">
+      <table class="typecho-list-table">
+        <colgroup><col width="25%"><col width="45%"><col width="8%"><col width="10%"><col width=""></colgroup>
+        <thead><tr><th>名称</th><th>描述</th><th>版本</th><th>作者</th><th>操作</th></tr></thead>
+        <tbody>
+          <tr id="plugin-NolineApi">
+            <td>Noline 对外接口</td>
+            <td>把主题设置、健康数据和买菜流水以 JSON 接口暴露出去。</td>
+            <td>1.7.13</td>
+            <td><a href="###">qine233</a></td>
+            <td><a href="###">设置</a> &bull; <a href="###">禁用</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <h4 class="typecho-list-table-title">禁用的插件</h4>
+    <div class="typecho-table-wrap">
+      <table class="typecho-list-table deactivate">
+        <colgroup><col width="25%"><col width="45%"><col width="8%"><col width="10%"><col width=""></colgroup>
+        <thead><tr><th>名称</th><th>描述</th><th>版本</th><th>作者</th><th>操作</th></tr></thead>
+        <tbody>
+          <tr id="plugin-HelloWorld">
+            <td>Hello Word</td>
+            <td>一个示例插件。</td>
+            <td>1.0.0</td>
+            <td><a href="###">Typecho</a></td>
+            <td><a href="###">启用</a> &bull; <a href="###">删除</a></td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div></div></div></div>
 '''
@@ -376,14 +395,29 @@ MESSAGES = '''
     <div class="message popup error" style="position:static;display:block"><p>安全令牌对不上。多半是页面开着太久或者换了登录状态。</p></div>
     <div class="message popup success" style="position:static;display:block"><p>评论已通过。</p></div>
     <div class="message popup notice" style="position:static;display:block"><p>你的 Typecho 有新版本可以更新。</p></div>
-    <ul class="comment-list">
-      <li class="comment-item"><h4><a href="###">访客</a> <span class="tip">说：</span></h4>
-        <div class="comment-body">这个后台看着舒服多了。</div>
-        <div class="comment-reply-content">已经回复过了：谢谢。</div>
-        <div class="comment-actions"><a class="btn btn-s" href="###">通过</a> <a class="btn btn-s" href="###">回复</a></div></li>
-      <li class="comment-item spam"><h4><a href="###">广告</a></h4>
-        <div class="comment-body">买我东西。</div></li>
-    </ul>
+    <div class="typecho-table-wrap">
+      <table class="typecho-list-table">
+        <thead><tr><th>&nbsp;</th><th>作者</th><th>评论内容</th><th>文件</th><th>日期</th><th>&nbsp;</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td>访客 <span class="tip">visitor@example.com</span></td>
+            <td class="title">这个后台看着舒服多了，卡片化的列表尤其好用。</td>
+            <td><a href="###">后台皮肤这一版做了什么</a></td>
+            <td>2026-10-20</td>
+            <td><a class="hidden-by-mouse" href="###">通过</a></td>
+          </tr>
+          <tr class="checked">
+            <td><input type="checkbox" checked></td>
+            <td>广告 <span class="tip">spam@example.com</span></td>
+            <td class="title">买我东西，链接在正文里。</td>
+            <td><a href="###">日记为什么不是文章</a></td>
+            <td>2026-10-19</td>
+            <td><a class="hidden-by-mouse" href="###">回复</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div></div></div></div>
 '''
 
@@ -521,6 +555,8 @@ TAGS = NAV.replace('__TOGGLE__', TOGGLE) + '''
 PAGES = {
     'write.html': shell('发布文章', WRITE),
     'write-dark.html': shell('发布文章', WRITE, dark=True),
+    'writefiles.html': shell('发布文章', WRITE_FILES),
+    'writefiles-dark.html': shell('发布文章', WRITE_FILES, dark=True),
     'settings.html': shell('主题管理', SETTINGS),
     'settings-dark.html': shell('主题管理', SETTINGS, dark=True),
     'list.html': shell('文章管理', LIST),
