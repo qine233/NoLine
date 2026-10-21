@@ -260,7 +260,7 @@
 }
 
 /* ---------- 代码块 ----------
-   语法配色交给 vendor/atom-one-dark.min.css，这里管容器、红绿灯和滚动。
+   语法配色交给 css/atom-one-dark.min.css，这里管容器、红绿灯和滚动。
 
    macOS 红绿灯画在 pre 的 background-image 上，不用 ::before——pre 是 overflow:auto，
    绝对定位的伪元素会跟着内容横向滚走，而默认 background-attachment:scroll 的背景

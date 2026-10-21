@@ -1,6 +1,6 @@
 # Noline
 
-> 一个克制、无描边的 Typecho 主题，配一个可选的 REST 接口插件。当前版本 **1.30.0**。
+> 一个克制、无描边的 Typecho 主题，配一个可选的 REST 接口插件。当前版本 **1.30.1**。
 
 Noline 主张「无描边卡片」与「设计令牌驱动」：层次靠留白、圆角和一套统一的颜色令牌划分，
 不靠重描边和强阴影。所有颜色集中在 `:root`，浅色深色各一套，强调色在后台填一个十六进制就够，
@@ -314,10 +314,10 @@ DELETE /api/bills/records?id=     按 id 删一条
 
 ```bash
 python3 _dev/build.py            # 本地先过一遍门槛
-git tag -a 1.30.0 -m "1.30.0" && git push origin 1.29.7
+git tag -a 1.30.1 -m "1.30.1" && git push origin 1.29.7
 ```
 
-tag 名用 `1.30.0` 或 `v1.30.0`（工作流只认这两种形状），且必须等于 `NOLINE_VERSION`。
+tag 名用 `1.30.1` 或 `v1.30.1`（工作流只认这两种形状），且必须等于 `NOLINE_VERSION`。
 后台「主题管理 → 主题与插件更新」读的是 `releases/latest` 那个附件，所以**没有 `noline.zip` 的 Release
 等于没发布**：页面会报「这个 Release 没有 noline.zip 附件」。
 也可以不推 tag，直接在 Actions 页手动运行工作流、手填 tag。
@@ -335,6 +335,9 @@ tag 名用 `1.30.0` 或 `v1.30.0`（工作流只认这两种形状），且必�
   （`file/upload` 会返回非空 `upload_urls`），插件会明确拒绝并提示去后台把该策略改成云端/本地，
   而不是自作主张地去接一套签名协议。
 - 不做「首屏关键 CSS 内联 + 其余异步」：异步补 CSS 会重新引入首屏白闪，这一版宁可留全量阻塞 CSS。
+- 三个第三方文件（`highlight.min.js`、`matter.min.js`、`atom-one-dark.min.css`）**平铺在 `js/` 与 `css/` 下，
+  不收进 `vendor/` 子目录**：不少面板/nginx 配置会给任何带 `/vendor/` 的请求直接回 404（防 Composer 目录外泄那条），
+  线上表现就是桌面模式「加载失败」、文章页代码没高亮，而本地怎么测都是好的。别把它们「整理」回去。
 
 ---
 

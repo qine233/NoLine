@@ -281,8 +281,11 @@ $vtReady = noline_header_sent('Cross-Origin-Opener-Policy');
     <link rel="stylesheet" href="<?php echo noline_css_url('css/article.css'); ?>?v=<?php echo NOLINE_VERSION; ?>">
     <?php endif; ?>
     <?php if ($needHighlight): ?>
-    <link rel="stylesheet" href="<?php $this->options->themeUrl('css/vendor/atom-one-dark.min.css'); ?>?v=<?php echo NOLINE_VERSION; ?>">
-    <script defer src="<?php $this->options->themeUrl('js/vendor/highlight.min.js'); ?>?v=<?php echo NOLINE_VERSION; ?>"></script>
+    <?php /* 这两个第三方文件平铺在 css/ 与 js/ 下，不放进 vendor/ 子目录：
+       线上 nginx 对任何带 /vendor/ 的请求一律回 404（和文件在不在无关），
+       桌面模式的物理引擎和文章页的代码高亮会一起哑掉。 */ ?>
+    <link rel="stylesheet" href="<?php $this->options->themeUrl('css/atom-one-dark.min.css'); ?>?v=<?php echo NOLINE_VERSION; ?>">
+    <script defer src="<?php $this->options->themeUrl('js/highlight.min.js'); ?>?v=<?php echo NOLINE_VERSION; ?>"></script>
     <?php endif; ?>
 
     <script defer src="<?php $this->options->themeUrl('js/main.js'); ?>?v=<?php echo NOLINE_VERSION; ?>"></script>

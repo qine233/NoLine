@@ -1,7 +1,7 @@
 <?php if (!defined('__TYPECHO_ROOT_DIR__')) exit; ?>
 <?php
 /**
- * 桌面模式的入口胶囊（配 js/desk.js + js/vendor/matter.min.js）。
+ * 桌面模式的入口胶囊（配 js/desk.js + js/matter.min.js）。
  *
  * 点「桌面」之后，信息流里的卡片就成了刚体：能拖、能撞、掉到容器底堆成一堆。
  * 默认是关的——来读文章的人不该被一堆斜着的卡片拦住，这是个加法不是改版。

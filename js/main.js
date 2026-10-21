@@ -1484,7 +1484,7 @@
        桌面模式入口
        --------------------------------------------------------------------------
        matter.js 压缩后还有 80KB，不能出现在首屏：这颗按钮点下去才开始拉
-       js/vendor/matter.min.js 和 js/desk.js，两个串成一条链，拉完当场进桌面。
+       js/matter.min.js 和 js/desk.js，两个串成一条链，拉完当场进桌面。
 
        这颗按钮的点击只归这里管，desk.js 负责它自己那两颗（摇晃 / 收回）——
        同一颗按钮挂两个监听会一次点击切两回。
@@ -1526,18 +1526,18 @@
                     resolve();
                 };
                 el.onerror = function () {
-                    reject(new Error('desk asset failed'));
+                    reject(new Error(url.slice(url.lastIndexOf('/') + 1)));
                 };
                 document.head.appendChild(el);
             });
         }
 
         function ensure() {
-            var matter = assetUrl('vendor/matter.min.js');
+            var matter = assetUrl('matter.min.js');
             var desk = assetUrl('desk.js');
 
             if (!matter || !desk) {
-                return Promise.reject(new Error('no theme path'));
+                return Promise.reject(new Error('推不出主题里 js/ 的位置'));
             }
 
             return load(matter).then(function () {
@@ -1566,6 +1566,12 @@
                 }, function () {
                     loading = null;         /* 失败要能再点一次重拉，别把 reject 悬在那儿 */
                     toggle.classList.remove('is-busy');
+
+                    /* 404 长得和「按钮坏了」一模一样，报一行才知道断在哪一份资源上 */
+                    if (window.console) {
+                        window.console.warn('[Noline] 桌面模式的脚本没拉起来：'
+                            + (err && err.message ? err.message : '未知原因'));
+                    }
 
                     if (label) {
                         label.textContent = LABEL_DESK_FAIL;

@@ -1,7 +1,7 @@
 /**
  * 桌面模式：把信息流里的卡片交给 matter.js 当刚体。
  *
- * 这个文件和 js/vendor/matter.min.js 都是 main.js 在第一次点「桌面」时才拉的——
+ * 这个文件和 js/matter.min.js 都是 main.js 在第一次点「桌面」时才拉的——
  * 压缩后仍有 80KB 的物理引擎不该出现在首屏关键路径上。脚本到位之后只往全局挂一个
  * window.NolineDesk，剩下的动作一律由那次点击触发。
  *

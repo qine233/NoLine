@@ -2018,8 +2018,8 @@ def main():
     render('page3.html', '第 3 页', page3)
 
     # 文章页带上 highlight.js，才能验证 pre code.hljs 的 padding 特异性冲突有没有真的解决
-    hl = ('    <link rel="stylesheet" href="../css/vendor/atom-one-dark.min.css?v=__VERSION__">\n'
-          '    <script defer src="../js/vendor/highlight.min.js?v=__VERSION__"></script>')
+    hl = ('    <link rel="stylesheet" href="../css/atom-one-dark.min.css?v=__VERSION__">\n'
+          '    <script defer src="../js/highlight.min.js?v=__VERSION__"></script>')
     render('post.html', '文章',
            POST_BODY.replace('__SIDEBAR__', SIDEBAR.rstrip('\n')).replace('__TOC__', TOC_CARD.rstrip('\n')), hl)
 
