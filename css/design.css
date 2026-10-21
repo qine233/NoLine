@@ -983,18 +983,21 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
     transition: box-shadow .3s ease, border-color .3s ease, background-color .25s ease;
 }
 
-/* 只有列表卡片做上浮。文章正文卡不能加 transform——
-   一来鼠标在正文里移动整块跟着抖动，二来 transform 会生成新的包含块，
+/* 列表卡 hover 照 heo：整圈描边翻成强调色、投影换成强调色底光，卡片不位移。
+   上浮 3px 是后来自己加的，看着更「活泼」，但双列里两张卡一起上下抖，
+   12px 圆角和邻居的相对位置全程在动，读起来反而乱。
+   文章正文卡更不能加 transform——transform 会生成新的包含块，
    把正文内 position:sticky 的目录之类钉死。评论卡同样是 .article-card，一并受限。 */
-.post-card:hover,
-.link-card:hover {
-    box-shadow: var(--shadow-lift);
+.post-card:hover {
+    border: var(--style-border-hover);
+    box-shadow: var(--shadow-main);
 }
-.post-card:hover { transform: translateY(-3px); }
+.link-card:hover { box-shadow: var(--shadow-lift); }
 
-/* 列表卡 hover 时顶部一条强调色发丝线。left/right 收在圆角内侧，配合 .card 的
-   overflow:hidden 自然裁剪；.link-card 没设 overflow，但头顶是平的，不裁也不越界。 */
-.post-card::after,
+/* 友链卡 hover 时顶部一条强调色发丝线。信息流卡以前共用这条，现在它整圈描边
+   都会变色，头顶再压一条就成了双线，所以撤了；left/right 收在圆角内侧，
+   配合 .card 的 overflow:hidden 自然裁剪。
+   .link-card 没设 overflow，但头顶是平的，不裁也不越界。 */
 .link-card::after {
     content: "";
     position: absolute;
@@ -1008,7 +1011,6 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
     transform: scaleX(.6);
     transition: opacity .3s ease, transform .3s ease;
 }
-.post-card:hover::after,
 .link-card:hover::after { opacity: 1; transform: scaleX(1); }
 
 /* 滚动进场：initScrollReveal() 给列表卡挂 .reveal，进视口加 .is-visible。
@@ -1020,7 +1022,9 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
 }
 .reveal.is-visible { opacity: 1; transform: none; }
 
-.post-card { position: relative; padding: 1.75rem 2rem; transition: box-shadow .3s ease, transform .3s var(--ease-spring), background-color .25s ease; }
+/* --t 而不是逐条列：hover 时描边、投影、底色要同时补间，分开写就会有一先一后。
+   本行会整个覆盖 .card 那条 transition，所以必须自己带上 border-color。 */
+.post-card { position: relative; padding: 1.75rem 2rem; transition: var(--t); }
 .article-card { padding: 2.25rem 3rem; }
 @media (max-width: 640px) {
     .post-card { padding: 1.25rem; }
@@ -1079,11 +1083,11 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform .45s ease;
+    /* 1.03 + 那条 cubic-bezier 是 heo 的数：照片刚够看出在推近，
+       又不会推到能看清压缩噪点。1.04 配 ease 会在结尾弹一下。 */
+    transition: transform .4s cubic-bezier(.4, 0, .25, 1);
 }
-.post-card:hover .post-cover img { transform: scale(1.04); }
-/* 压在照片上的强调色发丝线只会像一条错位的进度条，带封面的卡不要它 */
-.post-card.has-cover::after { content: none; }
+.post-card:hover .post-cover img { transform: scale(1.03); }
 
 @media (min-width: 1200px) and (max-width: 1299px) {
     .main-content.feed .post-card.has-cover {
@@ -1366,21 +1370,11 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
     display: inline-flex;
     align-items: center;
     gap: .375rem;
-    color: var(--on-accent-container);
-    background-color: var(--accent-container);
-    padding: .125rem .5rem;
-    border-radius: var(--radius-md);
+    /* 就是一行次级灰字，不带药丸底、不带圆点（heo 的 .original tip）。
+       卡片里强调色已经够多——标题 hover、封面、底栏两颗药丸——meta 那行
+       再塞一颗蓝药丸，读起来是「这里有个按钮」，不是「这篇属于哪个分类」。 */
+    color: var(--text-secondary);
     font-weight: 500;
-}
-/* 分类标签前那粒点：它顶替的是「这一段属于一个分类」的语义标记，
-   不是装饰——卡片标题的圆点已经跟着药丸一起退了，这里这颗还在。 */
-.category-tag::before {
-    content: "";
-    width: .375rem;
-    height: .375rem;
-    border-radius: 50%;
-    background-color: var(--accent);
-    flex-shrink: 0;
 }
 
 /* ==========================================================================
@@ -1567,23 +1561,21 @@ html.is-desk .status-fold.is-clamped:not(.is-open) .status-content::after { disp
    ========================================================================== */
 
 .post-title {
+    /* 20px / 700 / 1.5 是 heo 的标题三围。原来 800 + 1.4 + 负字距是从别处抄来的
+       「更现代」的排法，两行标题挤在一起，双列里读起来比 heo 累。 */
     font-size: 1.25rem;
-    font-weight: 800;
-    line-height: 1.4;
-    letter-spacing: -.01em;
+    font-weight: 700;
+    line-height: 1.5;
     color: var(--text-strong);
     margin-bottom: .5rem;
     overflow-wrap: break-word;
 }
-/* 标题 hover 下划线从 0 扫到满宽：背景渐变 + background-size 过渡，比 border-bottom 平滑 */
-.post-title-link {
-    background-image: linear-gradient(var(--accent), var(--accent));
-    background-repeat: no-repeat;
-    background-position: 0 100%;
-    background-size: 0 2px;
-    transition: color .2s, background-size .3s ease;
-}
-.post-title-link:hover { color: var(--accent); background-size: 100% 2px; }
+/* 标题变色由「整张卡被 hover」触发，不是「鼠标压在这行字上」——heo 的判据是
+   你指的是这篇，而不是你的指针落在哪。下划线扫过那条撤了：卡片描边整圈都会
+   翻成强调色，标题底下再多一条横线只会跟它抢。 */
+.post-title-link { transition: color .3s; }
+.post-card:hover .post-title-link,
+.post-title-link:hover { color: var(--accent); }
 /* 两列并排时标题长度不一会把卡片拉得高一块矮一块，信息流里统一收两行。
    只作用于 .feed：page.php 那批 h1.post-title.page-title 不该被裁。 */
 .main-content.feed .post-title {
@@ -1637,8 +1629,9 @@ html.is-desk .status-fold.is-clamped:not(.is-open) .status-content::after { disp
 .post-content:empty { display: none; }
 
 .post-footer {
-    border-top: 1px solid var(--border-color);
-    padding-top: 1rem;
+    /* 不再画那条发丝线（heo 的卡底就是一排裸元素）：底栏两颗药丸自带底色，
+       上面还有一段摘要的间距，横线夹在中间像表格线。 */
+    padding-top: .25rem;
     margin-top: .25rem;
     display: flex;
     align-items: center;
@@ -1680,8 +1673,8 @@ a.stat-item:hover { color: var(--accent); background-color: var(--accent-bg); }
 
 /* 整块是一个 <a>：链接默认的下划线和蓝色都得压掉，否则三行摘要会全是蓝字带线。
 
-   不再自带一条发丝线：上面 .post-footer 那条刚画过，两张卡挨得近时会出现两条
-   只隔 1rem 的横线，像表格线。这里只留一点间距，底色留给 hover，
+   它自己也不带发丝线：整张卡从摘要到底栏到这一块都是裸元素，中间夹两条只隔
+   1rem 的横线会像表格线。这里只留一点间距，底色留给 hover，
    正好兼作「这一整条都能点」的提示。 */
 .card-comments {
     display: flex;
@@ -1862,18 +1855,24 @@ a.stat-item:hover { color: var(--accent); background-color: var(--accent-bg); }
    跟着站内其它标题图标（评论数、相关文章）走强调色——六枚灰图标会让整栏发闷。 */
 .card-header .noline-icon { font-size: 1.125rem; color: var(--accent); }
 
-.tags-container { padding: 0 .25rem .25rem; display: flex; flex-wrap: wrap; gap: .375rem; }
+/* 4px 缝、淡底 + 1px 蓝灰描边，两个都是 heo 的数：只有淡底的话药丸会像
+   糊在卡面上的一团灰，描边一进来才是一颗颗「可以点的标签」。 */
+.tags-container { padding: 0 .25rem .25rem; display: flex; flex-wrap: wrap; gap: .25rem; }
 .tag {
     display: inline-flex;
     align-items: center;
     background-color: var(--surface-soft);
+    border: var(--style-border);
     color: var(--text-secondary);
     font-size: .75rem;
     padding: .25rem .625rem;
     border-radius: var(--radius-md);
-    transition: background-color .2s, color .2s, transform .15s var(--ease-spring), box-shadow .2s ease;
+    transition: background-color .2s, color .2s, border-color .2s, transform .15s var(--ease-spring), box-shadow .2s ease;
 }
-.tag:hover { background-color: var(--brand); color: var(--on-brand); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+/* 井号是 heo 标签卡的招牌：没有它，一排药丸读起来像分类；有了它才像标签。
+   写在 ::before 里，模板和 RSS 都不用多带一个字符。 */
+.tag::before { content: "#"; opacity: .55; margin-right: .125rem; }
+.tag:hover { background-color: var(--brand); border-color: var(--brand); color: var(--on-brand); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
 .tag-count { margin-left: .3125rem; color: var(--text-light); font-size: .6875rem; }
 .tag:hover .tag-count { color: var(--on-brand-muted); }
 
@@ -4736,7 +4735,6 @@ html.is-leaving .post-hero { opacity: 0; transform: translateY(-8px); transition
     .site-hero, .post-hero { min-height: 0; padding: 0 0 1rem; }
     .site-hero-cover, .post-hero-cover { display: none !important; }
     .card { box-shadow: none !important; }
-    .post-card::after,
     .link-card::after { display: none; }
     html.is-loading .container,
     html.is-leaving .container,

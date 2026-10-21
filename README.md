@@ -1,10 +1,10 @@
 # Noline
 
-> 一个克制、无描边的 Typecho 主题，配一个可选的 REST 接口插件。当前版本 **1.31.0**。
+> 一个克制、令牌驱动的 Typecho 主题，配一个可选的 REST 接口插件。当前版本 **1.32.0**。
 
-Noline 主张「无描边卡片」与「设计令牌驱动」：层次靠留白、圆角和一套统一的颜色令牌划分，
-不靠重描边和强阴影。所有颜色集中在 `:root`，浅色深色各一套，强调色在后台填一个十六进制就够，
-深色模式会按它自动算出更亮的变体，换肤不用翻文件。
+Noline 主张「一条 1px 蓝灰线就够了」：卡片层次靠留白、12px 圆角、`#e3e8f7` 描边和一层几乎
+看不见的浅投影划分，不上重阴影、不上渐变。所有颜色集中在 `:root`，浅色深色各一套，强调色在
+后台填一个十六进制就够，深色模式会按它自动算出更亮的变体，换肤不用翻文件。
 
 ---
 
@@ -318,10 +318,10 @@ DELETE /api/bills/records?id=     按 id 删一条
 
 ```bash
 python3 _dev/build.py            # 本地先过一遍门槛
-git tag -a 1.31.0 -m "1.31.0" && git push origin ai-1.0 --follow-tags
+git tag -a 1.32.0 -m "1.32.0" && git push origin ai-1.0 --follow-tags
 ```
 
-tag 名用 `1.31.0` 或 `v1.31.0`（工作流只认这两种形状），且必须等于 `NOLINE_VERSION`。
+tag 名用 `1.32.0` 或 `v1.32.0`（工作流只认这两种形状），且必须等于 `NOLINE_VERSION`。
 后台「主题管理 → 主题与插件更新」读的是 `releases/latest` 那个附件，所以**没有 `noline.zip` 的 Release
 等于没发布**：页面会报「这个 Release 没有 noline.zip 附件」。
 也可以不推 tag，直接在 Actions 页手动运行工作流、手填 tag。
