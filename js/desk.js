@@ -11,6 +11,11 @@
  *
  * 尺寸一律读 offsetWidth/offsetHeight，不读 getBoundingClientRect：旋转之后的
  * bounding box 是斜着的外接矩形，拿它当刚体尺寸会越撞越大。
+ *
+ * 「摇晃」这颗按钮做两件事：先去抓一批随机文章换上桌（shakeBatch），再把这批
+ * 掀起来往中间堆。地址只从核心渲染的页码条里读，一个字都不自己拼；换下来的原卡
+ * 整批存进一个 fragment，收回桌面时原样还回信息流（clearCurrent / restoreOriginals）——
+ * 有人玩过桌面，不该把别人的阅读路径变成一堆随机文章。
  */
 (function () {
     'use strict';
@@ -26,6 +31,14 @@
     var STORE_KEY = 'noline-desk';
     var CARD_SEL = '.post-card, .status-card';
     var DESK_CLASS = 'is-desk';
+
+    /* 抓回来的那一页只取直系的卡片：.main-content 底下还挂着公告卡（div.card）、
+       药丸条和页码条，少一层 :scope 就会把不属于列表的东西铺到桌上。
+       和 main.js 自动加载里的 ':scope > article' 是同一条守卫。 */
+    var CARD_SEL_ROOT = ':scope > .post-card, :scope > .status-card';
+
+    var BATCH = 8;        /* 「换一批」一次铺几张卡。再多就堆成一堵墙，不像散在桌上 */
+    var LABEL_BATCH = '换一批中';
 
     var PAD = 6;            /* 卡片离桌面边缘的最小间距，四面墙就压在这条线上 */
     var WALL_T = 400;       /* 墙必须做厚：高速运动的卡片会被瞬移进薄墙里然后穿出去 */
@@ -45,10 +58,15 @@
     var btnShake = document.getElementById('feed-desk-shake');
     var btnExit = document.getElementById('feed-desk-exit');
     var chipCount = document.getElementById('feed-desk-count');
+    var shakeLabel = btnShake ? btnShake.querySelector('span') : null;
 
     if (!feed || !btnToggle) {
         return;
     }
+
+    /* 「摇晃」那句「点一下就换一批随机文章」的初始文案，从模板里读而不是写死：
+       feed-desk.php 那边是 _e('摇晃')，写死了就把翻译覆盖掉。 */
+    var LABEL_SHAKE = shakeLabel ? shakeLabel.textContent : '';
 
     var reduceQuery = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
 
@@ -65,8 +83,31 @@
     var saveTimer = 0;
     var resizeTimer = 0;
 
+    /* --- 「换一批」那套状态 --- */
+    var pages = [];           /* 可抓的分页地址，从核心渲染的页码条里读 */
+    var pageCursor = 0;
+    var lastBatchUrl = '';
+    var preloaded = null;     /* { url, els }：上一次抓完顺手预热的下一批 */
+    var swapping = false;     /* 正在抓，按钮 disabled 之外再上一道锁 */
+    var originals = null;     /* documentFragment：第一次换批时收走的原卡 */
+    var epoch = 0;            /* 每次退桌 +1，在途的抓取回来发现对不上就直接丢 */
+
     function rand(a, b) {
         return a + Math.random() * (b - a);
+    }
+
+    /* 原地洗乱（Fisher–Yates）。分页地址和页内的卡片都要洗：
+       不洗的话每次摇晃都是「第 2 页开头那几张」，看着像没换。 */
+    function shuffle(arr) {
+        for (var i = arr.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var t = arr[i];
+
+            arr[i] = arr[j];
+            arr[j] = t;
+        }
+
+        return arr;
     }
 
     function clamp(v, a, b) {
@@ -512,6 +553,13 @@
        ========================================================================== */
 
     function save() {
+        /* 换过一批之后不写存档：那会儿桌上全是随机文章，坐标存下来，
+           下次进桌面会把首页那批原卡摆到不属于它们的位置上。
+           换批之前的那一份存档留着才有意义，所以这里直接跳过。 */
+        if (originals) {
+            return;
+        }
+
         var data = { w: Math.round(size.w), items: [] };
 
         for (var i = 0; i < items.length; i++) {
@@ -572,6 +620,16 @@
 
         root.classList.add(DESK_CLASS);
 
+        /* 换一批的那点状态每次进桌面都从零开始：上一次会话留下的预取、
+           游标和「上一批是哪页」都不该带进来。originals 必须在这里归零，
+           否则刚还回去的原卡会被当成第二次换批又收走一遍。 */
+        epoch++;
+        originals = null;
+        preloaded = null;
+        lastBatchUrl = '';
+        setBusy(false);
+        buildPages();
+
         /* class 先挂再量：卡片宽度是这条 class 给的 --desk-card-w，
            顺序反了量到的就是信息流原来的列宽，刚体和 DOM 从第一帧就对不上。 */
         var r = feed.getBoundingClientRect();
@@ -608,6 +666,12 @@
         }
 
         pileFrames = 0;
+
+        /* 在途的抓取一律作废（epoch 对不上就会被丢弃），按钮也不留在「换一批中」 */
+        epoch++;
+        preloaded = null;
+        setBusy(false);
+
         window.clearTimeout(saveTimer);
         save();
 
@@ -627,7 +691,6 @@
             items[i].el.classList.remove('is-dragging');
         }
 
-        items = [];
         drag = null;
 
         M.World.clear(engine.world, false);
@@ -636,6 +699,12 @@
         walls = null;
 
         root.classList.remove(DESK_CLASS);
+
+        /* 先下桌再清空 items：restoreOriginals() 靠 items 找到抓来的那批节点。
+           class 已经摘掉了，这时候还回去的原卡直接是信息流的样子。 */
+        restoreOriginals();
+        items = [];
+
         reveal(false);
     }
 
@@ -670,6 +739,311 @@
 
         pileFrames = Math.round(PILE_MS / STEP);
         wake();
+    }
+
+    /* ==========================================================================
+       换一批：点「摇晃」先去抓随机文章，抓回来的这批再掀起来堆
+       ========================================================================== */
+
+    /**
+     * 分页地址只能从渲染好的页码条里读，一个字都不自己拼。
+     * 核心用 Router::url($type . '_page') 生成它，开/关伪静态、各种固定链接格式
+     * 靠这一条同时兼容——和 main.js 里 nextHref() 同一个理由。
+     *
+     * 页码条会被自动加载设成 hidden，但节点还在，display:none 不影响 querySelector。
+     * 当前页那一条也在里面（核心给它包了 <a>），按解析后的绝对地址剔掉：
+     * 桌上的卡就是这一页的，再抓一遍只是把同一批重排一次。
+     */
+    function buildPages() {
+        pages = [];
+        pageCursor = 0;
+
+        /* 抓不动的环境下干脆不建池子：shakeBatch 看见空池自然退回「只晃」，
+           比让人在按钮上试出一句 TypeError 好。 */
+        if (!window.fetch || !window.DOMParser || !window.Promise) {
+            return;
+        }
+
+        var nav = feed.querySelector('.page-navigator');
+
+        if (!nav) {
+            return;
+        }
+
+        var seen = {};
+
+        Array.prototype.forEach.call(nav.querySelectorAll('a[href]'), function (a) {
+            var raw = a.getAttribute('href');
+            var url = '';
+
+            if (!raw) {
+                return;
+            }
+
+            try {
+                url = new URL(raw, document.baseURI).href;
+            } catch (e) {
+                return;
+            }
+
+            if (seen[url] || url === window.location.href) {
+                return;
+            }
+
+            seen[url] = 1;
+            pages.push(url);
+        });
+
+        shuffle(pages);
+    }
+
+    /* 转一圈重新洗牌，免得第 N 次之后永远是同一个顺序在倒。连着两次抓到同一页
+       也算白点，所以跳过 lastBatchUrl——只有一页可抓时没得挑，那就重复。 */
+    function nextPage() {
+        if (!pages.length) {
+            return '';
+        }
+
+        var url = '';
+
+        for (var guard = 0; guard < pages.length; guard++) {
+            if (pageCursor >= pages.length) {
+                pageCursor = 0;
+                shuffle(pages);
+            }
+
+            url = pages[pageCursor++];
+
+            if (url !== lastBatchUrl || pages.length < 2) {
+                return url;
+            }
+        }
+
+        return url;
+    }
+
+    /**
+     * 抓回来的这批和桌上的是不是同一批。
+     *
+     * 核心的页码条给「当前页」那一条也包了 <a>，buildPages 只按解析后的地址剔一次；
+     * 地址栏带查询串、或者首页实际指向 /index.php 的时候剔不掉，抓回来还是同一批卡。
+     * 换一批却看不出变化，比不换更糟——撞上就把这个地址从池子里摘掉，这一次只晃。
+     */
+    function sameBatch(els) {
+        if (els.length !== items.length) {
+            return false;
+        }
+
+        var ids = {};
+
+        for (var i = 0; i < items.length; i++) {
+            ids[items[i].id] = 1;
+        }
+
+        for (var j = 0; j < els.length; j++) {
+            if (!ids[els[j].getAttribute('data-cid') || '']) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    function dropPage(url) {
+        for (var i = pages.length - 1; i >= 0; i--) {
+            if (pages[i] === url) {
+                pages.splice(i, 1);
+            }
+        }
+
+        /* 池子缩了游标可能越界，回到开头重走一圈 */
+        if (pageCursor > pages.length) {
+            pageCursor = 0;
+        }
+    }
+
+    function fetchBatch(url) {
+        return window.fetch(url, { credentials: 'same-origin' })
+            .then(function (res) {
+                if (!res.ok) {
+                    throw new Error('HTTP ' + res.status);
+                }
+                return res.text();
+            })
+            .then(function (html) {
+                var doc = new DOMParser().parseFromString(html, 'text/html');
+                var list = doc.querySelector('.main-content');
+                var found = [];
+
+                if (!list) {
+                    throw new Error('那一页没有 .main-content');
+                }
+
+                Array.prototype.forEach.call(list.querySelectorAll(CARD_SEL_ROOT), function (el) {
+                    found.push(el);
+                });
+
+                if (!found.length) {
+                    throw new Error('那一页一张卡都没有');
+                }
+
+                shuffle(found);
+
+                return { url: url, els: found.slice(0, BATCH) };
+            });
+    }
+
+    /**
+     * 收走桌上的卡。
+     *
+     * 第一次是「借」：原卡整批搬进一个 fragment 存着，退桌时原样还回去——
+     * 信息流不能因为有人玩过桌面就变成一堆随机文章，那是别人的阅读路径。
+     * 之后每批换掉的都是抓来的节点，直接扔。
+     */
+    function clearCurrent() {
+        var keep = !originals;
+        var frag = keep ? document.createDocumentFragment() : null;
+
+        for (var i = 0; i < items.length; i++) {
+            M.World.remove(engine.world, items[i].body);
+            items[i].el.style.transform = '';
+
+            if (keep) {
+                frag.appendChild(items[i].el);
+            } else if (items[i].el.parentNode) {
+                items[i].el.parentNode.removeChild(items[i].el);
+            }
+        }
+
+        items = [];
+
+        if (keep) {
+            originals = frag;
+        }
+    }
+
+    function insertBatch(els) {
+        /* 状态区原本是列表最后一个孩子：插在它前面，桌面上的卡片才还在页码条之前 */
+        var anchor = document.getElementById('feed-status');
+
+        for (var i = 0; i < els.length; i++) {
+            /* 显式 importNode：跨文档直接 append 的 adopts 行为各家不一致（同 main.js）。
+               saved 传 null 是刻意的——新批次一律从桌面上方落进来，
+               拿旧存档摆位会让每次换批长得一模一样。 */
+            var node = feed.insertBefore(document.importNode(els[i], true), anchor || null);
+
+            addBody(node, i, els.length, null);
+        }
+
+        setCount(items.length);
+    }
+
+    /* 抓来的那批不属于这个页面，退桌时得下桌；原卡则回到它们原来的位置。 */
+    function restoreOriginals() {
+        for (var i = 0; i < items.length; i++) {
+            if (items[i].el.parentNode) {
+                items[i].el.parentNode.removeChild(items[i].el);
+            }
+        }
+
+        if (originals) {
+            feed.insertBefore(originals, document.getElementById('feed-status') || null);
+            originals = null;
+        }
+    }
+
+    function setBusy(on) {
+        swapping = on;
+
+        if (btnShake) {
+            btnShake.disabled = on;
+            btnShake.classList[on ? 'add' : 'remove']('is-busy');
+        }
+        if (shakeLabel) {
+            shakeLabel.textContent = on ? LABEL_BATCH : LABEL_SHAKE;
+        }
+    }
+
+    /* 抓完这一批就顺手预热下一批：连着点摇晃的人不该每次都等一趟网络。 */
+    function warm(mark) {
+        var url = nextPage();
+
+        if (!url) {
+            return;
+        }
+
+        fetchBatch(url).then(function (batch) {
+            if (mark === epoch) {
+                preloaded = batch;
+            }
+        }).catch(function () {
+            /* 预热失败不算事，下一次点摇晃会自己再抓一遍 */
+        });
+    }
+
+    /**
+     * 「摇晃」按钮：换一批随机文章，然后把这批掀起来堆到中间。
+     *
+     * 抓不到也要挨这一下——按钮的承诺是「点一下就晃」，网络出问题的时候
+     * 宁可继续晃桌上这批，也不要变成一个点了没反应的按钮。
+     */
+    function shakeBatch() {
+        if (!running || swapping) {
+            return;
+        }
+
+        var mark = epoch;
+        var job;
+
+        if (preloaded) {
+            job = Promise.resolve(preloaded);
+            preloaded = null;
+        } else {
+            var url = nextPage();
+
+            if (!url) {
+                /* 全站只有一页（或页码条压根没渲染）：没得换，那就只晃 */
+                shake();
+                return;
+            }
+
+            job = fetchBatch(url);
+        }
+
+        setBusy(true);
+
+        job.then(function (batch) {
+            if (mark !== epoch) {
+                return;
+            }
+
+            if (sameBatch(batch.els)) {
+                dropPage(batch.url);
+                setBusy(false);
+                shake();
+                return;
+            }
+
+            lastBatchUrl = batch.url;
+            clearCurrent();
+            insertBatch(batch.els);
+            setBusy(false);
+            warm(mark);
+            shake();
+        }).catch(function (err) {
+            if (mark !== epoch) {
+                return;
+            }
+
+            setBusy(false);
+
+            if (window.console) {
+                window.console.warn('[Noline] 桌面换一批没抓到：'
+                    + (err && err.message ? err.message : '未知原因'));
+            }
+
+            shake();
+        });
     }
 
     /* ==========================================================================
@@ -724,7 +1098,9 @@
     }
 
     if (btnShake) {
-        btnShake.addEventListener('click', shake);
+        /* 挂的是 shakeBatch 不是 shake：这颗按钮现在承诺两件事——
+           先换一批随机文章，再把它们掀起来。纯物理的那一下留给预取都没了的时候兜底。 */
+        btnShake.addEventListener('click', shakeBatch);
     }
     if (btnExit) {
         btnExit.addEventListener('click', stop);
@@ -732,7 +1108,7 @@
 
     window.NolineDesk = {
         toggle: toggle,
-        shake: shake,
+        shake: shakeBatch,
         active: function () {
             return running;
         }

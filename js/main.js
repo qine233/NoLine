@@ -1563,7 +1563,7 @@
                     toggle.classList.remove('is-busy');
                     /* 这一次点击本身就算「进来」，不再假装用户又点了一下 */
                     window.NolineDesk.toggle();
-                }, function () {
+                }, function (err) {
                     loading = null;         /* 失败要能再点一次重拉，别把 reject 悬在那儿 */
                     toggle.classList.remove('is-busy');
 

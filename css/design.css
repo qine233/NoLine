@@ -1450,8 +1450,11 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
 }
 .feed-desk-btn[aria-pressed="true"] .noline-icon { color: var(--on-brand); }
 /* 脚本还没拉下来（matter.js 80KB，慢网络上要转一会儿）时给个正在忙的样子，
-   否则连点两下的人以为按钮坏了。 */
+   否则连点两下的人以为按钮坏了。同一副面孔也用在「换一批」抓文章的那一段。 */
 .feed-desk-btn.is-busy { opacity: .6; cursor: progress; }
+/* 抓取途中这颗按钮是真的 disabled：原生按钮不会触发 click，可 :hover 照样命中、
+   配色照样变，看着像还能点。指针直接按住。 */
+.feed-desk-btn:disabled { pointer-events: none; }
 
 /* 桌上摊了几张卡。满屏斜块没有个数目，看着像渲染坏了。 */
 .feed-desk-count {
