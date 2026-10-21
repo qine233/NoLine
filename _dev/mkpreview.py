@@ -450,16 +450,25 @@ def next_feed_flip():
     return flip
 
 
+def feed_cid():
+    """这张卡在夹具里的 cid。序号从 40 起跟着 FEED_INDEX 走，跟着**构造**那一刻递增，
+    而不是渲染某一页时现场排——同一张动态卡会在 index 和 page2 里各出现一次，
+    两次必须拿到同一个编号，因为现实中它就是同一篇文章。桌面模式按编号存坐标，
+    编号一变整桌位置就全对错人。"""
+    return 40 + FEED_INDEX[0]
+
+
 def post_card(title, excerpt, views, comments, preview=(), cover=False, reading=0):
     block = comment_preview(preview, indent=20)
     cover_cls = ' has-cover' if cover else ''
+    cid = feed_cid()
     flip_cls = ' flip' if next_feed_flip() else ''
     cover_html = ('                    <a class="post-cover" href="./post.html" tabindex="-1" aria-hidden="true">\n'
                   '                        <img src="__COVER__" alt="" loading="lazy">\n'
                   '                    </a>\n') if cover else ''
     reading_html = ('                                <span class="meta-item">{{icon:book-open}}约 %d 分钟</span>\n'
                     % reading) if reading > 0 else ''
-    return """                <article class="card post-card__COVER_CLS____FLIP_CLS__">
+    return """                <article class="card post-card__COVER_CLS____FLIP_CLS__" data-cid="__CID__">
 __COVER_BLOCK__                    <div class="post-card-body">
                     <div class="post-header">
                         <img src="__AVATAR__" alt="" class="avatar" width="40" height="40" loading="lazy">
@@ -487,6 +496,7 @@ __READING_BLOCK__                            </div>
                 </article>
 """.replace('__COVER_CLS__', cover_cls).replace('__FLIP_CLS__', flip_cls) \
    .replace('__COVER_BLOCK__', cover_html).replace('__READING_BLOCK__', reading_html) \
+   .replace('__CID__', str(cid)) \
    .replace('__TITLE__', title).replace('__EXCERPT__', excerpt) \
    .replace('__VIEWS__', str(views)).replace('__COMMENTS__', str(comments)) \
    .replace('__PREVIEW__', '\n\n' + block if block else '')
@@ -500,8 +510,9 @@ def status_card(content, ago, absolute, views, comments, preview=()):
     动态卡也要占一个信息流序号：模板里的 $feedIndex 对文章卡和动态卡一起递增，
     漏掉它会让动态卡后面那张文章卡的左右朝向和真实渲染不一致。"""
     block = comment_preview(preview, indent=28)
+    cid = feed_cid()
     next_feed_flip()
-    return """                <article class="card status-card">
+    return """                <article class="card status-card" data-cid="__CID__">
                     <div class="status-main">
                         <img src="__AVATAR__" alt="" class="status-avatar" width="42" height="42" loading="lazy">
 
@@ -524,7 +535,8 @@ def status_card(content, ago, absolute, views, comments, preview=()):
                         </div>
                     </div>
                 </article>
-""".replace('__CONTENT__', content).replace('__AGO__', ago).replace('__ABS__', absolute) \
+""".replace('__CID__', str(cid)) \
+   .replace('__CONTENT__', content).replace('__AGO__', ago).replace('__ABS__', absolute) \
    .replace('__VIEWS__', str(views)).replace('__COMMENTS__', str(comments)) \
    .replace('__PREVIEW__', '\n\n' + block if block else '')
 
@@ -597,6 +609,23 @@ def feed_cats(active='index'):
             '        </div>' % (home_on, home_cur, '\n'.join(rows)))
 
 
+# 桌面模式的入口胶囊，照抄 public/feed-desk.php 的输出形状。
+# 三颗按钮里只有「桌面」可见，摇晃和收回两颗初始 hidden 由 desk.js 掀开；
+# 编号（feed-desk-*）和 desk.js / main.js 里 getElementById 的那四个必须逐字对上。
+FEED_DESK = """            <div class="feed-desk-bar" id="feed-desk-bar">
+                <button type="button" class="feed-desk-btn" id="feed-desk-toggle" aria-pressed="false">
+                    {{icon:cube}}<span>桌面</span>
+                </button>
+                <button type="button" class="feed-desk-btn" id="feed-desk-shake" hidden>
+                    {{icon:shuffle}}<span>摇晃</span>
+                </button>
+                <button type="button" class="feed-desk-btn" id="feed-desk-exit" hidden>
+                    {{icon:xmark}}<span>收回</span>
+                </button>
+                <span class="feed-desk-count" id="feed-desk-count" hidden></span>
+            </div>"""
+
+
 INDEX_BODY = """
 <div class="site-hero has-cover">
     <div class="site-hero-cover" style="background-image:url('__COVER__')" aria-hidden="true"></div>
@@ -620,6 +649,7 @@ INDEX_BODY = """
                 </div>
             </div>
 __CATS__
+__DESK__
 __CARDS__
 __NAV__
 __FEED__
@@ -643,6 +673,7 @@ LIST_PAGE_BODY = """
                 <p class="archive-count">{{icon:file-lines}}共 6 篇文章</p>
             </div>
 __CATS__
+__DESK__
 __CARDS__
 __NAV__
 __FEED__
@@ -1935,6 +1966,7 @@ def main():
     def list_body(shell, cards_html, page, total, active):
         return (shell
                 .replace('__CATS__', feed_cats(active))
+                .replace('__DESK__', FEED_DESK)
                 .replace('__CARDS__', cards_html.rstrip('\n'))
                 .replace('__NAV__', page_nav(page, total))
                 .replace('__FEED__', FEED_STATUS)

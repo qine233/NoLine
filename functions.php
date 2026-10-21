@@ -4,7 +4,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
 /**
  * 主题版本号。同时用作静态资源的缓存指纹（?v=），改版本即可强制刷新客户端缓存。
  */
-define('NOLINE_VERSION', '1.29.7');
+define('NOLINE_VERSION', '1.30.0');
 
 /* ==========================================================================
    后台设置
@@ -960,7 +960,7 @@ function noline_categories($row = null)
  * 可用名称见 public/icons.php：
  *   导航  house box-archive file-lines comments link circle-info folder
  *   界面  bars magnifying-glass sun moon clock eye comment tag scale heart
- *         calendar history bullhorn chart-line
+ *         calendar history bullhorn chart-line cube shuffle xmark
  *   品牌  github bilibili
  *   自绘  sprout compass paper-plane arrow-up scale heart
  */

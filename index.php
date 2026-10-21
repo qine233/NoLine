@@ -4,7 +4,7 @@
  *
  * @package Noline
  * @author QINE
- * @version 1.29.7
+ * @version 1.30.0
  * @link https://www.idkzr.com/
  */
 
@@ -72,6 +72,8 @@ $heroCover  = trim((string)$this->options->logobgcolor);
                    （var/Widget/Archive.php 的 ____currentPage() 与 parameter）。 */ ?>
             <?php $feedIndex = ((int)$this->currentPage - 1) * (int)$this->parameter->pageSize; ?>
             <?php $this->need('public/feed-cats.php'); ?>
+            <?php /* 桌面模式入口。放在这里而不是药丸条里：那条一个分类都没有时整块不输出。 */ ?>
+            <?php $this->need('public/feed-desk.php'); ?>
 
             <?php if ($this->have()): ?>
                 <?php $thumbs = noline_thumbs(); ?>
@@ -89,7 +91,10 @@ $heroCover  = trim((string)$this->options->logobgcolor);
 
                     <?php $thumb = isset($thumbs[(int)$this->cid]) ? $thumbs[(int)$this->cid] : ''; ?>
                     <?php $wordCount = noline_word_count($this->text); ?>
-                <article class="card post-card<?php if ($thumb !== ''): ?> has-cover<?php endif; ?><?php echo $flip; ?>">
+                <?php /* data-cid 是给桌面模式用的：卡片散开之后靠序号记位置，
+                       一发新文章全线位移，记下来的坐标就全对错人了。 */ ?>
+                <article class="card post-card<?php if ($thumb !== ''): ?> has-cover<?php endif; ?><?php echo $flip; ?>"
+                         data-cid="<?php $this->cid(); ?>">
                     <?php if ($thumb !== ''): ?>
                     <a class="post-cover" href="<?php $this->permalink(); ?>" tabindex="-1" aria-hidden="true">
                         <img src="<?php echo htmlspecialchars($thumb, ENT_QUOTES, 'UTF-8'); ?>" alt="" loading="lazy">

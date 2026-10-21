@@ -996,9 +996,7 @@
                 if (start === null) {
                     start = ts;
                 }
-                /* 除法两侧不能留空格：jscheck.py 会把空格后的 / 误认成正则字面量，
-                   一路吞到换行，把右括号也吃掉，静态检查就报括号不平衡。 */
-                var t = Math.min((ts-start)/duration, 1);
+                var t = Math.min((ts - start) / duration, 1);
                 var eased = 1 - Math.pow(1 - t, 3);
                 el.textContent = String(Math.round(target * eased)) + suffix;
                 if (t < 1) {
@@ -1480,6 +1478,101 @@
         }
 
         measure();
+    }
+
+    /* ==========================================================================
+       桌面模式入口
+       --------------------------------------------------------------------------
+       matter.js 压缩后还有 80KB，不能出现在首屏：这颗按钮点下去才开始拉
+       js/vendor/matter.min.js 和 js/desk.js，两个串成一条链，拉完当场进桌面。
+
+       这颗按钮的点击只归这里管，desk.js 负责它自己那两颗（摇晃 / 收回）——
+       同一颗按钮挂两个监听会一次点击切两回。
+       ========================================================================== */
+
+    /* 和 LABEL_FEED_FAIL 同一套理由：静态资源里够不着 PHP 的 _e() */
+    var LABEL_DESK_FAIL = '加载失败';
+
+    function initDesk() {
+        var toggle = document.getElementById('feed-desk-toggle');
+        var loading = null;
+
+        if (!toggle) {
+            return;
+        }
+
+        /* 资源地址从 main.js 自己那条 script 标签上推：主题装在哪个目录都不用配，
+           ?v= 版本号原样带着，改了 desk.js 不至于让用户继续吃旧缓存。 */
+        function assetUrl(name) {
+            var scripts = document.getElementsByTagName('script');
+
+            for (var i = 0; i < scripts.length; i++) {
+                var m = (scripts[i].getAttribute('src') || '').match(/^(.*\/js\/)main\.js(\?.*)?$/);
+
+                if (m) {
+                    return m[1] + name + (m[2] || '');
+                }
+            }
+
+            return null;
+        }
+
+        function load(url) {
+            return new Promise(function (resolve, reject) {
+                var el = document.createElement('script');
+
+                el.src = url;
+                el.onload = function () {
+                    resolve();
+                };
+                el.onerror = function () {
+                    reject(new Error('desk asset failed'));
+                };
+                document.head.appendChild(el);
+            });
+        }
+
+        function ensure() {
+            var matter = assetUrl('vendor/matter.min.js');
+            var desk = assetUrl('desk.js');
+
+            if (!matter || !desk) {
+                return Promise.reject(new Error('no theme path'));
+            }
+
+            return load(matter).then(function () {
+                return load(desk);
+            });
+        }
+
+        toggle.addEventListener('click', function () {
+            var label = toggle.querySelector('span');
+
+            if (window.NolineDesk) {
+                window.NolineDesk.toggle();
+                return;
+            }
+
+            if (label && label.textContent === LABEL_DESK_FAIL) {
+                label.textContent = '桌面';
+            }
+
+            if (!loading) {
+                toggle.classList.add('is-busy');
+                loading = ensure().then(function () {
+                    toggle.classList.remove('is-busy');
+                    /* 这一次点击本身就算「进来」，不再假装用户又点了一下 */
+                    window.NolineDesk.toggle();
+                }, function () {
+                    loading = null;         /* 失败要能再点一次重拉，别把 reject 悬在那儿 */
+                    toggle.classList.remove('is-busy');
+
+                    if (label) {
+                        label.textContent = LABEL_DESK_FAIL;
+                    }
+                });
+            }
+        });
     }
 
     /* ==========================================================================
@@ -2006,5 +2099,6 @@
         initStatCount();
         initToc();
         initFeedCats();
+        initDesk();
     });
 })();

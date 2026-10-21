@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-js/main.js 的静态验证。
+js/main.js 与 js/desk.js 的静态验证。
 
 本机没有 node，也没有可用的浏览器（file:// 和本地 HTTP 服务都被安全策略挡了），
-所以 main.js 一行都跑不起来。这里退而求其次，做三件能被静态证明的事：
+所以这两份脚本一行都跑不起来。这里退而求其次，做三件能被静态证明的事：
 
 1. 词法平衡——括号 / 圆括号 / 方括号在剥掉字符串和注释之后必须配平
 2. 引用完整——每个被调用的函数名都必须有定义，或者在浏览器全局白名单里
-3. 钩子对得上——这是最关键的一组。main.js 里所有 getElementById / querySelector
+3. 钩子对得上——这是最关键的一组。两份脚本里所有 getElementById / querySelector
    用到的 #id 和 .class，必须真的存在于模板里（或是 JS 自己创建的）。
    重构最容易出的事故就是改了 HTML 忘了改 JS，或者反过来，而这类错误
    不会报错，只会让功能静默失效。
@@ -19,7 +19,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-MAIN_JS = ROOT / 'js' / 'main.js'
+# 两份脚本过同一套检查。main.js 是首屏那份；desk.js 是桌面模式按需加载的那份，
+# 它靠 main.js 注入，模板里没有任何 <script> 直接引它，所以钩子检查一样管用，
+# 但「localStorage 键要在 header.php 的防闪烁脚本里读一遍」那条对它不适用（见下）。
+JS_FILES = [('main.js', ROOT / 'js' / 'main.js'), ('desk.js', ROOT / 'js' / 'desk.js')]
 STYLESHEETS = [ROOT / 'css' / 'design.css', ROOT / 'css' / 'article.css']
 
 errors = []
@@ -43,8 +46,14 @@ def tokenize_js(src):
     tokens = []
     i = 0
     n = len(src)
-    # 正则字面量只可能出现在这些 token 之后，否则 / 是除号
-    value_ctx = re.compile(r'(?:^|[=(,:\[!&|?{};+]|\breturn\b|\btypeof\b)\s*$', re.S)
+    # 斜杠是除号还是正则字面量的开头，看的不是「上一个 token」而是「上一段代码」：
+    # 只盯最后一个 token 会被空格骗过去（' / ' 里最后一个是空格），于是把除号连着一
+    # 整段代码当正则吞掉，括号平衡跟着误报。这里自己攒两个状态——
+    # 上一个非空白代码字符，以及紧贴着的标识符尾巴（判断 return / typeof 用）。
+    regex_after = set('(=,:[!&|?{};+')
+    regex_after_kw = {'return', 'typeof', 'in', 'of', 'new', 'delete', 'case', 'else', 'do'}
+    prev_ch = ''
+    prev_word = ''
 
     while i < n:
         c = src[i]
@@ -79,7 +88,7 @@ def tokenize_js(src):
             i = j
             continue
 
-        if c == '/' and value_ctx.search(''.join(t[1] for t in tokens[-1:]) if tokens else ''):
+        if c == '/' and (prev_ch == '' or prev_ch in regex_after or prev_word in regex_after_kw):
             j = i + 1
             in_class = False
             while j < n:
@@ -101,6 +110,9 @@ def tokenize_js(src):
             continue
 
         tokens.append(('code', c))
+        if not c.isspace():
+            prev_ch = c
+            prev_word = prev_word + c if re.match(r'[\w$]', c) else ''
         i += 1
 
     return tokens
@@ -139,6 +151,9 @@ BROWSER_GLOBALS = {
     'encodeURIComponent', 'decodeURIComponent', 'getComputedStyle',
     # 自动加载要用到的三个：解析相对地址 / 抓下一页 / 把响应当文档解析
     'URL', 'fetch', 'DOMParser',
+    # 桌面模式：自动加载把下一页的卡塞进 .feed 之后，desk.js 得给它们补刚体，
+    # 靠的就是这个观察者。matter.js 那边只认 window.Matter，不裸调它的构造函数。
+    'MutationObserver',
 }
 
 
@@ -243,11 +258,14 @@ def markup_corpus():
         # 拼进 $bodyClass 再整体 echo，nav-fixed 由 main.js 按滚动位置挂撤。
         # 三者都不会以 class="…" 字面量出现在模板源码里。
         'has-hero', 'hero-cover', 'nav-fixed',
+        # 桌面模式：is-busy 是 main.js 拉 matter.js 期间挂在那颗按钮上的，
+        # is-dragging 是 desk.js 按住卡片时挂的，is-desk 挂在 <html> 上。
+        'is-busy', 'is-dragging', 'is-desk',
     }
     return text, js_created
 
 
-def check_hooks(src):
+def check_hooks(name, src, enforce_store):
     markup, js_created = markup_corpus()
 
     id_pat = re.compile(r"""getElementById\(\s*'([\w-]+)'\s*\)""")
@@ -260,7 +278,7 @@ def check_hooks(src):
 
     for element_id in sorted(ids):
         if 'id="%s"' % element_id not in markup:
-            fail('钩子', 'main.js 找 #%s，但没有任何模板输出这个 id' % element_id)
+            fail('钩子', '%s 找 #%s，但没有任何模板输出这个 id' % (name, element_id))
 
     classes = set()
     for m in sel_pat.finditer(src):
@@ -277,7 +295,7 @@ def check_hooks(src):
             continue
         if cls in CONDITIONAL_CLASSES:
             continue
-        fail('钩子', 'main.js 选 .%s，但没有任何模板输出这个 class' % cls)
+        fail('钩子', '%s 选 .%s，但没有任何模板输出这个 class' % (name, cls))
 
     # classList 操作的字符串
     cl_pat = re.compile(r"""classList\.(?:add|remove|toggle|contains)\(\s*'([\w-]+)'""")
@@ -291,23 +309,26 @@ def check_hooks(src):
         # 所以再认一遍这些片段里的类名——和 classcheck.py 的 PHP_EMITTED 是同一件事。
         if cls in CONDITIONAL_CLASSES:
             continue
-        fail('钩子', "main.js 操作 class '%s'，但模板里没有它，样式表也未必有" % cls)
+        fail('钩子', "%s 操作 class '%s'，但模板里没有它，样式表也未必有" % (name, cls))
 
     # localStorage 的键必须在 header.php 的防闪烁脚本里也读一遍，否则首帧会闪。
     # sessionStorage 的 noline-nav 不算——那是 main.js 在两个页面之间自己传的接力棒。
     # main.js 统一走 readStore/writeStore/dropStore(store, key)，所以只认这一个形状。
-    constants = dict(re.findall(r"""var\s+(\w+)\s*=\s*'([\w-]+)'\s*;""", src))
-    local_keys = {constants.get(k, k)
-                  for k in re.findall(r'window\.localStorage\s*,\s*(\w+)', src)}
+    # desk.js 不参与这条：它的 noline-desk 记的是卡片坐标，首帧根本没有桌面，
+    # 防闪烁脚本无从替它恢复，硬要求它进 header.php 只会多一段永远用不上的内联 JS。
+    if enforce_store:
+        constants = dict(re.findall(r"""var\s+(\w+)\s*=\s*'([\w-]+)'\s*;""", src))
+        local_keys = {constants.get(k, k)
+                      for k in re.findall(r'window\.localStorage\s*,\s*(\w+)', src)}
 
-    inline = (ROOT / 'public' / 'header.php').read_text(encoding='utf-8')
-    for key in sorted(local_keys):
-        if key not in inline:
-            fail('钩子', "main.js 用 localStorage 键 '%s'，但 header.php 的防闪烁脚本没读它" % key)
-    if not local_keys:
-        fail('钩子', '没能从 main.js 里解析出任何 localStorage 键，检查逻辑本身失效了')
+        inline = (ROOT / 'public' / 'header.php').read_text(encoding='utf-8')
+        for key in sorted(local_keys):
+            if key not in inline:
+                fail('钩子', "%s 用 localStorage 键 '%s'，但 header.php 的防闪烁脚本没读它" % (name, key))
+        if not local_keys:
+            fail('钩子', '没能从 %s 里解析出任何 localStorage 键，检查逻辑本身失效了' % name)
 
-    print('钩子: main.js 引用 %d 个 id、%d 个 class' % (len(ids), len(classes)))
+    print('钩子: %s 引用 %d 个 id、%d 个 class' % (name, len(ids), len(classes)))
 
 
 # ---------------------------------------------------------------- CSS 结构
@@ -355,16 +376,15 @@ def max_depth(body):
 # ---------------------------------------------------------------- main
 
 def main():
-    if not MAIN_JS.is_file():
-        print('找不到 js/main.js')
-        return 1
-
-    src = MAIN_JS.read_text(encoding='utf-8')
-    print('验证 js/main.js（%d 行）\n' % (src.count('\n') + 1))
-
-    check_balance('main.js', src)
-    check_references('main.js', src)
-    check_hooks(src)
+    for name, path in JS_FILES:
+        if not path.is_file():
+            print('找不到 js/%s' % name)
+            return 1
+        src = path.read_text(encoding='utf-8')
+        print('验证 js/%s（%d 行）' % (name, src.count('\n') + 1))
+        check_balance(name, src)
+        check_references(name, src)
+        check_hooks(name, src, name == 'main.js')
     print()
     for path in STYLESHEETS:
         check_css(path)
@@ -375,7 +395,7 @@ def main():
             print('  ' + err)
         return 1
 
-    print('\nOK: main.js 括号平衡、无未定义引用、钩子与模板一一对应；CSS 花括号平衡')
+    print('\nOK: 两份脚本括号平衡、无未定义引用、钩子与模板一一对应；CSS 花括号平衡')
     return 0
 
 

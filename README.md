@@ -1,6 +1,6 @@
 # Noline
 
-> 一个克制、无描边的 Typecho 主题，配一个可选的 REST 接口插件。当前版本 **1.29.7**。
+> 一个克制、无描边的 Typecho 主题，配一个可选的 REST 接口插件。当前版本 **1.30.0**。
 
 Noline 主张「无描边卡片」与「设计令牌驱动」：层次靠留白、圆角和一套统一的颜色令牌划分，
 不靠重描边和强阴影。所有颜色集中在 `:root`，浅色深色各一套，强调色在后台填一个十六进制就够，
@@ -29,6 +29,18 @@ Noline 主张「无描边卡片」与「设计令牌驱动」：层次靠留白�
 | | |
 |---|---|
 | ![首页浅色](docs/screenshots/index-light.png) | ![首页深色](docs/screenshots/index-dark.png) |
+
+桌面模式（首页底栏那颗「桌面」按下去，信息流里的卡片就变成有碰撞体积的方块：
+能拖着走、会互相压、落到底板上会歪着倒；「摇晃」把整桌掀起来，松手它们自己重新堆好；
+关掉桌面模式位置还留在原地，下次进来接着是那堆）。浅色 / 深色 / 刚摇晃完：
+
+| | | |
+|---|---|---|
+| ![桌面模式](docs/screenshots/desk-light.png) | ![桌面模式深色](docs/screenshots/desk-dark.png) | ![摇晃之后](docs/screenshots/desk-shake.png) |
+
+移动端（390px，卡片收小到 42vw，字号照旧不降）：
+
+<img src="docs/screenshots/desk-mobile.png" alt="移动端桌面模式" width="320">
 
 文章页：
 
@@ -82,6 +94,10 @@ Noline 主张「无描边卡片」与「设计令牌驱动」：层次靠留白�
   （支持方向键漫游）。
 - 命中「动态分类」的文章渲染成微博式动态卡：不显示标题、正文原地铺开、超过 6 行折叠出「全文」。
 - 下一页预取：滚动接近底部时提前取好下一页，翻页不留白屏。
+- **桌面模式**（默认关闭）：卡片变成有碰撞体积的方块，能拖动、会互相压、摇晃后自己堆好。
+  物理用 vendored 的 matter-js，只在按下开关时才懒加载那一份脚本；位置按文章 cid 存进
+  `localStorage`，关掉再开还是那一堆。窄屏只留拖动和摇晃、卡片收小，字号不动。
+  文章不足 4 篇时整块入口不渲染。
 
 ### 文章页
 - hero 头图 + 正文排版（二级标题下划线、引用块、表格、脚注、图片圆角、嵌套列表）。
@@ -271,10 +287,10 @@ DELETE /api/bills/records?id=     按 id 删一条
 
 | 脚本 | 拦的是什么 |
 |---|---|
-| `phpcheck.py` | 插件五个文件的括号配对、文件头守卫、`self::` 指向的方法是否存在、私有方法漏调用、**跨类读 `private` 成员/常量**（PHP 里是 fatal 不是警告）、**字符串里套同种引号**（引号数量照样是偶数、括号照样配平，只有走词法才看得见）、`_t()` 占位符缺参、**主题字段表与 `functions.php` 的 14 项是否漂移** |
+| `phpcheck.py` | 插件六个文件的括号配对、文件头守卫、`self::` 指向的方法是否存在、私有方法漏调用、**跨类读 `private` 成员/常量**（PHP 里是 fatal 不是警告）、**字符串里套同种引号**（引号数量照样是偶数、括号照样配平，只有走词法才看得见）、`_t()` 占位符缺参、**主题字段表与 `functions.php` 的 14 项是否漂移** |
 | `structure.py` | 模板 PHP/HTML 平衡、文档外壳、页面骨架、图标引用、死函数、重复声明 |
 | `classcheck.py` | 模板在用的 class 有没有样式、样式表里有没有解释不了的死规则（双向） |
-| `jscheck.py` | `main.js` 括号平衡、未定义引用、JS 钩子与模板 id/class 一一对应、CSS 花括号 |
+| `jscheck.py` | `main.js` 与 `desk.js` 括号平衡、未定义引用、JS 钩子与模板 id/class 一一对应、CSS 花括号 |
 | `iconcheck.py` | 图标 path 存在性与 viewBox 越界 |
 | `pathcheck.py` | 模板里写死的资源路径是否有效 |
 | `tokens.py` / `remify.py` | 令牌是否成对、字号是否 rem 化 |
@@ -298,10 +314,10 @@ DELETE /api/bills/records?id=     按 id 删一条
 
 ```bash
 python3 _dev/build.py            # 本地先过一遍门槛
-git tag -a 1.29.7 -m "1.29.7" && git push origin 1.29.7
+git tag -a 1.30.0 -m "1.30.0" && git push origin 1.29.7
 ```
 
-tag 名用 `1.29.7` 或 `v1.29.7`（工作流只认这两种形状），且必须等于 `NOLINE_VERSION`。
+tag 名用 `1.30.0` 或 `v1.30.0`（工作流只认这两种形状），且必须等于 `NOLINE_VERSION`。
 后台「主题管理 → 主题与插件更新」读的是 `releases/latest` 那个附件，所以**没有 `noline.zip` 的 Release
 等于没发布**：页面会报「这个 Release 没有 noline.zip 附件」。
 也可以不推 tag，直接在 Actions 页手动运行工作流、手填 tag。

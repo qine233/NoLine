@@ -36,6 +36,10 @@ RUNTIME = {
     # 顶栏的两档状态：has-hero / hero-cover 由 header.php 拼进 $bodyClass 再整体 echo，
     # nav-fixed 由 main.js 在滚动时挂撤。三者都是 design.css 里 --nav-* 开关的扳机。
     'has-hero', 'hero-cover', 'nav-fixed',
+    # 桌面模式三颗扳机：is-desk 挂在 <html> 上（整段桌面样式的开关，由 desk.js 挂撤），
+    # is-dragging 挂在被按住的那张卡上，is-busy 挂在入口按钮上（matter.js 还在下载）。
+    # 三者都以 JS 常量或字面量出现，模板 class 属性里没有。
+    'is-desk', 'is-dragging', 'is-busy',
 }
 
 # Typecho 核心（评论列表、分页）和 Markdown 解析器（脚注）自己渲染出来的类，

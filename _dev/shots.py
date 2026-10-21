@@ -32,23 +32,60 @@ CHROME = Path(os.environ.get(
 # 宁可 assert 失败，也不要悄悄发一张「说是深色其实是浅色」的图。
 THEME_HOOK = "theme = localStorage.getItem('noline-theme');"
 
-# (夹具, 输出名, CSS 像素宽, 高, 倍率, 主题, 触屏, 走 iframe)
+# (夹具, 输出名, CSS 像素宽, 高, 倍率, 主题, 触屏, 走 iframe, 桌面模式)
 # 触屏那一栏是 (hover: none) 的开关：它是**设备**属性，不跟视口宽度走，
 # 所以「手机上的分类条」必须同时给窄视口和触屏两样，缺一样就拍成桌面布局。
+#
+# 最后一栏只有首页那几张用得上：'' 什么都不点，'open' 点一下「桌面」，
+# 'shake' 点开之后再去点「摇晃」。桌面态不是渲染出来的状态，是**跑**出来的——
+# 卡片得先落位、撞开、堆好，截图才有意义，所以这几张的虚拟时间预算单独放宽
+# （见 DESK_BUDGET）。
 SHOTS = [
-    ('index.html', 'index-light.png', 1440, 1040, 1, 'light', False, False),
-    ('index.html', 'index-dark.png', 1440, 1040, 1, 'dark', False, False),
-    ('post.html', 'post-light.png', 1440, 1040, 1, 'light', False, False),
-    ('health.html', 'health.png', 1440, 900, 1, 'light', False, False),
-    ('bills.html', 'bills.png', 1440, 1180, 1, 'light', False, False),
-    ('showcase.html', 'showcase.png', 1440, 1240, 1, 'light', False, False),
-    ('showcase.html', 'showcase-dark.png', 1440, 1240, 1, 'dark', False, False),
-    ('showcase.html', 'showcase-mobile.png', 390, 844, 2, 'light', True, True),
-    ('index.html', 'index-mobile.png', 390, 844, 2, 'light', True, True),
+    ('index.html', 'index-light.png', 1440, 1040, 1, 'light', False, False, ''),
+    ('index.html', 'index-dark.png', 1440, 1040, 1, 'dark', False, False, ''),
+    ('post.html', 'post-light.png', 1440, 1040, 1, 'light', False, False, ''),
+    ('health.html', 'health.png', 1440, 900, 1, 'light', False, False, ''),
+    ('bills.html', 'bills.png', 1440, 1180, 1, 'light', False, False, ''),
+    ('showcase.html', 'showcase.png', 1440, 1240, 1, 'light', False, False, ''),
+    ('showcase.html', 'showcase-dark.png', 1440, 1240, 1, 'dark', False, False, ''),
+    ('showcase.html', 'showcase-mobile.png', 390, 844, 2, 'light', True, True, ''),
+    ('index.html', 'index-mobile.png', 390, 844, 2, 'light', True, True, ''),
+    ('index.html', 'desk-light.png', 1440, 1040, 1, 'light', False, False, 'open'),
+    ('index.html', 'desk-dark.png', 1440, 1040, 1, 'dark', False, False, 'open'),
+    ('index.html', 'desk-shake.png', 1440, 1040, 1, 'light', False, False, 'shake'),
+    ('index.html', 'desk-mobile.png', 390, 844, 2, 'light', True, True, 'open'),
 ]
 
 # headless=new 在这台机器上截完不自己退出，等够时间就整组收掉
 WAIT = 75
+
+# 桌面那几张要给物理循环留时间：落位 + 撞开 + 堆好，6000ms 只够卡片散完，
+# 「摇晃」那条还得再等一轮往中间拉的力（desk.js 的 PILE_MS 是 1900）。
+BUDGET = 6000
+DESK_BUDGET = 14000
+
+# 注入到夹具末尾的那几下点击。桌面入口是 main.js 懒加载 matter.js 之后才有的，
+# 所以第一下要等脚本到位；「摇晃」那一下等卡片落稳了再点，不然图里是一片糊。
+DESK_CLICK = """<script>
+setTimeout(function () {
+    /* 首屏整块搬掉。headless 的 --screenshot 会把 fixed 层画在滚动偏移上：页面只要
+       滚过一屏，顶栏和那颗入口胶囊就悬在画面正中间。桌面自己占满一屏，砍掉首屏之后
+       scrollY 停在 0，两个浮层才回到该在的位置——真实浏览器里没这毛病，是截图管线的。 */
+    var hero = document.querySelector('.site-hero');
+    if (hero) { hero.parentNode.removeChild(hero); }
+
+    var t = document.getElementById('feed-desk-toggle');
+    if (t) { t.click(); }
+}, 500);
+%s
+setTimeout(function () { window.scrollTo(0, 0); }, 12500);
+</script>"""
+
+DESK_SHAKE = """setTimeout(function () {
+    var s = document.getElementById('feed-desk-shake');
+    if (s) { s.click(); }
+}, 5200);
+"""
 
 # Chrome 的窗口有最小宽度，--window-size=390 会被抬到 500（量出来 innerWidth=500），
 # 拍出来的就是一张被裁掉的桌面图。窄屏只能把夹具塞进一个 390 宽的 iframe 里拍：
@@ -56,8 +93,8 @@ WAIT = 75
 MIN_WINDOW = 500
 
 
-def build_page(fixture: Path, theme: str, dest: Path):
-    """把夹具搬进临时目录：相对路径改成绝对，主题写死。"""
+def build_page(fixture: Path, theme: str, dest: Path, desk: str = ''):
+    """把夹具搬进临时目录：相对路径改成绝对，主题写死，需要时补上那一下点击。"""
     html = fixture.read_text(encoding='utf-8')
 
     if theme != 'light':
@@ -67,6 +104,12 @@ def build_page(fixture: Path, theme: str, dest: Path):
 
     # 夹具里只引用 ../css 和 ../js（图片全是内联 data URI），搬到别处就得指回主题目录
     html = html.replace('"../', '"file://%s/' % THEME)
+
+    if desk:
+        if '</body>' not in html:
+            sys.exit('FAIL: %s 没有 </body>，注入不了那一下点击' % fixture.name)
+        html = html.replace('</body>', DESK_CLICK % (DESK_SHAKE if desk == 'shake' else ''), 1)
+
     dest.write_text(html, encoding='utf-8')
 
 
@@ -81,7 +124,7 @@ def build_host(page: Path, width: int, height: int, dest: Path):
         encoding='utf-8')
 
 
-def shoot(src: Path, png: Path, width, height, scale, touch, crop):
+def shoot(src: Path, png: Path, width, height, scale, touch, crop, budget):
     args = [
         str(CHROME),
         '--headless=new',
@@ -93,7 +136,7 @@ def shoot(src: Path, png: Path, width, height, scale, touch, crop):
         '--user-data-dir=%s' % tempfile.mkdtemp(prefix='noline-shot-'),
         '--window-size=%d,%d' % (width, height),
         '--force-device-scale-factor=%d' % scale,
-        '--virtual-time-budget=6000',
+        '--virtual-time-budget=%d' % budget,
     ]
 
     if touch:
@@ -147,13 +190,15 @@ def main():
     done = []
 
     try:
-        for fixture, name, w, h, scale, theme, touch, frame in SHOTS:
+        for fixture, name, w, h, scale, theme, touch, frame, desk in SHOTS:
             if only and only not in name:
                 continue
 
-            page = tmp / ('%s-%s.html' % (Path(fixture).stem, theme))
+            # 文件名带上桌面态：注入过点击的那份 index-light.html 和没注入的那份
+            # 是两个不同的页面，共用一个路径就是后一张图覆盖前一张的输入
+            page = tmp / ('%s-%s%s.html' % (Path(fixture).stem, theme, '-' + desk if desk else ''))
             png = OUT / name
-            build_page(PREVIEW / fixture, theme, page)
+            build_page(PREVIEW / fixture, theme, page, desk)
 
             if frame:
                 # 名字里不能带 .png：那是张 HTML，Chrome 按后缀决定怎么解，
@@ -169,7 +214,8 @@ def main():
                 window = (w, h)
                 crop = None
 
-            shoot(src, png, window[0], window[1], scale, touch, crop)
+            shoot(src, png, window[0], window[1], scale, touch, crop,
+                  DESK_BUDGET if desk else BUDGET)
             done.append((name, w * scale, h * scale, png.stat().st_size))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

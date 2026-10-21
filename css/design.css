@@ -1384,6 +1384,182 @@ body.hero-cover:not(.nav-fixed) .search-kbd {
 }
 
 /* ==========================================================================
+   桌面模式（public/feed-desk.php + js/desk.js + js/vendor/matter.min.js）
+   --------------------------------------------------------------------------
+   点「桌面」之后信息流里的卡片交给 matter.js 当刚体：能拖、能撞、掉到容器底
+   堆成一堆。整套规则全部挂在 html.is-desk 底下，收回之后一条都不剩，
+   默认阅读路径完全不经过这套。
+   ========================================================================== */
+
+/* 入口胶囊。常驻的只有「桌面」这一颗，摇晃和收回两颗要等桌面铺开才掀开。
+   fixed 浮在正文之上，是浮层，所以这里用磨砂玻璃。 */
+.feed-desk-bar {
+    position: fixed;
+    left: 50%;
+    bottom: 1.25rem;
+    transform: translateX(-50%);
+    z-index: var(--z-float);
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+    padding: .375rem .5rem;
+    border: var(--style-border);
+    border-radius: var(--radius-pill);
+    background-color: var(--glass-bg);
+    -webkit-backdrop-filter: saturate(180%) blur(var(--glass-blur));
+    backdrop-filter: saturate(180%) blur(var(--glass-blur));
+    box-shadow: var(--shadow-glass), var(--glass-inset);
+}
+
+/* 按钮配方照 .feed-cat-more 抄：这套观感里「能点的东西」得长一个样。 */
+.feed-desk-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    min-height: 34px;
+    padding: .375rem .875rem;
+    border: var(--style-border);
+    border-radius: var(--radius-pill);
+    background-color: var(--card-bg);
+    box-shadow: var(--shadow-border);
+    font-family: inherit;
+    font-size: .8125rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text-strong);
+    cursor: pointer;
+    transition: var(--t);
+}
+/* 自己声明了 display 就会把 UA 那条 [hidden]{display:none} 压掉，
+   每个被 JS 揭开/盖上的组件都得补这一笔（同 .feed-cat-more）。 */
+.feed-desk-btn[hidden],
+.feed-desk-count[hidden] { display: none; }
+.feed-desk-btn:hover {
+    background-color: var(--surface-soft);
+    border-color: var(--accent-ring);
+    color: var(--accent);
+}
+.feed-desk-btn .noline-icon { font-size: .875rem; color: var(--accent); }
+/* 桌面正开着的时候填成品牌色，和 .feed-cat.active 同一副面孔。 */
+.feed-desk-btn[aria-pressed="true"] {
+    background-color: var(--brand);
+    border-color: var(--brand);
+    color: var(--on-brand);
+    box-shadow: var(--shadow-main);
+}
+.feed-desk-btn[aria-pressed="true"] .noline-icon { color: var(--on-brand); }
+/* 脚本还没拉下来（matter.js 80KB，慢网络上要转一会儿）时给个正在忙的样子，
+   否则连点两下的人以为按钮坏了。 */
+.feed-desk-btn.is-busy { opacity: .6; cursor: progress; }
+
+/* 桌上摊了几张卡。满屏斜块没有个数目，看着像渲染坏了。 */
+.feed-desk-count {
+    padding: 0 .5rem;
+    font-size: .75rem;
+    font-weight: 500;
+    color: var(--text-light);
+    white-space: nowrap;
+}
+
+/* --- 桌面本体 --- */
+
+/* 高度用 dvh、vh 兜底：iOS Safari 的 100vh 把地址栏那一条也算进去了，
+   按 vh 给的话最底下堆着的那排卡片会永久藏在屏幕外。
+   --desk-card-w 是本地旋钮，不是设计令牌：只有桌面态用得到。 */
+html.is-desk .main-content.feed {
+    --desk-card-w: 15rem;
+    position: relative;
+    height: calc(100vh - var(--topbar-h) - 5.5rem);
+    height: calc(100dvh - var(--topbar-h) - 5.5rem);
+    min-height: 26rem;
+    padding: 0;
+    overflow: hidden;
+    /* 描边用 inset 阴影而不是 border：桌面里全是每帧改 transform 的子元素，
+       实测 1px border 在软件光栅化下约 2/3 次会画成一圈 3px 近黑边（_dev/shots.py 拍出来
+       整块桌面被黑框套住），换成 inset 阴影后 3/3 干净，视觉上同样是 1px 描边。 */
+    border-radius: var(--radius-lg);
+    box-shadow: inset 0 0 0 1px var(--card-border);
+    background-color: var(--surface-sunken);
+    /* 一层淡格纹：卡片散开之后得有个「落在哪儿」的参照，纯底色像一整块空白 */
+    background-image: radial-gradient(var(--border-soft) 1px, transparent 1px);
+    background-size: 1.25rem 1.25rem;
+}
+
+@media (max-width: 639px) {
+    html.is-desk .main-content.feed { --desk-card-w: min(13rem, 42vw); }
+}
+
+/* 桌面只收卡片。公告、药丸条、页码、状态区一概不进刚体世界——它们既没有可拖的
+   意义，留在桌上只会压在卡片底下。
+   那颗入口胶囊本身也是 .feed 的直系孩子，它是唯一的退出通道，不能跟着一起收掉。 */
+html.is-desk .main-content.feed > :not(.post-card):not(.status-card):not(.feed-desk-bar) { display: none; }
+
+/* left/top 一律归零，位置全部由 desk.js 写进 transform 的 translate3d：
+   逐帧改 left/top 会触发整页重排，卡片会抖，鼠标也会跟丢。
+   transition 只留 box-shadow——transform 归物理循环，这里再插一手就成拔河了。 */
+html.is-desk .main-content.feed > .post-card,
+html.is-desk .main-content.feed > .status-card {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: var(--desk-card-w);
+    max-width: none;
+    margin: 0;
+    /* 拖的时候页面不能跟着滚，否则一根手指拖着卡片、整页在底下跑 */
+    touch-action: none;
+    cursor: grab;
+    /* 故意不写 will-change: transform：卡片每帧都在改 transform，合成器自己会提升图层，
+       提前声明只是把「几十张卡 = 几十个常驻图层」写死。更糟的是它会连带桌面的圆角裁剪
+       在软件光栅化下画出一圈 3px 黑边（_dev/shots.py 拍出来的桌面图原本整个框是黑的），
+       去掉之后描边恢复正常，帧率没差别。 */
+    transition: box-shadow .3s ease;
+}
+html.is-desk .main-content.feed > .is-dragging {
+    cursor: grabbing;
+    z-index: 2;
+    box-shadow: var(--shadow-lift);
+}
+
+/* 1200–1299 那条区间把带封面的卡排成左右分栏，桌面上卡片只有 15rem 宽，
+   40% 的封面会缩成一条九十来个像素的窄缝。一律退回封面上置。 */
+html.is-desk .main-content.feed .post-card.has-cover { display: block; }
+html.is-desk .main-content.feed .post-card.has-cover .post-cover {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+}
+
+/* 桌面上的卡片是「一块纸片」，不是阅读版面：摘要收两行、底部统计和最近评论退场，
+   不然一张竖卡能把桌面占满，其余全压在它底下。字号一个字都没动——
+   缩的是这张纸，不是可读性。 */
+html.is-desk .post-card-body { padding: .875rem 1rem 1rem; }
+html.is-desk .post-excerpt {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+}
+html.is-desk .post-footer,
+html.is-desk .card-comments { display: none; }
+/* 动态卡不做「全文」那一套：折叠按钮要量正文自然高度才知道该不该出现，桌面上卡片
+   本来就被裁过，量出来的数没有意义。直接限高，点开详情去。
+   两条钳位规则都得压住——main.js 一挂上 .is-clamped，那条的选择器比这条更狠，
+   高度会换成「6 行」那一档；它自带的那层渐变也一起收掉，桌面上用的是 mask。 */
+html.is-desk .status-actions { display: none; }
+html.is-desk .status-toggle { display: none; }
+html.is-desk .status-fold .status-content,
+html.is-desk .status-fold.is-clamped:not(.is-open) .status-content {
+    max-height: 8rem;
+    overflow: hidden;
+    /* 渐隐用 currentColor 而不是写死的黑：遮罩只认 alpha，令牌检查也不允许
+       组件里出现字面颜色。 */
+    -webkit-mask-image: linear-gradient(to bottom, currentColor 76%, transparent);
+    mask-image: linear-gradient(to bottom, currentColor 76%, transparent);
+}
+html.is-desk .status-fold.is-clamped:not(.is-open) .status-content::after { display: none; }
+
+/* ==========================================================================
    文章标题 / 摘要 / 标签
    ========================================================================== */
 

@@ -17,7 +17,7 @@
  * hidden —— 脚本没跑起来（404、被扩展拦下）时正文就是全量铺开，不会把内容藏掉。
  */
 ?>
-<article class="card status-card">
+<article class="card status-card" data-cid="<?php $this->cid(); ?>">
     <div class="status-main">
         <img src="<?php echo noline_author_avatar($this); ?>" alt="" class="status-avatar" width="42" height="42" loading="lazy">
 

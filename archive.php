@@ -22,6 +22,8 @@
             <?php /* 和 index.php 同一张药丸条、同一套左右朝向计数，理由见那边注释。 */ ?>
             <?php $feedIndex = ((int)$this->currentPage - 1) * (int)$this->parameter->pageSize; ?>
             <?php $this->need('public/feed-cats.php'); ?>
+            <?php /* 和 index.php 同一颗桌面入口，理由见那边的注释。 */ ?>
+            <?php $this->need('public/feed-desk.php'); ?>
 
             <?php if ($this->have()): ?>
                 <?php $thumbs = noline_thumbs(); ?>
@@ -37,7 +39,8 @@
 
                     <?php $thumb = isset($thumbs[(int)$this->cid]) ? $thumbs[(int)$this->cid] : ''; ?>
                     <?php $wordCount = noline_word_count($this->text); ?>
-                <article class="card post-card<?php if ($thumb !== ''): ?> has-cover<?php endif; ?><?php echo $flip; ?>">
+                <article class="card post-card<?php if ($thumb !== ''): ?> has-cover<?php endif; ?><?php echo $flip; ?>"
+                         data-cid="<?php $this->cid(); ?>">
                     <?php if ($thumb !== ''): ?>
                     <a class="post-cover" href="<?php $this->permalink(); ?>" tabindex="-1" aria-hidden="true">
                         <img src="<?php echo htmlspecialchars($thumb, ENT_QUOTES, 'UTF-8'); ?>" alt="" loading="lazy">
