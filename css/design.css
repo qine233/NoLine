@@ -43,6 +43,12 @@
     --ink-fill-2: .05;      /* 软表面：标签底、按钮底、hover */
     --ink-fill-3: .08;      /* 代码底、输入底、头像占位 */
 
+    /* 顶部进度条扫过去的那两端。起点跟着强调色走（换肤即换色），
+       终点固定成品红——和站标那支渐变同一个收尾色。深色下终点要提亮一档，
+       否则品红压在深底上几乎看不见，整条只剩蓝。 */
+    --accent-2: #cf0db9;
+    --progress-grad: linear-gradient(215deg, var(--accent) 0%, var(--accent-2) 100%);
+
     /* 强调色：优先取后台配置，缺省回落到靛蓝 #425AEF。
        -rgb 是给 rgba() 用的三元组，避免依赖 color-mix() 的浏览器兼容性。 */
     --accent:       var(--accent-user, #425aef);
@@ -230,6 +236,8 @@
     --z-scrim: 800;
     --z-topbar: 1000;
     --z-progress: 2000;
+    /* 全屏遮罩盖过一切，包括进度条本身（两者同时开时，细条不该压在遮罩上闪） */
+    --z-splash: 2100;
     /* 浮动按钮压在遮罩之下（抽屉打开时跟着内容一起暗掉），灯箱则盖过顶栏 */
     --z-float: 700;
     --z-modal: 1500;
@@ -264,6 +272,9 @@
     --ink-fill-1: .02;
     --ink-fill-2: .05;
     --ink-fill-3: .08;
+
+    /* 品红在深底上要提亮一档才透得出来，否则渐变后半段是黑的 */
+    --accent-2: #ec5bd0;
 
     --accent:       var(--accent-user-dark, #8a9bff);
     --accent-rgb:   var(--accent-user-dark-rgb, 138, 155, 255);
@@ -4684,21 +4695,101 @@ html.is-leaving .container,
 html.is-leaving .site-hero,
 html.is-leaving .post-hero { opacity: 0; transform: translateY(-8px); transition-duration: .18s; }
 
-/* 顶部进度条。用 scaleX 而不是 width，走合成层不触发重排。 */
+/* 顶部进度条。用 scaleX 而不是 width，走合成层不触发重排。
+   底色是品牌那支 215° 渐变，上面叠一层 45° 斜纹并以 background-position 推进——
+   细条在动，才读得出「还在加载」，静止的一条只是个装饰。 */
 #noline-progress {
     position: fixed;
     top: 0; left: 0; right: 0;
-    height: 2px;
+    height: 3px;
     z-index: var(--z-progress);
     background-color: var(--accent);
-    box-shadow: 0 0 8px var(--accent);
+    background-image:
+        linear-gradient(45deg,
+            rgba(var(--paper-rgb), .28) 25%, transparent 25%,
+            transparent 50%, rgba(var(--paper-rgb), .28) 50%,
+            rgba(var(--paper-rgb), .28) 75%, transparent 75%, transparent),
+        var(--progress-grad);
+    background-size: 12px 100%, 100% 100%;
+    background-repeat: repeat, no-repeat;
+    box-shadow: 0 0 10px rgba(var(--accent-rgb), .55);
     transform: scaleX(0);
     transform-origin: 0 50%;
     opacity: 0;
     pointer-events: none;
     transition: transform .2s ease, opacity .3s ease;
 }
-#noline-progress.is-active { opacity: 1; }
+#noline-progress.is-active {
+    opacity: 1;
+    animation: noline-progress-flow .7s linear infinite;
+}
+/* 斜纹的水平周期 = 12px / cos45° 取整到一格，位移一格即无缝循环。 */
+@keyframes noline-progress-flow {
+    from { background-position: 0 0, 0 0; }
+    to   { background-position: 12px 0, 0 0; }
+}
+
+/* 全屏遮罩。身后没有任何内容要穿过，所以是实底卡片色而不是玻璃（浮层才配磨砂）。
+   默认不可见、只由 main.js 挂 .is-active——脚本没跑起来时它绝不能自己冒出来盖住整页。 */
+#noline-splash {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-splash);
+    display: grid;
+    place-items: center;
+    background-color: var(--card-bg);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .26s ease, visibility 0s linear .26s;
+}
+#noline-splash.is-active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity .26s ease;
+}
+.noline-splash-inner {
+    display: grid;
+    justify-items: center;
+    gap: .9375rem;
+}
+.noline-splash-logo {
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 50%;
+    object-fit: cover;
+}
+/* 没配头像时是名字首字母：底色用细条那支同一渐变，两处呼应 */
+span.noline-splash-logo {
+    display: grid;
+    place-items: center;
+    background-image: var(--progress-grad);
+    color: var(--on-brand);
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1;
+}
+.noline-splash-text {
+    font-size: .8125rem;
+    letter-spacing: .06em;
+    color: var(--text-light);
+}
+/* 呼吸：头像一收一放，字跟着明暗。比纯转圈安静，也和这套扁平观感搭。 */
+@keyframes noline-splash-breathe {
+    0%, 100% { transform: scale(.94); opacity: .68; }
+    50%      { transform: scale(1); opacity: 1; }
+}
+@keyframes noline-splash-blink {
+    0%, 100% { opacity: .55; }
+    50%      { opacity: 1; }
+}
+#noline-splash.is-active .noline-splash-logo {
+    animation: noline-splash-breathe 1.5s ease-in-out infinite;
+}
+#noline-splash.is-active .noline-splash-text {
+    animation: noline-splash-blink 1.5s ease-in-out infinite;
+}
 
 /* ==========================================================================
    降低动效偏好
@@ -4720,6 +4811,11 @@ html.is-leaving .post-hero { opacity: 0; transform: translateY(-8px); transition
     html.is-leaving .container,
     html.is-loading .site-hero, html.is-loading .post-hero,
     html.is-leaving .site-hero, html.is-leaving .post-hero { opacity: 1; transform: none; }
+
+    /* 斜纹和头像呼吸都不该动。main.js 在 reduce 时压根不调 progressShow/splashShow，
+       这两条只是防住别的入口（比如 bfcache 恢复时残留的 .is-active）。 */
+    #noline-progress.is-active { animation: none; }
+    #noline-splash { display: none; }
 }
 
 /* ==========================================================================
@@ -4727,7 +4823,7 @@ html.is-leaving .post-hero { opacity: 0; transform: translateY(-8px); transition
    ========================================================================== */
 
 @media print {
-    .topbar, .nav-scrim, #noline-progress,
+    .topbar, .nav-scrim, #noline-progress, #noline-splash,
     .article-nav, .comment-form,
     .related, .random-card,
     .post-hero-card, .hero-lip { display: none !important; }

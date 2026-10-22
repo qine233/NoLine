@@ -112,6 +112,34 @@
     }
 
     /* ==========================================================================
+       全屏遮罩（后台把转场样式选成「只用遮罩」或「两者都要」时才有这个元素）
+       只在「点下去、旧页还挂着」的这段时间盖住整屏：新文档里它是天生隐藏的，
+       快页面不会闪一下头像，而 .is-active 全靠这里挂，main.js 没跑起来就永远不盖屏。
+       ========================================================================== */
+
+    var splash = document.getElementById('noline-splash');
+    var splashTimer = null;
+
+    function splashHide() {
+        if (!splash) {
+            return;
+        }
+        clearTimeout(splashTimer);
+        splash.classList.remove('is-active');
+    }
+
+    function splashShow() {
+        if (!splash || reduceMotion()) {
+            return;
+        }
+        /* 兜底：reveal() 没被调到（目标页返回了非 HTML、或浏览器直接换页）时，
+           遮罩不能把整站盖死。4 秒比任何一次正常加载都长。 */
+        clearTimeout(splashTimer);
+        splash.classList.add('is-active');
+        splashTimer = setTimeout(splashHide, 4000);
+    }
+
+    /* ==========================================================================
        页面转场：离开淡出 + 进场揭示
        ========================================================================== */
 
@@ -124,6 +152,7 @@
         }
         revealed = true;
         root.classList.remove('is-loading');
+        splashHide();
         progressDone();
     }
 
@@ -135,6 +164,7 @@
         leaving = true;
 
         progressShow(0);
+        splashShow();
         /* 连等两帧再推进。scaleX(0) 和 scaleX(.7) 若落在同一次样式计算里，
            浏览器看不到起始值，过渡会被直接跳过。 */
         requestAnimationFrame(function () {
@@ -176,6 +206,7 @@
             if (event.persisted) {
                 leaving = false;
                 root.classList.remove('is-leaving', 'is-loading');
+                splashHide();
                 progressDone();
             }
         });

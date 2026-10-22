@@ -139,6 +139,12 @@ __EXTRA_HEAD__
 <!-- 进度条和遮罩都必须是 .topbar 的兄弟：顶栏有 backdrop-filter，
      它会给固定定位的后代建包含块，塞进去就会跟着顶栏一起跑。 -->
 <div id="noline-progress" aria-hidden="true"></div>
+<div id="noline-splash" aria-hidden="true">
+    <span class="noline-splash-inner">
+        <img src="__AVATAR__" alt="" class="noline-splash-logo" width="72" height="72">
+        <span class="noline-splash-text">稍等，正在打开</span>
+    </span>
+</div>
 <div class="nav-scrim" id="nav-scrim"></div>
 
 <header class="topbar">

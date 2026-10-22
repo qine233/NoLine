@@ -355,9 +355,9 @@ SETTINGS = '''
 
     <h3 class="nl-h3">在线更新</h3>
     <div class="nl-ver">
-      <span><b>1.31.0</b><em>主题</em></span>
+      <span><b>1.32.0</b><em>主题</em></span>
       <span class="nl-ver-arrow">→</span>
-      <span><b>1.32.0</b><em>Release · 2 小时前</em></span>
+      <span><b>1.33.0</b><em>Release · 2 小时前</em></span>
       <span class="nl-inline"><button class="btn btn-s primary" type="button">立即更新</button></span>
     </div>
     <details class="nl-log"><summary>上一次换装的记录</summary><pre>备份 usr/themes/noline → …
@@ -549,7 +549,7 @@ def plugins_page(gen):
     on = ('<tr id="plugin-NolineApi">\n'
           '<td>Noline 对外接口</td>\n'
           '<td>把主题设置、健康数据和买菜流水以 JSON 接口暴露出去。</td>\n'
-          '<td class="kit-hidden-mb">1.9.1</td>\n'
+          '<td class="kit-hidden-mb">1.9.2</td>\n'
           '<td class="kit-hidden-mb"><a href="###">qine233</a></td>\n'
           '<td><a href="###">设置</a> &bull; <a href="###">禁用</a></td>\n</tr>\n')
     off = ('<tr id="plugin-HelloWorld">\n<td>Hello Word</td>\n<td>一个示例插件。</td>\n'

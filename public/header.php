@@ -26,6 +26,9 @@ $bilibiliName = trim((string)$this->options->BliBliname);
 /* 窄屏下显示名被 CSS 藏起来了，title 与 aria-label 是它仅剩的出口，所以两边都要有值 */
 $githubTitle   = $githubName !== '' ? $githubName : 'GitHub';
 $bilibiliTitle = $bilibiliName !== '' ? $bilibiliName : 'Bilibili';
+
+/* 转场样式（进度条 / 遮罩 / 两者）。后台没保存过时回退成 both，见 noline_transition_mode()。 */
+$transition = noline_transition_mode();
 /* 顶栏压在首屏上时要白字，压在页底色上时要墨色——这两件事由 body 上这两个类决定，
    design.css 里的 --nav-* 开关跟着换（见「顶栏」一节）。
  * has-hero：这一页有没有首屏。首页和文章页有，其它页面没有，
@@ -293,8 +296,24 @@ $vtReady = noline_header_sent('Cross-Origin-Opener-Policy');
 <body class="<?php echo $bodyClass; ?>">
 
 <?php /* 进度条和遮罩都必须是 .topbar 的兄弟：顶栏有 backdrop-filter，
-         它会给固定定位的后代建包含块，塞进去就会跟着顶栏一起跑。 */ ?>
+         它会给固定定位的后代建包含块，塞进去就会跟着顶栏一起跑。
+         两个元素都默认不可见，只有 main.js 挂上 .is-active 才出现——
+         脚本 404 或被扩展拦下时页面绝不能被遮罩永久盖住，所以宁可不出、不要常开。 */ ?>
+<?php if ($transition !== 'splash'): ?>
 <div id="noline-progress" aria-hidden="true"></div>
+<?php endif; ?>
+<?php if ($transition !== 'bar'): ?>
+<div id="noline-splash" aria-hidden="true">
+    <span class="noline-splash-inner">
+        <?php if ($avatar !== null): ?>
+        <img src="<?php echo $avatar; ?>" alt="" class="noline-splash-logo" width="72" height="72">
+        <?php else: ?>
+        <span class="noline-splash-logo"><?php echo noline_initial($name); ?></span>
+        <?php endif; ?>
+        <span class="noline-splash-text"><?php _e('稍等，正在打开'); ?></span>
+    </span>
+</div>
+<?php endif; ?>
 <div class="nav-scrim" id="nav-scrim"></div>
 
 <header class="topbar">

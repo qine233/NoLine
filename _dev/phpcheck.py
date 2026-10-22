@@ -404,7 +404,7 @@ def check_theme_fields():
     if len(keys) != len(set(keys)):
         fail('主题 themeConfig() 里有重复的字段名：%s' % keys)
 
-    want_element = {'html': 'Textarea', 'bool': 'Checkbox'}
+    want_element = {'html': 'Textarea', 'bool': 'Checkbox', 'select': 'Select'}
 
     for element, key in elements:
         if key not in specs:

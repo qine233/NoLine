@@ -37,6 +37,7 @@ class Theme
      *   csv    逗号分隔的 slug:icon 列表
      *   html   原样存的富文本（公告、备案号），只限长度不做清洗——见下面 write() 的说明
      *   bool   开关，存 '1' 或不存在
+     *   select 固定选项，值必须在 values 里；空串按 default 回填（后台的下拉永远会带一个值）
      */
     private const FIELDS = [
         'logoCss' => [
@@ -92,6 +93,19 @@ class Theme
             'kind'  => 'bool',
             'max'   => 0,
             'hint'  => '开启后在右栏显示「分类」卡。默认关闭——分类已经在信息流顶上那条吸顶药丸条里出现过一次。',
+        ],
+        'transitionMode' => [
+            'label'   => '页面转场样式',
+            'kind'    => 'select',
+            'max'     => 6,
+            'values'  => array('both', 'bar', 'splash'),
+            'labels'  => array(
+                'both'   => '两者都要',
+                'bar'    => '只用顶部进度条',
+                'splash' => '只用全屏遮罩',
+            ),
+            'default' => 'both',
+            'hint'    => '站内跳转的反馈用哪一种：both 顶部进度条与全屏遮罩都出，bar 只出顶部那条会流动的品牌渐变细条，splash 只出盖屏的卡片底色遮罩（中间是站点头像，没配头像时用名字首字母）。',
         ],
         'gtihubname' => [
             'label' => 'GitHub 显示名',
@@ -282,6 +296,18 @@ class Theme
 
                 return _t('颜色要写成 #abc 或 #aabbcc');
 
+            case 'select':
+                if ($value === '') {
+                    return $spec['default'];
+                }
+
+                if (in_array($value, $spec['values'], true)) {
+                    return $value;
+                }
+
+                return _t('只能是 %s 中的一个（留空按 %s 处理）',
+                    implode(' / ', $spec['values']), $spec['default']);
+
             case 'csv':
                 if ($value === '') {
                     return '';
@@ -381,6 +407,17 @@ class Theme
                 $html .= '<label class="nl-switch"><input type="checkbox" id="' . $id . '" name="t['
                     . $key . ']" value="1"' . ($value === '1' ? ' checked' : '') . '> '
                     . _t('开启') . '</label>';
+            } elseif ($spec['kind'] === 'select') {
+                $html .= '<select id="' . $id . '" name="t[' . $key . ']">';
+
+                foreach ($spec['values'] as $option) {
+                    $html .= '<option value="' . htmlspecialchars($option, ENT_QUOTES, 'UTF-8') . '"'
+                        . ($value === $option ? ' selected' : '') . '>'
+                        . htmlspecialchars($spec['labels'][$option], ENT_QUOTES, 'UTF-8')
+                        . '</option>';
+                }
+
+                $html .= '</select>';
             } elseif ($spec['kind'] === 'html') {
                 $html .= '<textarea id="' . $id . '" name="t[' . $key . ']" rows="4" maxlength="'
                     . $spec['max'] . '" spellcheck="false">'

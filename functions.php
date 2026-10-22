@@ -4,7 +4,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
 /**
  * 主题版本号。同时用作静态资源的缓存指纹（?v=），改版本即可强制刷新客户端缓存。
  */
-define('NOLINE_VERSION', '1.32.0');
+define('NOLINE_VERSION', '1.33.0');
 
 /* ==========================================================================
    后台设置
@@ -67,6 +67,21 @@ function themeConfig($form)
         _t('默认关闭。分类导航已经在信息流顶上那条吸顶药丸条里出现了一次，右栏再来一张是重复；'
            . '需要一张能一眼看全分类和各自篇数的卡时再勾上。'));
     $form->addInput($showSidebarCats);
+
+    /* 站内跳转的两种「软」反馈：顶部细条和全屏遮罩。默认两个都开——
+       细条在快的时候只是点缀，遮罩在慢的时候才真正顶用，用户自己按口味关一个。 */
+    $transitionMode = new Typecho_Widget_Helper_Form_Element_Select('transitionMode',
+        array(
+            'both'   => _t('两者都要（推荐）'),
+            'bar'    => _t('只用顶部进度条'),
+            'splash' => _t('只用全屏遮罩'),
+        ),
+        'both',
+        _t('页面转场样式'),
+        _t('点击站内链接到下一页画出来之间的反馈用哪一种。「顶部进度条」是页沿那条会流动的品牌渐变细条；'
+           . '「全屏遮罩」是整屏盖成卡片底色、中间站点头像轻轻呼吸，头像没配时用名字首字母。'
+           . '系统开了「减弱动态效果」时两者都自动退化成原生跳转，这里的选择不会被无视。'));
+    $form->addInput($transitionMode);
 
     $gtihubname = new Typecho_Widget_Helper_Form_Element_Text('gtihubname', NULL, _t('GitHub'),
         _t('GitHub 显示名'),
@@ -659,6 +674,24 @@ function noline_accent_style()
         . '--accent-user-dark-rgb:' . implode(', ', $dark) . ';'
         . '--accent-user-dark-hover:' . vsprintf('#%02x%02x%02x', $darkHover)
         . '}</style>' . "\n";
+}
+
+/* ==========================================================================
+   页面转场
+   ========================================================================== */
+
+/**
+ * 后台选的转场样式：'both' / 'bar' / 'splash'。
+ *
+ * 主题选项是整块序列化存的，这个字段在用户第一次进后台保存之前压根不存在，
+ * 直接读会撞上 __get()，所以 isset() 探一下、认不出的值一律回退成 both。
+ */
+function noline_transition_mode()
+{
+    $options = Typecho_Widget::widget('Widget_Options');
+    $mode = isset($options->transitionMode) ? trim((string)$options->transitionMode) : '';
+
+    return in_array($mode, array('bar', 'splash', 'both'), true) ? $mode : 'both';
 }
 
 /* ==========================================================================

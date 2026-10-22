@@ -5,7 +5,7 @@
 > 服务器端源码在 `plugins/NolineApi/`（Typecho 插件：`Plugin.php` 路由与端点、`Theme.php` 主题配置项、
 > `Bills.php` 买菜记账、`Cloudreve.php` 图床代理、`Admin.php` 后台管理页、`Updater.php` 主题与插件更新），
 > 有冲突以源码为准。
-> 接口版本：plugin 1.7.0，本文档对应 2026-10-18 的实现（端点形态自 1.4.0 起没有变化）。
+> 接口版本：plugin 1.9.2，本文档对应 2026-10-22 的实现（端点形态自 1.4.0 起没有变化）。
 >
 > **本文档现在覆盖两块数据**：
 > - **体重**（§4.1–4.7）——一天一条，按天覆盖。
@@ -17,6 +17,9 @@
 >    同时新增 `PUT /api/theme`（§4.3，**高危**，务必先读那一节的安全说明）。
 > 2. `1.4.0`：新增记账的 5 个端点（§4.8–4.12）。**对既有端点零影响**——体重、主题、ping 的
 >    请求和响应一个字节都没动。看不到 `bills` 路由（回 404）就说明服务器还在 1.4.0 之前。
+> 3. `1.9.2`：`theme` 多了一个键 `transitionMode`（`both` / `bar` / `splash`，见 §4.3）。
+>    同样是**只增不改**：既有键的形态与含义一个都没动。老服务器不认这个键，
+>    PUT 它会被整批拒绝（`errors.transitionMode` = 不是本主题的配置项），要先探测服务器版本。
 
 ---
 
@@ -32,7 +35,7 @@
 5. 离线可用：本地暂存，联网后补交（两边重放安全性不一样，见 §7.3 与 §7.8）。
 6. 记账：记一笔（品名 + 金额 + 哪天，可选分类 / 哪儿买的 / 备注），改一笔，删一笔。
 7. 记账看板：本周 / 本月 / 累计花了多少、跟上一期比涨跌、近 7 个月柱状、本月钱花在哪类。
-8. （可选）跟着博客改门面：读 / 写主题的 14 项配置（头像、强调色、公告等），见 §4.2 与 §4.3。
+8. （可选）跟着博客改门面：读 / 写主题的 15 项配置（头像、强调色、公告等），见 §4.2 与 §4.3。
    **默认可以完全不做**——这块能力风险高（拿到密钥就能改整站），只有用户明确要在 App 里改设置时才做。
 
 **不做**：多用户、账号体系、运动/饮食/睡眠数据、收支预算、多币种。体重只有体重；
@@ -200,6 +203,7 @@ https://site/?noline_api=health      # 服务器抢了 /api，或连 index.php �
       "navIcons": "",
       "notice": "",
       "showSidebarCats": true,
+      "transitionMode": "both",
       "gtihubname": "zhouzhou",
       "gtihubsite": "https://github.com/…",
       "BliBliname": "",
@@ -217,7 +221,7 @@ https://site/?noline_api=health      # 服务器抢了 /api，或连 index.php �
 }
 ```
 
-- `data.theme` 就是主题后台「设置外观」里的**全部 14 项**，一项不落。键名是博客历史遗留的拼写
+- `data.theme` 就是主题后台「设置外观」里的**全部 15 项**，一项不落。键名是博客历史遗留的拼写
   （`gtihubname`、`BliBliname` 都是错的，`logoCss` 其实指头像、`logobg` 其实是座右铭、
   `logobgcolor` 其实是首页头图），**不要改名、不要猜语义**，改了就读不回已存的值。
 - 除 `showSidebarCats` 外全部是**字符串**，没配的是 `""`（不是 null）。
@@ -232,7 +236,7 @@ https://site/?noline_api=health      # 服务器抢了 /api，或连 index.php �
 
 ### 4.3 PUT /api/theme —— 写主题设置（**高危，先读安全那一栏**）
 
-把后台「设置外观」里的 14 项全部开放给接口。服务器后台有独立开关
+把后台「设置外观」里的 15 项全部开放给接口。服务器后台有独立开关
 `接口写主题设置`（默认开着）；关掉时本端点回 `403`，`GET /api/theme` 不受影响。
 
 > 🔴 **这条能力的后果要说清楚**：
@@ -300,6 +304,7 @@ https://site/?noline_api=health      # 服务器抢了 /api，或连 index.php �
 | `navIcons` | `string`（`slug:图标` 逗号分隔） | 500 字 | 导航图标 | 格式 slug:图标名，逗号分隔，例如 yanzhi:code,photos:image。 |
 | `notice` | `string`（**HTML 原样存，不清洗**） | 4000 字 | 首页公告 | 显示在首页内容区顶部的公告卡，留空则整张卡不出现。 |
 | `showSidebarCats` | `true` / `false` | — | 右栏分类卡 | 开启后在右栏显示「分类」卡。 |
+| `transitionMode` | `string`，只能是 `both` / `bar` / `splash` | 6 | 页面转场样式 | 站内跳转的反馈：`bar` 是顶部那条会流动的渐变细条，`splash` 是盖屏的卡片底色遮罩（中间站点头像），`both` 两者都出。传空串服务器按 `both` 回填。 |
 | `gtihubname` | `string` | 100 字 | GitHub 显示名 | 写在顶栏 GitHub 按钮上，配了之后按钮会从方块长成药丸。 |
 | `gtihubsite` | `string`（URL 或 `/` 开头） | 500 字 | GitHub 链接 | 你的 GitHub 主页。 |
 | `BliBliname` | `string` | 100 字 | Bilibili 显示名 | 写在顶栏 Bilibili 按钮上，规则同 GitHub 显示名。 |
@@ -888,7 +893,7 @@ https://site/?noline_api=health      # 服务器抢了 /api，或连 index.php �
 **5000 条**（一天三四条能用四五年），超出时都**丢最旧的**。所以极老的记录可能凭空消失——
 App 不要把「最早一条」当不可变边界，也不要把本地缓存当成准。
 
-后台还有一个「主题管理」页（顶栏右上角的链接 → `?noline_api=settings`）：14 项主题设置、
+后台还有一个「主题管理」页（顶栏右上角的链接 → `?noline_api=settings`）：15 项主题设置、
 接口状态、GitHub 一键更新都在那儿。**它走管理员登录态 + 会话令牌，和接口密钥是两套鉴权**——
 App 拿不到也不需要拿那个页面。
 `noline.zip` 里有两个根（`noline/` 主题 + `plugins/NolineApi/` 插件），更新时成对交换、成对回滚；
@@ -1165,7 +1170,7 @@ curl -s -X POST -H "X-Noline-Key: ***" -H 'Content-Type: application/json' \
 **主题设置（做 §4.3 才需要，只读展示则跳过本组）**
 - [ ] 编辑器里每个字段的类型对齐 §4.3 的字段表：3 个开关用 switch、2 个富文本用多行、
       `accentColor` 用取色器 + 十六进制输入双入口、`navIcons` 给「逗号分隔的 slug:图标」提示
-- [ ] 只把改动过的字段放进 PUT body，不要整包 14 项原样回传
+- [ ] 只把改动过的字段放进 PUT body，不要整包 15 项原样回传
 - [ ] `data.saved` 成功后用响应体里的新值刷新本地，不重新 GET
 - [ ] 400 时把 `data.errors` 逐字段回显到对应输入框下面，其余字段保留用户已输入的内容
 - [ ] `notice` / `logoFooter` 的输入框明示「这里可以写 HTML」，且**不要**在预览里执行它

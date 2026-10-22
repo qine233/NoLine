@@ -277,6 +277,7 @@ def check_skeleton(path, text):
 
 HOOKS = {
     'id="noline-progress"': 'id',
+    'id="noline-splash"': 'id',
     'id="topnav"': 'id',
     'id="nav-scrim"': 'id',
     'id="nav-toggle"': 'id',
