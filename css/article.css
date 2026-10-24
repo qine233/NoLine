@@ -135,33 +135,40 @@
 
 .post-content li {
     position: relative;
-    display: flex;
-    /* 自绘标记用的是 flex，那么嵌套列表也必须能换行：不换行的话它是父项的
-       第二个 flex 子项，会和父项的文字并排站在一行里。 */
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: .5em;
+    /* 标记绝对定位，正文留在正常的行内流里。
+       别改回 flex：flex 会把一个 li 里的 <strong>、每段文字都拆成独立 flex 项，
+       项与项之间被 gap 撑开、还会在任意一项后面换行，「遮罩**只在旧页挂着**，新页…」
+       这种加粗引导的句子会被切成三截。 */
+    padding-left: .95em;      /* 圆点 .45em + 间隙 .5em */
     margin: .25rem 0;
 }
 
 .post-content ul > li::before {
     content: "";
-    flex: 0 0 .45em;
+    position: absolute;
+    left: 0;
+    /* 行高 1.7 → 首行中线约 .85em，圆点 .45em，所以从 .62em 处起画 */
+    top: .62em;
     width: .45em;
     height: .45em;
-    /* 行高 1.7 → 首行中线约 .85em，圆点 .45em，所以从 .62em 处起画 */
-    margin-top: .62em;
     border-radius: 50%;
     background-color: var(--accent);
     box-shadow: 0 0 0 .18em rgba(var(--accent-rgb), .24);
 }
 
+.post-content ol > li {
+    /* 序号药丸自己缩到 .8em，所以 1.45em 落到父字号上只有 1.16em */
+    padding-left: 1.66em;
+}
+
 .post-content ol > li::before {
     content: counter(noline-li);
     counter-increment: noline-li;
-    flex: 0 0 1.45em;
+    position: absolute;
+    left: 0;
+    top: .125em;
+    width: 1.45em;
     height: 1.45em;
-    margin-top: .125em;
     border-radius: 50%;
     background-color: var(--accent);
     color: var(--on-brand);
@@ -171,21 +178,12 @@
     text-align: center;
 }
 
-/* 嵌套列表自己换行并占满一行，缩进按**父列表**的标记宽度算：
-   圆点 .45em + 间隙 .5em，序号药丸 1.45em + .5em。对齐到父项文字的左边缘，
-   而不是压在标记底下。 */
+/* 嵌套列表本来就是块，直接落在父项的 padding-left 里，跟父项文字左边缘对齐 */
 .post-content li > ul,
 .post-content li > ol {
-    flex: 1 0 100%;
     margin: .25rem 0 0;
     padding-left: 0;
 }
-
-.post-content ul > li > ul,
-.post-content ul > li > ol { margin-left: .95em; }
-
-.post-content ol > li > ul,
-.post-content ol > li > ol { margin-left: 1.95em; }
 
 /* ---------- 引用 ---------- */
 
