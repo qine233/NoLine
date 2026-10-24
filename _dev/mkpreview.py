@@ -324,7 +324,46 @@ SIDEBAR = """        <aside class="sidebar">
             <div class="sidebar-sticky">
 
 __TOC__
+__RECENT__
+
                 <div class="card card-widget">
+                    <div class="card-header">{{icon:chart-line}}站点信息</div>
+                    <div class="site-stats">
+                        <span class="site-stat">文章<b data-count="42">42</b></span>
+                        <span class="site-stat">评论<b data-count="318">318</b></span>
+                        <span class="site-stat">分类<b data-count="5">5</b></span>
+                        <span class="site-stat">运行<b data-count="2190">2190 天</b></span>
+                    </div>
+                    <div class="site-footer-note">
+                        <p>&copy; 2026 Noline</p>
+                        <p>由 Typecho 驱动 · 主题 Noline</p>
+                        <p><a href="https://beian.miit.gov.cn/">京ICP备00000000号</a></p>
+                    </div>
+                </div>
+
+            </div>
+
+        </aside>
+"""
+
+
+# 目录卡：模板里被 $this->is('single') 挡着，所以只有 post/health 两份夹具有它，
+# index 与 page2/page3 替换成空串——列表页压根不该出现这张卡。
+# 里面只有模板那层空 <ol>：条目和标题 id 都是 main.js 现场搭的，夹具在浏览器里
+# 打开时会跑一遍真的 initToc。健康页正文只有一两个 h2，正好当「少于两个标题
+# 整张卡保持 hidden」那条分支的反例。
+TOC_CARD = """                <div class="card card-widget sidebar-toc" id="sidebar-toc" hidden>
+                    <div class="card-header">{{icon:bars}}目录</div>
+                    <nav class="toc-content" id="toc-content" aria-label="文章目录">
+                        <ol class="toc-list" id="toc-list"></ol>
+                    </nav>
+                </div>
+"""
+
+# 近期评论卡：模板里被 !$this->is('single') 挡着——单篇文章和各类独立页正文下面就是
+# 自己的评论区，右栏再来一份是重复。所以只有 index / page2 / page3 三份夹具有它，
+# post / health / bills / showcase 替换成空串。
+RECENT_CARD = """                <div class="card card-widget">
                     <div class="card-header">{{icon:comments}}近期评论</div>
                     <div class="rcomment-list">
                         <a class="rcomment-item" href="./post.html#comment-1">
@@ -358,39 +397,6 @@ __TOC__
                             </span>
                         </a>
                     </div>
-                </div>
-
-                <div class="card card-widget">
-                    <div class="card-header">{{icon:chart-line}}站点信息</div>
-                    <div class="site-stats">
-                        <span class="site-stat">文章<b data-count="42">42</b></span>
-                        <span class="site-stat">评论<b data-count="318">318</b></span>
-                        <span class="site-stat">分类<b data-count="5">5</b></span>
-                        <span class="site-stat">运行<b data-count="2190">2190 天</b></span>
-                    </div>
-                    <div class="site-footer-note">
-                        <p>&copy; 2026 Noline</p>
-                        <p>由 Typecho 驱动 · 主题 Noline</p>
-                        <p><a href="https://beian.miit.gov.cn/">京ICP备00000000号</a></p>
-                    </div>
-                </div>
-
-            </div>
-
-        </aside>
-"""
-
-
-# 目录卡：模板里被 $this->is('single') 挡着，所以只有 post/health 两份夹具有它，
-# index 与 page2/page3 替换成空串——列表页压根不该出现这张卡。
-# 里面只有模板那层空 <ol>：条目和标题 id 都是 main.js 现场搭的，夹具在浏览器里
-# 打开时会跑一遍真的 initToc。健康页正文只有一两个 h2，正好当「少于两个标题
-# 整张卡保持 hidden」那条分支的反例。
-TOC_CARD = """                <div class="card card-widget sidebar-toc" id="sidebar-toc" hidden>
-                    <div class="card-header">{{icon:bars}}目录</div>
-                    <nav class="toc-content" id="toc-content" aria-label="文章目录">
-                        <ol class="toc-list" id="toc-list"></ol>
-                    </nav>
                 </div>
 """
 
@@ -1977,7 +1983,8 @@ def main():
                 .replace('__NAV__', page_nav(page, total))
                 .replace('__FEED__', FEED_STATUS)
                 .replace('__SIDEBAR__', SIDEBAR.rstrip('\n'))
-                .replace('__TOC__', ''))
+                .replace('__TOC__', '')
+                .replace('__RECENT__', RECENT_CARD.rstrip('\n')))
 
     index = list_body(INDEX_BODY, cards, 1, 3, 'index')
     render('index.html', '首页', index, is_home=True)
@@ -2027,23 +2034,23 @@ def main():
     hl = ('    <link rel="stylesheet" href="../css/atom-one-dark.min.css?v=__VERSION__">\n'
           '    <script defer src="../js/highlight.min.js?v=__VERSION__"></script>')
     render('post.html', '文章',
-           POST_BODY.replace('__SIDEBAR__', SIDEBAR.rstrip('\n')).replace('__TOC__', TOC_CARD.rstrip('\n')), hl)
+           POST_BODY.replace('__SIDEBAR__', SIDEBAR.rstrip('\n')).replace('__TOC__', TOC_CARD.rstrip('\n')).replace('__RECENT__', ''), hl)
 
     # 健康页：SVG 折线是 PHP 拼出来的，夹具里按同一套算法重算一遍，
     # 这样在浏览器里看到的坐标、圆点、涨跌配色和线上一致
     render('health.html', '健康记录',
-           health_page().replace('__SIDEBAR__', SIDEBAR.rstrip('\n')).replace('__TOC__', TOC_CARD.rstrip('\n')))
+           health_page().replace('__SIDEBAR__', SIDEBAR.rstrip('\n')).replace('__TOC__', TOC_CARD.rstrip('\n')).replace('__RECENT__', ''))
 
     # 记账页：周/月合计、柱高、占比条全部按插件里那套算法重算，
     # 六月一根空柱是故意留的——那个月一条没记，图上不能凭空少一格
     render('bills.html', '买菜记账',
-           bills_page().replace('__SIDEBAR__', SIDEBAR.rstrip('\n')).replace('__TOC__', TOC_CARD.rstrip('\n')))
+           bills_page().replace('__SIDEBAR__', SIDEBAR.rstrip('\n')).replace('__TOC__', TOC_CARD.rstrip('\n')).replace('__RECENT__', ''))
 
     # 项目展示页：六张表的内容直接从 showcase.php 的 PHP 字面量里解出来，
     # 页面上任何一句文案改了，夹具会跟着改，不会各写一份。
     # 这一页没有目录卡（正文不是长文章，右栏不需要跟着跳锚点），__TOC__ 置空。
     render('showcase.html', '项目展示',
-           showcase_page().replace('__SIDEBAR__', SIDEBAR.rstrip('\n')).replace('__TOC__', ''))
+           showcase_page().replace('__SIDEBAR__', SIDEBAR.rstrip('\n')).replace('__TOC__', '').replace('__RECENT__', ''))
 
     print('\n提醒：夹具在 noline/_preview/ 下，验证完必须删掉，不能随主题发布。')
 
